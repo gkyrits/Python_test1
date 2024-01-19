@@ -1,6 +1,9 @@
 import tkinter as tk
 import tkinter.ttk as ttk
 
+def Butt1_event(id):
+    print("Button "+str(id))
+
 
 #MyLabel class
 class MyLabel(ttk.Label):
@@ -17,8 +20,8 @@ class App:
         self.root.title("Test App V0.1")
         tk.Label(self.root, text="Hello!").pack()
         ttk.Label(self.root, text="New Hello!").pack()
-        tk.Button(self.root, text="Button").pack()
-        ttk.Button(self.root, text="Button2").pack()
+        tk.Button(self.root, text="Button",command=lambda:Butt1_event(1)).pack()
+        ttk.Button(self.root, text="Button2",command=lambda:Butt1_event(2)).pack()
         MyLabel(self.root,text="..1..",font="Arial 12")
         MyLabel(self.root,font="Arial 15")
 
@@ -28,7 +31,7 @@ class App:
 
     def run(self):
         """ run method """
-        self.root.mainloop()
+        self.root.mainloop()    
 
 #main code ----
 app = App()
