@@ -3,7 +3,7 @@ import tkinter as tk
 wroot = tk.Tk()
 wroot.title("test3 v01")
 tk.Label(wroot, text="main window").pack(pady=1)
-wroot.geometry("600x200+300+350")
+wroot.geometry("600x150+300+350")
 
 #wch1 = tk.Toplevel(wroot)
 #tk.Label(wch1, text="child 1 window" ).pack(padx=5, pady=10) 
