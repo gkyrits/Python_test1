@@ -12,7 +12,7 @@ wroot.geometry("600x150+300+350")
 #wch2.transient(wroot) 
 #tk.Label(wch2, text="child 2 window" ).pack(padx=5, pady=10)
 
-wch3 = tk.Toplevel(wroot, borderwidth=1, bg="blue")
+wch3 = tk.Toplevel(wroot, borderwidth=1, bg="green")
 tk.Label(wch3, text="child 3 window" ).pack(padx=80, pady=50)
 tk.Button(wch3, text="Exit", width=20, command=wch3.destroy).pack(side=tk.LEFT, padx=10)
 wch3.overrideredirect(1)
