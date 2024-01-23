@@ -22,7 +22,7 @@ def test1(win,title=WIN_TITLE, id=1, fullscreen=0,geometry="320x240+0+0"):
         win.title(title)
         win.geometry(geometry)
         win.resizable(False, False)
-        win.attributes("-toolwindow",1)    
+        #win.attributes("-toolwindow",1) //not supported in 3.9   
     frm=tk.Frame(win, relief=tk.GROOVE, borderwidth=2)
     if(id==1):
         buildWin1(frm,win)                        
@@ -32,8 +32,9 @@ def test1(win,title=WIN_TITLE, id=1, fullscreen=0,geometry="320x240+0+0"):
 
 
 def but1_act():    
-    t1 = tk.Toplevel()
+    t1 = tk.Toplevel(bg="green")
     t1.attributes("-topmost",1)
+    t1.overrideredirect(1)
     test1(t1,"Child Window",id=2,geometry="220x140+50+50")
 
 def but2_act():
@@ -44,6 +45,7 @@ def but3_act():
 
 #---main---
 root = tk.Tk()
+root.config(bg="red")
 test1(root,fullscreen=1)
 #t1 = tk.Toplevel(root)
 #t1.attributes("-topmost",1)
