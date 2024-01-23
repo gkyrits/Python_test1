@@ -24,11 +24,10 @@ def test1(win,title=WIN_TITLE, id=1, fullscreen=0,geometry="320x240+0+0"):
         win.resizable(False, False)
         win.attributes("-toolwindow",1)    
     frm=tk.Frame(win, relief=tk.GROOVE, borderwidth=2)
-    match id:
-        case 1:
-            buildWin1(frm,win)                        
-        case _:
-            buildWin(frm,win)
+    if(id==1):
+        buildWin1(frm,win)                        
+    else:
+        buildWin(frm,win)
     frm.pack(padx=5, pady=5, fill=tk.BOTH, expand=tk.YES)
 
 
