@@ -1,7 +1,7 @@
 import tkinter as tk
 
 WIN_TITLE = 'Test 4 V0.1'
-LARG_SREEN = 1
+LARG_SREEN = 0
 
 #-----------------------------------------------------------------------------
 def buildWin1(frm,win):
@@ -30,7 +30,7 @@ def buildWin2(frm,win):
     cv=tk.Canvas(rightfrm, bg="wheat2")
     cv.pack(padx=5, pady=5, side=tk.TOP, fill=tk.BOTH)
     xy = (10, 10, 130, 130)
-    id=cv.create_arc(xy, start=0, extent=0, fill='sky blue')    
+    id=cv.create_arc(xy, start=90, extent=0, fill='sky blue')    
     scl.config(command=lambda x :scale_change(x,lbl,cv,id))
     rightfrm.pack(side=tk.LEFT, expand=tk.YES, fill=tk.BOTH)
 
