@@ -1,6 +1,7 @@
 import tkinter as tk
 
 WIN_TITLE = 'Test 4 V0.1'
+LARG_SREEN = 1
 
 def buildWin1(frm,win):
         bg_col="yellow"
@@ -33,6 +34,9 @@ def buildWin2(frm,win):
     tk.Button(rightfrm,text="Exit", command=win.destroy).pack(padx=5, pady=5, side=tk.BOTTOM, fill=tk.X)
     rightfrm.pack(side=tk.LEFT, expand=tk.YES, fill=tk.BOTH)
 
+def buildWin3(frm,win):
+    pass
+
 
 
 def test1(win,title=WIN_TITLE, id=0, fullscreen=0,geometry="320x240+0+0"):
@@ -48,6 +52,8 @@ def test1(win,title=WIN_TITLE, id=0, fullscreen=0,geometry="320x240+0+0"):
         buildWin1(frm,win)
     elif(id==2):
         buildWin2(frm,win)
+    elif(id==3):
+        buildWin3(frm,win)
     else:
         buildWin0(frm,win)    
     frm.pack(padx=5, pady=5, fill=tk.BOTH, expand=tk.YES)
@@ -58,19 +64,36 @@ def but1_act():
     t1.attributes("-topmost",1)
     t1.overrideredirect(1)
     test1(t1,"Child Window 1",id=1,geometry="220x140+50+50")
+    t1.wait_window()
+    print('win1 Exit!')
 
 def but2_act():
     t1 = tk.Toplevel(bg="blue")
     t1.attributes("-topmost",1)
     t1.overrideredirect(1)
-    test1(t1,"Child Window 2",id=2,geometry="220x200+50+50")    
+    test1(t1,"Child Window 2",id=2,geometry="220x200+50+20") 
+    t1.wait_window()
+    print('win2 Exit!')       
 
 def but3_act():
-    pass        
+    t1 = tk.Toplevel(bg="gold",relief=tk.GROOVE,borderwidth=2)
+    t1.attributes("-topmost",1)
+    t1.overrideredirect(1)
+    tk.Message(t1,text="Hello! asfa a fas fasd fa sdf asd fas df asdf as df asdf",relief=tk.GROOVE,width=100,bg="OliveDrab2").pack(padx=5,pady=5)
+    tk.Button(t1,text="exit",command=t1.destroy,height=1).pack(padx=5,pady=5,fill=tk.X)
+    t1.update()
+    geom_str=str(t1.winfo_width())+'x'+str(t1.winfo_height())+'+100+50'
+    t1.geometry(geom_str)
+    t1.wait_window()
+    print('win3 Exit!')
 
 #---main---
 root = tk.Tk()
 root.config(bg="red")
-test1(root,fullscreen=0)
+if(LARG_SREEN):
+    root.overrideredirect(1)
+    test1(root,fullscreen=0)
+else:
+    test1(root,fullscreen=1)
 tk.mainloop()
 print('End...')
