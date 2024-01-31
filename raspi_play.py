@@ -44,18 +44,24 @@ class Gui:
         datetmfrm = tk.Frame(pnlother, bg=datetm_bg)
         #--panel clock        
         clk_fg = "purple"
-        clkfrm = tk.Frame(datetmfrm, bg=datetm_bg)
+        clkfrm = tk.Frame(datetmfrm, bg=datetm_bg, height=70)
         self.clkmain_lbl = tk.Label(clkfrm, text="00:00", fg=clk_fg, bg=datetm_bg, font="Arial 60 bold")
         self.clkmain_lbl.pack(side=tk.LEFT)
         self.clksec_lbl = tk.Label(clkfrm, text=":00", fg=clk_fg, bg=datetm_bg, font="Arial 30 bold")
-        self.clksec_lbl.pack(side=tk.LEFT, pady=10, anchor=tk.S)
+        self.clksec_lbl.pack(side=tk.LEFT, pady=0, anchor=tk.S)
         clkfrm.pack(side=tk.TOP, fill=tk.X)
+        clkfrm.pack_propagate(0) #enable Frame height
         #--panel date        
         date_fg = "blue"
-        datefrm = tk.Frame(datetmfrm, bg=datetm_bg)
-        self.date_lbl = tk.Label(datefrm, text="01/01/2000", fg=date_fg, bg=datetm_bg, font="Arial 20 bold")
-        self.date_lbl.pack(side=tk.LEFT)
+        datefrm = tk.Frame(datetmfrm, bg=datetm_bg, height=40)
+        self.date_lbl1 = tk.Label(datefrm, text="January", fg=date_fg, bg=datetm_bg, font="Arial 20 bold")
+        self.date_lbl1.pack(side=tk.LEFT, pady=0, anchor=tk.S)
+        self.date_lbl2 = tk.Label(datefrm, text="01", fg=date_fg, bg=datetm_bg, font="Arial 30 bold")
+        self.date_lbl2.pack(side=tk.LEFT)       
+        self.date_lbl3 = tk.Label(datefrm, text="2024", fg=date_fg, bg=datetm_bg, font="Arial 20 bold")
+        self.date_lbl3.pack(side=tk.LEFT, pady=0, anchor=tk.S)          
         datefrm.pack(side=tk.TOP, fill=tk.X)
+        datefrm.pack_propagate(0) #enable Frame height
         #--close panel datetm
         datetmfrm.pack(side=tk.TOP, padx=5, pady=5, fill=tk.X)
         #--close panel right
