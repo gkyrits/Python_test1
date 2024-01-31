@@ -33,22 +33,32 @@ class Gui:
         win_col = "light yellow"
         pnl_bt_col = "pink"
         pnlfrm =  tk.Frame(self.root, bg=win_col)
-        tk.Button(pnlfrm,text="K1", bg=pnl_bt_col).pack(side=tk.TOP, expand=tk.YES)
-        tk.Button(pnlfrm,text="K2", bg=pnl_bt_col).pack(side=tk.TOP, expand=tk.YES)
-        tk.Button(pnlfrm,text="K3", bg=pnl_bt_col, command=self.root.destroy).pack(side=tk.TOP, expand=tk.YES)
+        tk.Button(pnlfrm,text="K1", bg=pnl_bt_col, width=1).pack(side=tk.TOP, expand=tk.YES)
+        tk.Button(pnlfrm,text="K2", bg=pnl_bt_col, width=1).pack(side=tk.TOP, expand=tk.YES)
+        tk.Button(pnlfrm,text="K3", bg=pnl_bt_col, width=1, command=self.root.destroy).pack(side=tk.TOP, expand=tk.YES)
         pnlfrm.pack(side=tk.LEFT, fill=tk.Y)
         #--panel right
         pnlother =  tk.Frame(self.root, bg=win_col, relief=tk.GROOVE, borderwidth=2)
-        #--panel clock
-        clk_bg = "light steel blue"
-        clk_fg = "blue"
-        clkfrm = tk.Frame(pnlother, bg=clk_bg)
-        self.clkmain_lbl = tk.Label(clkfrm, text="00:00", fg=clk_fg, bg=clk_bg, font="Arial 60 bold")
+        #--panel datetime
+        datetm_bg = "light steel blue"
+        datetmfrm = tk.Frame(pnlother, bg=datetm_bg)
+        #--panel clock        
+        clk_fg = "purple"
+        clkfrm = tk.Frame(datetmfrm, bg=datetm_bg)
+        self.clkmain_lbl = tk.Label(clkfrm, text="00:00", fg=clk_fg, bg=datetm_bg, font="Arial 60 bold")
         self.clkmain_lbl.pack(side=tk.LEFT)
-        self.clksec_lbl = tk.Label(clkfrm, text=":00", fg=clk_fg, bg=clk_bg, font="Arial 30 bold")
+        self.clksec_lbl = tk.Label(clkfrm, text=":00", fg=clk_fg, bg=datetm_bg, font="Arial 30 bold")
         self.clksec_lbl.pack(side=tk.LEFT, pady=10, anchor=tk.S)
-        clkfrm.pack(side=tk.TOP, padx=5, pady=5, fill=tk.X)
-        #---
+        clkfrm.pack(side=tk.TOP, fill=tk.X)
+        #--panel date        
+        date_fg = "blue"
+        datefrm = tk.Frame(datetmfrm, bg=datetm_bg)
+        self.date_lbl = tk.Label(datefrm, text="01/01/2000", fg=date_fg, bg=datetm_bg, font="Arial 20 bold")
+        self.date_lbl.pack(side=tk.LEFT)
+        datefrm.pack(side=tk.TOP, fill=tk.X)
+        #--close panel datetm
+        datetmfrm.pack(side=tk.TOP, padx=5, pady=5, fill=tk.X)
+        #--close panel right
         pnlother.pack(side=tk.LEFT, expand=tk.YES, fill=tk.BOTH)
         
         
