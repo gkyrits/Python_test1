@@ -3,6 +3,32 @@ import tkinter as tk
 LCD_SIZE = "320x240"
 FULL_SCREEN = 1
 
+def get_month(date):    
+    if date==1:
+        return "January"
+    elif date==2:
+         return "February"
+    elif date==3:
+         return "March"
+    elif date==4:
+         return "April"
+    elif date==5:
+         return "May"
+    elif date==6:
+         return "June"
+    elif date==7:
+         return "July"
+    elif date==8:
+         return "August"
+    elif date==9:
+         return "September"
+    elif date==10:
+         return "October"
+    elif date==11:
+         return "November"
+    elif date==12:
+         return "December"                                        
+    
 #======== Gui Calss =========
 class Gui:
     def __init__(self):
@@ -26,7 +52,14 @@ class Gui:
         sec_time = ":"+time_part[2]        
         self.clkmain_lbl.config(text=main_time)
         self.clksec_lbl.config(text=sec_time)
-        #self.root.update()
+        #self.root.update() ?
+
+    def update_date(self,date):
+        date_part = date.split("/")
+        self.date_lbl1.config(text=get_month(int(date_part[1])))
+        self.date_lbl2.config(text=date_part[0])
+        self.date_lbl3.config(text=date_part[2])
+         
 
     def init_clock_window(self):
         #--panel buttons--
@@ -57,7 +90,7 @@ class Gui:
         self.date_lbl1 = tk.Label(datefrm, text="January", fg=date_fg, bg=datetm_bg, font="Arial 20 bold")
         self.date_lbl1.pack(side=tk.LEFT, pady=0, anchor=tk.S)
         self.date_lbl2 = tk.Label(datefrm, text="01", fg=date_fg, bg=datetm_bg, font="Arial 30 bold")
-        self.date_lbl2.pack(side=tk.LEFT)       
+        self.date_lbl2.pack(side=tk.LEFT,padx=5)       
         self.date_lbl3 = tk.Label(datefrm, text="2024", fg=date_fg, bg=datetm_bg, font="Arial 20 bold")
         self.date_lbl3.pack(side=tk.LEFT, pady=0, anchor=tk.S)          
         datefrm.pack(side=tk.TOP, fill=tk.X)
@@ -72,5 +105,6 @@ class Gui:
         
 gui = Gui()
 gui.update_clock("13:24:32")
+gui.update_date("31/02/2025")
 gui.run()
 print("End...")
