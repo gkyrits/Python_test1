@@ -1,7 +1,7 @@
 import tkinter as tk
 
 LCD_SIZE = "320x240"
-FULL_SCREEN = 1
+FULL_SCREEN = 0
 
 def get_month(date):    
     if date==1:
@@ -50,15 +50,15 @@ class Gui:
         time_part = time.split(":")
         main_time = time_part[0]+":"+time_part[1]
         sec_time = ":"+time_part[2]        
-        self.clkmain_lbl.config(text=main_time)
-        self.clksec_lbl.config(text=sec_time)
+        self.clkMain_lbl.config(text=main_time)
+        self.clkSec_lbl.config(text=sec_time)
         #self.root.update() ?
 
     def update_date(self,date):
         date_part = date.split("/")
-        self.date_lbl1.config(text=get_month(int(date_part[1])))
-        self.date_lbl2.config(text=date_part[0])
-        self.date_lbl3.config(text=date_part[2])
+        self.dateMonth_lbl.config(text=get_month(int(date_part[1])))
+        self.dateDay_lbl.config(text=date_part[0])
+        self.dateYear_lbl.config(text=date_part[2])
          
 
     def init_clock_window(self):
@@ -66,7 +66,7 @@ class Gui:
         win_col = "light yellow"
         pnl_bt_col = "pink"
         pnlfrm =  tk.Frame(self.root, bg=win_col)
-        tk.Button(pnlfrm,text="K1", bg=pnl_bt_col, width=1).pack(side=tk.TOP, expand=tk.YES)
+        tk.Button(pnlfrm,text="K1", bg=pnl_bt_col, width=1).pack(side=tk.TOP, expand=tk.YES) #Button.width: in text size
         tk.Button(pnlfrm,text="K2", bg=pnl_bt_col, width=1).pack(side=tk.TOP, expand=tk.YES)
         tk.Button(pnlfrm,text="K3", bg=pnl_bt_col, width=1, command=self.root.destroy).pack(side=tk.TOP, expand=tk.YES)
         pnlfrm.pack(side=tk.LEFT, fill=tk.Y)
@@ -77,24 +77,30 @@ class Gui:
         datetmfrm = tk.Frame(pnlother, bg=datetm_bg)
         #--panel clock        
         clk_fg = "purple"
-        clkfrm = tk.Frame(datetmfrm, bg=datetm_bg, height=70)
-        self.clkmain_lbl = tk.Label(clkfrm, text="00:00", fg=clk_fg, bg=datetm_bg, font="Arial 60 bold")
-        self.clkmain_lbl.pack(side=tk.LEFT)
-        self.clksec_lbl = tk.Label(clkfrm, text=":00", fg=clk_fg, bg=datetm_bg, font="Arial 30 bold")
-        self.clksec_lbl.pack(side=tk.LEFT, pady=0, anchor=tk.S)
-        clkfrm.pack(side=tk.TOP, fill=tk.X)
-        clkfrm.pack_propagate(0) #enable Frame height
+        clkFrm = tk.Frame(datetmfrm, bg=datetm_bg, height=70)
+        self.clkMain_lbl = tk.Label(clkFrm, text="00:00", fg=clk_fg, bg=datetm_bg, font="Arial 60 bold")
+        self.clkMain_lbl.pack(side=tk.LEFT)
+        self.clkSec_lbl = tk.Label(clkFrm, text=":00", fg=clk_fg, bg=datetm_bg, font="Arial 30 bold")
+        self.clkSec_lbl.pack(side=tk.LEFT, anchor=tk.S)
+        clkFrm.pack(side=tk.TOP, fill=tk.X)
+        clkFrm.pack_propagate(False) #enable Frame height
         #--panel date        
         date_fg = "blue"
-        datefrm = tk.Frame(datetmfrm, bg=datetm_bg, height=40)
-        self.date_lbl1 = tk.Label(datefrm, text="January", fg=date_fg, bg=datetm_bg, font="Arial 20 bold")
-        self.date_lbl1.pack(side=tk.LEFT, pady=0, anchor=tk.S)
-        self.date_lbl2 = tk.Label(datefrm, text="01", fg=date_fg, bg=datetm_bg, font="Arial 30 bold")
-        self.date_lbl2.pack(side=tk.LEFT,padx=5)       
-        self.date_lbl3 = tk.Label(datefrm, text="2024", fg=date_fg, bg=datetm_bg, font="Arial 20 bold")
-        self.date_lbl3.pack(side=tk.LEFT, pady=0, anchor=tk.S)          
-        datefrm.pack(side=tk.TOP, fill=tk.X)
-        datefrm.pack_propagate(0) #enable Frame height
+        dateFrm = tk.Frame(datetmfrm, bg=datetm_bg, height=40)
+        self.dateDay_lbl = tk.Label(dateFrm, text="01", fg=date_fg, bg=datetm_bg, font="Arial 40 bold")
+        self.dateDay_lbl.pack(side=tk.LEFT)  
+          #----panel day/month
+        weekMonthFrm = tk.Frame(dateFrm, bg=datetm_bg)
+        self.dateWeek_lbl = tk.Label(weekMonthFrm, text="Monday", fg=date_fg, bg=datetm_bg, font="Arial 10 bold")
+        self.dateWeek_lbl.pack(side=tk.TOP, anchor=tk.W)        
+        self.dateMonth_lbl = tk.Label(weekMonthFrm, text="January", fg=date_fg, bg=datetm_bg, font="Arial 16 bold")
+        self.dateMonth_lbl.pack(side=tk.TOP, anchor=tk.W)
+        weekMonthFrm.pack(side=tk.LEFT)
+          #-------------------  
+        self.dateYear_lbl = tk.Label(dateFrm, text="2024", fg=date_fg, bg=datetm_bg, font="Arial 30 bold")
+        self.dateYear_lbl.pack(side=tk.LEFT, anchor=tk.S)          
+        dateFrm.pack(side=tk.TOP, fill=tk.X, padx=2)
+        dateFrm.pack_propagate(False) #enable Frame height
         #--close panel datetm
         datetmfrm.pack(side=tk.TOP, padx=5, pady=5, fill=tk.X)
         #--close panel right
@@ -105,6 +111,6 @@ class Gui:
         
 gui = Gui()
 gui.update_clock("13:24:32")
-gui.update_date("31/02/2025")
+gui.update_date("31/09/2025")
 gui.run()
 print("End...")
