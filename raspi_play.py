@@ -1,7 +1,11 @@
 import tkinter as tk
+import time as tm
+import threading as thrd
 
 LCD_SIZE = "320x240"
-FULL_SCREEN = 0
+FULL_SCREEN = 1
+
+exit = False
 
 def get_month(date):    
     if date==1:
@@ -27,9 +31,27 @@ def get_month(date):
     elif date==11:
          return "November"
     elif date==12:
-         return "December"                                        
+         return "December"
+
+def get_weekDay(wday):
+
+    if wday==0:
+         return "Monday"
+    elif wday==1:
+         return "Tuesday"
+    elif wday==2:
+         return "Wednesday"
+    elif wday==3:
+         return "Thursday"
+    elif wday==4:
+         return "Friday"
+    elif wday==5:
+         return "Saturday"
+    elif wday==6:
+        return "Sunday"         
+          
     
-#======== Gui Calss =========
+#======== Gui Class =========
 class Gui:
     def __init__(self):
         self.root = tk.Tk()
@@ -51,15 +73,20 @@ class Gui:
         main_time = time_part[0]+":"+time_part[1]
         sec_time = ":"+time_part[2]        
         self.clkMain_lbl.config(text=main_time)
-        self.clkSec_lbl.config(text=sec_time)
-        #self.root.update() ?
+        self.clkSec_lbl.config(text=sec_time)        
 
     def update_date(self,date):
         date_part = date.split("/")
         self.dateMonth_lbl.config(text=get_month(int(date_part[1])))
         self.dateDay_lbl.config(text=date_part[0])
         self.dateYear_lbl.config(text=date_part[2])
-         
+        self.dateWeek_lbl.config(text=get_weekDay(int(date_part[3])))
+
+    def btn_exit(self):
+        global exit  
+        exit=True
+        self.root.destroy()
+
 
     def init_clock_window(self):
         #--panel buttons--
@@ -68,7 +95,7 @@ class Gui:
         pnlfrm =  tk.Frame(self.root, bg=win_col)
         tk.Button(pnlfrm,text="K1", bg=pnl_bt_col, width=1).pack(side=tk.TOP, expand=tk.YES) #Button.width: in text size
         tk.Button(pnlfrm,text="K2", bg=pnl_bt_col, width=1).pack(side=tk.TOP, expand=tk.YES)
-        tk.Button(pnlfrm,text="K3", bg=pnl_bt_col, width=1, command=self.root.destroy).pack(side=tk.TOP, expand=tk.YES)
+        tk.Button(pnlfrm,text="K3", bg=pnl_bt_col, width=1, command=self.btn_exit).pack(side=tk.TOP, expand=tk.YES)
         pnlfrm.pack(side=tk.LEFT, fill=tk.Y)
         #--panel right
         pnlother =  tk.Frame(self.root, bg=win_col, relief=tk.GROOVE, borderwidth=2)
@@ -106,11 +133,34 @@ class Gui:
         #--close panel right
         pnlother.pack(side=tk.LEFT, expand=tk.YES, fill=tk.BOTH)
         
-        
-#======== Main ============
+#======== Time Thread ========
+
+def update_guiDateTime(clk: Gui):
+     time_inf = tm.localtime(tm.time())
+     #print(time_inf)
+     time = "{0:02d}:{1:02d}:{2:02d}".format(time_inf.tm_hour,time_inf.tm_min,time_inf.tm_sec)
+     clk.update_clock(time)
+     date = "{0:d}/{1:d}/{2:d}/{3:d}".format(time_inf.tm_mday,time_inf.tm_mon,time_inf.tm_year,time_inf.tm_wday)
+     clk.update_date(date)     
+
+def time_thread():
+     global gui,exit
+     while True:
+          tm.sleep(1)
+          if exit:
+               break
+          update_guiDateTime(gui)
+               
+#======== Main ===============
         
 gui = Gui()
 gui.update_clock("13:24:32")
-gui.update_date("31/09/2025")
+gui.update_date("31/09/2025/1")
+
+# start time thread
+t=thrd.Thread(target=time_thread)
+t.start()
 gui.run()
+t.join()
+
 print("End...")
