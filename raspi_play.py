@@ -89,19 +89,24 @@ class Gui:
 
 
     def init_clock_window(self):
-        #--panel buttons--
+        #---------------
+        #  panel buttons left
+        #---------------
         win_col = "light yellow"
         pnl_bt_col = "pink"
-        pnlfrm =  tk.Frame(self.root, bg=win_col)
-        tk.Button(pnlfrm,text="K1", bg=pnl_bt_col, width=1).pack(side=tk.TOP, expand=tk.YES) #Button.width: in text size
-        tk.Button(pnlfrm,text="K2", bg=pnl_bt_col, width=1).pack(side=tk.TOP, expand=tk.YES)
-        tk.Button(pnlfrm,text="K3", bg=pnl_bt_col, width=1, command=self.btn_exit).pack(side=tk.TOP, expand=tk.YES)
-        pnlfrm.pack(side=tk.LEFT, fill=tk.Y)
-        #--panel right
-        pnlother =  tk.Frame(self.root, bg=win_col, relief=tk.GROOVE, borderwidth=2)
+        pnlButton =  tk.Frame(self.root, bg=win_col, width=20, padx=1)
+        tk.Button(pnlButton,text="K1", bg=pnl_bt_col).pack(side=tk.TOP, expand=tk.YES) #Button.width: in text size
+        tk.Button(pnlButton,text="K2", bg=pnl_bt_col).pack(side=tk.TOP, expand=tk.YES)
+        tk.Button(pnlButton,text="K3", bg=pnl_bt_col, command=self.btn_exit).pack(side=tk.TOP, expand=tk.YES)
+        pnlButton.pack(side=tk.LEFT, fill=tk.Y)
+        pnlButton.pack_propagate(False) #enable Frame width=20
+        #-------------
+        #  panel right
+        #-------------
+        pnlClock =  tk.Frame(self.root, bg=win_col, relief=tk.GROOVE, borderwidth=2)
         #--panel datetime
         datetm_bg = "light steel blue"
-        datetmfrm = tk.Frame(pnlother, bg=datetm_bg)
+        datetmfrm = tk.Frame(pnlClock, bg=datetm_bg)
         #--panel clock        
         clk_fg = "purple"
         clkFrm = tk.Frame(datetmfrm, bg=datetm_bg, height=70)
@@ -110,7 +115,7 @@ class Gui:
         self.clkSec_lbl = tk.Label(clkFrm, text=":00", fg=clk_fg, bg=datetm_bg, font="Arial 30 bold")
         self.clkSec_lbl.pack(side=tk.LEFT, anchor=tk.S)
         clkFrm.pack(side=tk.TOP, fill=tk.X)
-        clkFrm.pack_propagate(False) #enable Frame height
+        clkFrm.pack_propagate(False) #enable Frame height=70
         #--panel date        
         date_fg = "blue"
         dateFrm = tk.Frame(datetmfrm, bg=datetm_bg, height=40)
@@ -127,11 +132,30 @@ class Gui:
         self.dateYear_lbl = tk.Label(dateFrm, text="2024", fg=date_fg, bg=datetm_bg, font="Arial 30 bold")
         self.dateYear_lbl.pack(side=tk.LEFT, anchor=tk.S)          
         dateFrm.pack(side=tk.TOP, fill=tk.X, padx=2)
-        dateFrm.pack_propagate(False) #enable Frame height
+        dateFrm.pack_propagate(False) #enable Frame height=40
         #--close panel datetm
         datetmfrm.pack(side=tk.TOP, padx=5, pady=5, fill=tk.X)
         #--close panel right
-        pnlother.pack(side=tk.LEFT, expand=tk.YES, fill=tk.BOTH)
+        pnlClock.pack(side=tk.TOP, fill=tk.X)
+        #------
+        # panel bottom 
+        #------
+        pnlBottom = tk.Frame(self.root, bg=win_col, relief=tk.GROOVE, borderwidth=2)
+        #--panel laninfo
+        lanfont="Arial 10 "
+        lanwancol="green"
+        lanethcol="red"
+        lanInfFrm = tk.Frame(pnlBottom, bg=datetm_bg)
+        tk.Label(lanInfFrm,text="L:", bg=datetm_bg, fg=lanethcol, font=lanfont+"bold", width=1).grid(row=0)
+        self.ethIp = tk.Label(lanInfFrm,text="255.255.255.255", bg=datetm_bg, fg=lanethcol, font=lanfont, width=12, anchor=tk.W)
+        self.ethIp.grid(row=0, column=1)
+        tk.Label(lanInfFrm,text="W:", bg=datetm_bg, fg=lanwancol, font=lanfont+"bold", width=1).grid(row=1)
+        self.wanIp = tk.Label(lanInfFrm,text="0.0.0.0", bg=datetm_bg, fg=lanwancol, font=lanfont, width=12, anchor=tk.W)
+        self.wanIp.grid(row=1, column=1)
+        lanInfFrm.pack(side=tk.LEFT, padx=5, pady=5, fill=tk.Y)
+        #--close panel bottom
+        pnlBottom.pack(side=tk.BOTTOM, fill=tk.Y, expand=tk.YES, anchor=tk.W)
+
         
 #======== Time Thread ========
 
