@@ -96,9 +96,9 @@ class Gui:
 
 
     def init_clock_window(self):
-        #---------------
+        #----------------------
         #  panel buttons left
-        #---------------
+        #----------------------
         win_col = "light yellow"
         pnl_bt_col = "pink"
         pnlButton =  tk.Frame(self.root, bg=win_col, width=20, padx=1)
@@ -107,9 +107,9 @@ class Gui:
         tk.Button(pnlButton,text="3", bg=pnl_bt_col, command=self.btn_exit).pack(side=tk.TOP, expand=tk.YES)
         pnlButton.pack(side=tk.LEFT, fill=tk.Y)
         pnlButton.pack_propagate(False) #enable Frame width=20
-        #-------------
+        #----------------
         #  panel right
-        #-------------
+        #----------------
         pnlClock =  tk.Frame(self.root, bg=win_col, relief=tk.GROOVE, borderwidth=2)
         #--panel datetime
         datetm_bg = "light steel blue"
@@ -144,17 +144,19 @@ class Gui:
         datetmfrm.pack(side=tk.TOP, padx=5, pady=5, fill=tk.X)
         #--close panel right
         pnlClock.pack(side=tk.TOP, fill=tk.X)
-        #------
+        #----------------
         # panel bottom 
-        #------
-        pnlBottom = tk.Frame(self.root, bg=win_col, relief=tk.GROOVE, borderwidth=2)
+        #----------------
+        pnlBottom = tk.Frame(self.root)
+
         #--panel IPinfo
+        pnlCpuInfo = tk.Frame(pnlBottom, bg=win_col, relief=tk.GROOVE, borderwidth=2)        
         lanLblFont="Arial 10 bold italic"
         lanIpFont= "Arial 12 bold"
         wanIPcol="green"
         lanIPcol="SlateBlue4"
         IpPnlWidht=130
-        IPInfoFrm = tk.Frame(pnlBottom, bg=datetm_bg, width=IpPnlWidht)
+        IPInfoFrm = tk.Frame(pnlCpuInfo, bg=datetm_bg, width=IpPnlWidht)
           #-----sub panel for Lan info
         lanInfoFrm=tk.Frame(IPInfoFrm,bg=datetm_bg, height=35, width=IpPnlWidht)
         tk.Label(lanInfoFrm,text="Lan:", bg=datetm_bg, fg=lanIPcol, font=lanLblFont).pack(side=tk.TOP, anchor=tk.W)
@@ -169,11 +171,18 @@ class Gui:
         self.wanIp.pack(side=tk.TOP, anchor=tk.W)
         wanInfoFrm.pack(side=tk.TOP, anchor=tk.W)
         wanInfoFrm.pack_propagate(False)
-         #--close panel IPinfo
+        #--close panel IPinfo
         IPInfoFrm.pack(side=tk.LEFT, padx=5, pady=5, fill=tk.Y)
         IPInfoFrm.pack_propagate(False) #enable Frame width=100
         #--close panel bottom
-        pnlBottom.pack(side=tk.BOTTOM, fill=tk.Y, expand=tk.YES, anchor=tk.W)
+        pnlCpuInfo.pack(side=tk.LEFT, fill=tk.Y, expand=tk.YES, anchor=tk.W)
+
+        #--panel Weather
+        weatherFrm = tk.Frame(pnlBottom, bg=win_col, relief=tk.GROOVE, borderwidth=2)
+        tk.Label(weatherFrm, text="Weather...", width=30).pack(side=tk.LEFT, padx=5, pady=5)
+        weatherFrm.pack(side=tk.LEFT, fill=tk.BOTH, expand=tk.YES, anchor=tk.W)
+
+        pnlBottom.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=tk.YES)
 
         
 #======== Time Thread ========
