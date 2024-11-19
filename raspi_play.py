@@ -1,6 +1,7 @@
 import tkinter as tk
 import time as tm
 import threading as thrd
+import ipaddr as ip
 
 LCD_SIZE = "320x240"
 FULL_SCREEN = 1
@@ -82,6 +83,12 @@ class Gui:
         self.dateYear_lbl.config(text=date_part[2])
         self.dateWeek_lbl.config(text=get_weekDay(int(date_part[3])))
 
+    def update_ethIp(self,IpAddr):
+         self.ethIp.config(text=IpAddr)
+
+    def update_wanIp(self,IpAddr):
+         self.wanIp.config(text=IpAddr)
+       
     def btn_exit(self):
         global exit  
         exit=True
@@ -186,17 +193,31 @@ def time_thread():
           if exit:
                break
           update_guiDateTime(gui)
+
+#======== lanIp Thread ========          
+def lanIp_thread():
+     global gui,exit
+     while True:          
+          if exit:
+               break
+          gui.update_ethIp(ip.get_ip_address("eth0"))
+          gui.update_wanIp(ip.get_ip_address("lwan0"))
+          if exit:
+               break          
+          tm.sleep(5)
                
 #======== Main ===============
         
 gui = Gui()
-gui.update_clock("13:24:32")
-gui.update_date("31/09/2025/1")
-
 # start time thread
-t=thrd.Thread(target=time_thread)
-t.start()
+tm_thrd=thrd.Thread(target=time_thread)
+tm_thrd.start()
+# start lanIp thread
+lan_thrd=thrd.Thread(target=lanIp_thread)
+lan_thrd.start()
+
 gui.run()
-t.join()
+tm_thrd.join()
+lan_thrd.join()
 
 print("End...")
