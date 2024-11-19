@@ -1,8 +1,12 @@
 import socket
-import fcntl
 import struct
 
 def get_ip_address(ifname):
+    try:
+        import fcntl
+    except:
+        ip='----'
+        return ip    
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         ip= socket.inet_ntoa(fcntl.ioctl(
@@ -15,5 +19,6 @@ def get_ip_address(ifname):
     s.close()
     return ip
 
-print('eth0:'+get_ip_address('eth0'))
-print('wlan0:'+get_ip_address('wlan0'))
+if __name__ == '__main__':
+    print('eth0:'+get_ip_address('eth0'))
+    print('wlan0:'+get_ip_address('wlan0'))
