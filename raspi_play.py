@@ -95,9 +95,9 @@ class Gui:
         win_col = "light yellow"
         pnl_bt_col = "pink"
         pnlButton =  tk.Frame(self.root, bg=win_col, width=20, padx=1)
-        tk.Button(pnlButton,text="K1", bg=pnl_bt_col).pack(side=tk.TOP, expand=tk.YES) #Button.width: in text size
-        tk.Button(pnlButton,text="K2", bg=pnl_bt_col).pack(side=tk.TOP, expand=tk.YES)
-        tk.Button(pnlButton,text="K3", bg=pnl_bt_col, command=self.btn_exit).pack(side=tk.TOP, expand=tk.YES)
+        tk.Button(pnlButton,text="1", bg=pnl_bt_col).pack(side=tk.TOP, expand=tk.YES) #Button.width: in text size
+        tk.Button(pnlButton,text="2", bg=pnl_bt_col).pack(side=tk.TOP, expand=tk.YES)
+        tk.Button(pnlButton,text="3", bg=pnl_bt_col, command=self.btn_exit).pack(side=tk.TOP, expand=tk.YES)
         pnlButton.pack(side=tk.LEFT, fill=tk.Y)
         pnlButton.pack_propagate(False) #enable Frame width=20
         #-------------
@@ -121,7 +121,7 @@ class Gui:
         dateFrm = tk.Frame(datetmfrm, bg=datetm_bg, height=40)
         self.dateDay_lbl = tk.Label(dateFrm, text="01", fg=date_fg, bg=datetm_bg, font="Arial 40 bold")
         self.dateDay_lbl.pack(side=tk.LEFT)  
-          #----panel day/month
+          #----sub panel day/month
         weekMonthFrm = tk.Frame(dateFrm, bg=datetm_bg)
         self.dateWeek_lbl = tk.Label(weekMonthFrm, text="Monday", fg=date_fg, bg=datetm_bg, font="Arial 10 bold")
         self.dateWeek_lbl.pack(side=tk.TOP, anchor=tk.W)        
@@ -141,18 +141,30 @@ class Gui:
         # panel bottom 
         #------
         pnlBottom = tk.Frame(self.root, bg=win_col, relief=tk.GROOVE, borderwidth=2)
-        #--panel laninfo
-        lanfont="Arial 10 "
-        lanwancol="green"
-        lanethcol="red"
-        lanInfFrm = tk.Frame(pnlBottom, bg=datetm_bg)
-        tk.Label(lanInfFrm,text="L:", bg=datetm_bg, fg=lanethcol, font=lanfont+"bold", width=1).grid(row=0)
-        self.ethIp = tk.Label(lanInfFrm,text="255.255.255.255", bg=datetm_bg, fg=lanethcol, font=lanfont, width=12, anchor=tk.W)
-        self.ethIp.grid(row=0, column=1)
-        tk.Label(lanInfFrm,text="W:", bg=datetm_bg, fg=lanwancol, font=lanfont+"bold", width=1).grid(row=1)
-        self.wanIp = tk.Label(lanInfFrm,text="0.0.0.0", bg=datetm_bg, fg=lanwancol, font=lanfont, width=12, anchor=tk.W)
-        self.wanIp.grid(row=1, column=1)
-        lanInfFrm.pack(side=tk.LEFT, padx=5, pady=5, fill=tk.Y)
+        #--panel IPinfo
+        lanLblFont="Arial 10 bold italic"
+        lanIpFont= "Arial 12 bold"
+        wanIPcol="green"
+        lanIPcol="SlateBlue4"
+        IpPnlWidht=130
+        IPInfoFrm = tk.Frame(pnlBottom, bg=datetm_bg, width=IpPnlWidht)
+          #-----sub panel for Lan info
+        lanInfoFrm=tk.Frame(IPInfoFrm,bg=datetm_bg, height=35, width=IpPnlWidht)
+        tk.Label(lanInfoFrm,text="Lan:", bg=datetm_bg, fg=lanIPcol, font=lanLblFont).pack(side=tk.TOP, anchor=tk.W)
+        self.ethIp = tk.Label(lanInfoFrm,text="255.255.255.255", bg=datetm_bg, fg=lanIPcol, font=lanIpFont)
+        self.ethIp.pack(side=tk.TOP, anchor=tk.W)
+        lanInfoFrm.pack(side=tk.TOP, anchor=tk.W)
+        lanInfoFrm.pack_propagate(False)
+          #-----sub panel for Wan info
+        wanInfoFrm=tk.Frame(IPInfoFrm,bg=datetm_bg, height=35, width=IpPnlWidht)  
+        tk.Label(wanInfoFrm,text="Wan:", bg=datetm_bg, fg=wanIPcol, font=lanLblFont).pack(side=tk.TOP, anchor=tk.W)
+        self.wanIp = tk.Label(wanInfoFrm,text="0.0.0.0", bg=datetm_bg, fg=wanIPcol, font=lanIpFont)
+        self.wanIp.pack(side=tk.TOP, anchor=tk.W)
+        wanInfoFrm.pack(side=tk.TOP, anchor=tk.W)
+        wanInfoFrm.pack_propagate(False)
+         #--close panel IPinfo
+        IPInfoFrm.pack(side=tk.LEFT, padx=5, pady=5, fill=tk.Y)
+        IPInfoFrm.pack_propagate(False) #enable Frame width=100
         #--close panel bottom
         pnlBottom.pack(side=tk.BOTTOM, fill=tk.Y, expand=tk.YES, anchor=tk.W)
 
