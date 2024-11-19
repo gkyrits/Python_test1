@@ -201,7 +201,7 @@ def lanIp_thread():
           if exit:
                break
           gui.update_ethIp(ip.get_ip_address("eth0"))
-          gui.update_wanIp(ip.get_ip_address("lwan0"))
+          gui.update_wanIp(ip.get_ip_address("wlan0"))
           if exit:
                break          
           tm.sleep(5)
