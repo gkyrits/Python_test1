@@ -163,8 +163,31 @@ class Gui:
         IPInfoFrm.pack_propagate(False) #enable Frame width=100   
 
 
-    def weather_panel(self,parent):
-        tk.Label(parent, text="Weather...", width=30).pack(side=tk.TOP, padx=5, pady=5)
+    def weather_panel(self,parent):        
+        global img
+        wthr_bg = "light steel blue"        
+        temperCol="red"   
+        test_img='13.png'
+        img = tk.PhotoImage(file=test_img)        
+        wthrFrm=tk.Frame(parent,bg=wthr_bg)
+
+        tk.Label(wthrFrm, text="Clear Sky", fg="blue", bg=wthr_bg, font="Arial 10 bold", width=10, anchor=tk.W) .grid(row=0, column=1, columnspan=2, sticky=tk.E)
+        tk.Label(wthrFrm, text="24°C",      fg=temperCol,  bg=wthr_bg, font="Arial 12 bold").grid(row=0, sticky=tk.W)
+
+        tk.Label(wthrFrm, image=img,  bg=wthr_bg).grid(row=1, rowspan=2, column=2, sticky=tk.E)
+
+        tk.Label(wthrFrm, text="Feels Like",  bg=wthr_bg, font="Arial 8").grid(row=1, sticky=tk.W)
+        tk.Label(wthrFrm, text="Humidity",    bg=wthr_bg, font="Arial 8").grid(row=2, sticky=tk.W)
+        tk.Label(wthrFrm, text="Pressure",    bg=wthr_bg, font="Arial 8").grid(row=3, sticky=tk.W)
+        tk.Label(wthrFrm, text="Wind",        bg=wthr_bg, font="Arial 8").grid(row=4, sticky=tk.W)
+
+        tk.Label(wthrFrm, text="23°C",  bg=wthr_bg, font="Arial 8 bold").grid(row=1, column=1, sticky=tk.W)
+        tk.Label(wthrFrm, text="36%",  bg=wthr_bg, font="Arial 8 bold").grid(row=2, column=1, sticky=tk.W)
+        tk.Label(wthrFrm, text="1024 hPa",  bg=wthr_bg, font="Arial 8 bold").grid(row=3, column=1,  columnspan=2, sticky=tk.W)
+        tk.Label(wthrFrm, text="2.7 m/s",  bg=wthr_bg, font="Arial 8 bold").grid(row=4, column=1,  columnspan=2, sticky=tk.W)
+
+        wthrFrm.pack(side=tk.LEFT, padx=5, pady=5, fill=tk.BOTH, expand=tk.YES)
+
 
 
     def init_clock_window(self):
