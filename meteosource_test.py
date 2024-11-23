@@ -11,7 +11,6 @@ parameters = {'key': API_KEY,
 
 url = "https://www.meteosource.com/api/v1/free/nearest_place"
 data = requests.get(url, parameters).json()
-place = data['name']
 print('')
 print('Place :{}, {}, {}'.format(data['name'],data['adm_area2'],data['country']))
 
