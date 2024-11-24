@@ -138,29 +138,25 @@ class Gui:
 
     def ipInfo_panel(self,parent):
         datetm_bg = "light steel blue"
-        lanLblFont="Arial 10 bold italic"
-        lanIpFont= "Arial 12 bold"
+        lanLblFont="Arial 8 bold italic"
+        lanIpFont= "Arial 10 bold"
         wanIPcol="green"
         lanIPcol="SlateBlue4"
-        IpPnlWidht=130
-        IPInfoFrm = tk.Frame(parent, bg=datetm_bg, width=IpPnlWidht)
+        IPInfoFrm = tk.Frame(parent, bg=datetm_bg)
           #-----sub panel for Lan info
-        lanInfoFrm=tk.Frame(IPInfoFrm,bg=datetm_bg, height=35, width=IpPnlWidht)
+        lanInfoFrm=tk.Frame(IPInfoFrm,bg=datetm_bg)
         tk.Label(lanInfoFrm,text="Lan:", bg=datetm_bg, fg=lanIPcol, font=lanLblFont).pack(side=tk.TOP, anchor=tk.W)
-        self.ethIp = tk.Label(lanInfoFrm,text="255.255.255.255", bg=datetm_bg, fg=lanIPcol, font=lanIpFont)
+        self.ethIp = tk.Label(lanInfoFrm,text="0.0.0.0", bg=datetm_bg, fg=lanIPcol, font=lanIpFont, width=12, anchor=tk.W)
         self.ethIp.pack(side=tk.TOP, anchor=tk.W)
         lanInfoFrm.pack(side=tk.TOP, anchor=tk.W)
-        lanInfoFrm.pack_propagate(False)
           #-----sub panel for Wan info
-        wanInfoFrm=tk.Frame(IPInfoFrm,bg=datetm_bg, height=35, width=IpPnlWidht)  
+        wanInfoFrm=tk.Frame(IPInfoFrm,bg=datetm_bg)  
         tk.Label(wanInfoFrm,text="Wan:", bg=datetm_bg, fg=wanIPcol, font=lanLblFont).pack(side=tk.TOP, anchor=tk.W)
         self.wanIp = tk.Label(wanInfoFrm,text="0.0.0.0", bg=datetm_bg, fg=wanIPcol, font=lanIpFont)
         self.wanIp.pack(side=tk.TOP, anchor=tk.W)
-        wanInfoFrm.pack(side=tk.TOP, anchor=tk.W)
-        wanInfoFrm.pack_propagate(False)
+        wanInfoFrm.pack(side=tk.TOP, anchor=tk.W)        
         #--close panel IPinfo
-        IPInfoFrm.pack(side=tk.LEFT, padx=5, pady=5, fill=tk.Y)
-        IPInfoFrm.pack_propagate(False) #enable Frame width=100   
+        IPInfoFrm.pack(side=tk.LEFT, padx=5, pady=5, fill=tk.BOTH, expand=tk.YES)        
 
 
     def weather_panel(self,parent):        
@@ -214,7 +210,7 @@ class Gui:
         #--panel IPinfo
         pnlCpuInfo = tk.Frame(pnlBottom, bg=win_col, relief=tk.GROOVE, borderwidth=2)        
         self.ipInfo_panel(pnlCpuInfo)        
-        pnlCpuInfo.pack(side=tk.LEFT, fill=tk.Y, expand=tk.YES, anchor=tk.W)
+        pnlCpuInfo.pack(side=tk.LEFT, fill=tk.BOTH, expand=tk.YES, anchor=tk.W)
         #--panel Weather
         weatherFrm = tk.Frame(pnlBottom, bg=win_col, relief=tk.GROOVE, borderwidth=2)
         self.weather_panel(weatherFrm)
