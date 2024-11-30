@@ -2,6 +2,7 @@ import tkinter as tk
 import time as tm
 import threading as thrd
 import ipaddr as ip
+import weather as wthr
 
 LCD_SIZE = "320x240"
 FULL_SCREEN = 1
@@ -9,52 +10,52 @@ FULL_SCREEN = 1
 exit = False
 
 def get_month(date):    
-    if date==1:
+     if date==1:
         return "January"
-    elif date==2:
+     elif date==2:
          return "February"
-    elif date==3:
+     elif date==3:
          return "March"
-    elif date==4:
+     elif date==4:
          return "April"
-    elif date==5:
+     elif date==5:
          return "May"
-    elif date==6:
+     elif date==6:
          return "June"
-    elif date==7:
+     elif date==7:
          return "July"
-    elif date==8:
+     elif date==8:
          return "August"
-    elif date==9:
+     elif date==9:
          return "September"
-    elif date==10:
+     elif date==10:
          return "October"
-    elif date==11:
+     elif date==11:
          return "November"
-    elif date==12:
+     elif date==12:
          return "December"
 
 def get_weekDay(wday):
 
-    if wday==0:
+     if wday==0:
          return "Monday"
-    elif wday==1:
+     elif wday==1:
          return "Tuesday"
-    elif wday==2:
+     elif wday==2:
          return "Wednesday"
-    elif wday==3:
+     elif wday==3:
          return "Thursday"
-    elif wday==4:
+     elif wday==4:
          return "Friday"
-    elif wday==5:
+     elif wday==5:
          return "Saturday"
-    elif wday==6:
+     elif wday==6:
         return "Sunday"         
           
     
 #======== Gui Class =========
 class Gui:
-    def __init__(self):
+     def __init__(self):
         self.root = tk.Tk()
         self.root.title("raspi play v0.1")
         self.root.geometry(LCD_SIZE+'+0+0')
@@ -62,47 +63,57 @@ class Gui:
               self.root.overrideredirect(1)  
         self.init_clock_window()
 
-    def __str__(self):
+     def __str__(self):
         """ description """
         return "Gui Class"        
 
-    def run(self):
+     def run(self):
         self.root.mainloop()
 
-    def update_clock(self,time):
+     def update_clock(self,time):
         time_part = time.split(":")
         main_time = time_part[0]+":"+time_part[1]
         sec_time = ":"+time_part[2]        
         self.clkMain_lbl.config(text=main_time)
         self.clkSec_lbl.config(text=sec_time)        
 
-    def update_date(self,date):
+     def update_date(self,date):
         date_part = date.split("/")
         self.dateMonth_lbl.config(text=get_month(int(date_part[1])))
         self.dateDay_lbl.config(text=date_part[0])
         self.dateYear_lbl.config(text=date_part[2])
         self.dateWeek_lbl.config(text=get_weekDay(int(date_part[3])))
 
-    def update_ethIp(self,IpAddr):
+     def update_ethIp(self,IpAddr):
          self.ethIp.config(text=IpAddr)
 
-    def update_wanIp(self,IpAddr):
+     def update_wanIp(self,IpAddr):
          self.wanIp.config(text=IpAddr)
+
+     def update_weather(self,info):
+          if info['Error']=='':
+               self.wthr_temper.config(text=info['Temper'])
+               self.wthr_descript.config(text=info['Descript'])
+               self.wthr_like.config(text=info['Like'])
+               self.wthr_humid.config(text=info['Humidity'])
+               self.wthr_press.config(text=info['Pressure'])
+               self.wthr_wind.config(text=info['Wind'])
+         
        
-    def btn_exit(self):
+     def btn_exit(self):
         global exit  
         exit=True
         self.root.destroy()
 
 
-    def keys_panel(self,parent):
+     def keys_panel(self,parent):
         pnl_bt_col = "pink"
         tk.Button(parent,text="1", bg=pnl_bt_col).pack(side=tk.TOP, expand=tk.YES) #Button.width: in text size
         tk.Button(parent,text="2", bg=pnl_bt_col).pack(side=tk.TOP, expand=tk.YES)
         tk.Button(parent,text="3", bg=pnl_bt_col, command=self.btn_exit).pack(side=tk.TOP, expand=tk.YES)
 
 
-    def clock_panel(self,parent):
+     def clock_panel(self,parent):
         #--panel datetime
         datetm_bg = "light steel blue"
         datetmfrm = tk.Frame(parent, bg=datetm_bg)
@@ -136,7 +147,7 @@ class Gui:
         datetmfrm.pack(side=tk.TOP, padx=5, pady=5, fill=tk.X)         
 
 
-    def ipInfo_panel(self,parent):
+     def ipInfo_panel(self,parent):
         datetm_bg = "light steel blue"
         lanLblFont="Arial 8 bold italic"
         lanIpFont= "Arial 10 bold"
@@ -159,7 +170,7 @@ class Gui:
         IPInfoFrm.pack(side=tk.LEFT, padx=5, pady=5, fill=tk.BOTH, expand=tk.YES)        
 
 
-    def weather_panel(self,parent):        
+     def weather_panel(self,parent):        
         global img
         wthr_bg = "light steel blue"        
         temperCol="red"   
@@ -167,26 +178,32 @@ class Gui:
         img = tk.PhotoImage(file=test_img)        
         wthrFrm=tk.Frame(parent,bg=wthr_bg)
 
-        tk.Label(wthrFrm, text="Clear Sky", fg="blue", bg=wthr_bg, font="Arial 10 bold", width=10, anchor=tk.W) .grid(row=0, column=1, columnspan=2, sticky=tk.E)
-        tk.Label(wthrFrm, text="24°C",      fg=temperCol,  bg=wthr_bg, font="Arial 12 bold").grid(row=0, sticky=tk.W)
-
-        tk.Label(wthrFrm, image=img,  bg=wthr_bg).grid(row=1, rowspan=2, column=2, sticky=tk.E)
+        self.wthr_descript=tk.Label(wthrFrm, text="Clear Sky", fg="blue", bg=wthr_bg, font="Arial 10 bold", width=10, anchor=tk.W)
+        self.wthr_descript.grid(row=0, column=1, columnspan=2, sticky=tk.E)
+        self.wthr_temper=tk.Label(wthrFrm, text="24°C",      fg=temperCol,  bg=wthr_bg, font="Arial 14 bold")
+        self.wthr_temper.grid(row=0, sticky=tk.W)
+        self.wthr_image=tk.Label(wthrFrm, image=img,  bg=wthr_bg)
+        self.wthr_image.grid(row=1, rowspan=2, column=2, sticky=tk.E)
 
         tk.Label(wthrFrm, text="Feels Like",  bg=wthr_bg, font="Arial 8").grid(row=1, sticky=tk.W)
         tk.Label(wthrFrm, text="Humidity",    bg=wthr_bg, font="Arial 8").grid(row=2, sticky=tk.W)
         tk.Label(wthrFrm, text="Pressure",    bg=wthr_bg, font="Arial 8").grid(row=3, sticky=tk.W)
         tk.Label(wthrFrm, text="Wind",        bg=wthr_bg, font="Arial 8").grid(row=4, sticky=tk.W)
 
-        tk.Label(wthrFrm, text="23°C",  bg=wthr_bg, font="Arial 8 bold").grid(row=1, column=1, sticky=tk.W)
-        tk.Label(wthrFrm, text="36%",  bg=wthr_bg, font="Arial 8 bold").grid(row=2, column=1, sticky=tk.W)
-        tk.Label(wthrFrm, text="1024 hPa",  bg=wthr_bg, font="Arial 8 bold").grid(row=3, column=1,  columnspan=2, sticky=tk.W)
-        tk.Label(wthrFrm, text="2.7 m/s",  bg=wthr_bg, font="Arial 8 bold").grid(row=4, column=1,  columnspan=2, sticky=tk.W)
+        self.wthr_like=tk.Label(wthrFrm, text="23°C",  bg=wthr_bg, font="Arial 8 bold")
+        self.wthr_like.grid(row=1, column=1, sticky=tk.W)
+        self.wthr_humid=tk.Label(wthrFrm, text="36%",  bg=wthr_bg, font="Arial 8 bold")
+        self.wthr_humid.grid(row=2, column=1, sticky=tk.W)
+        self.wthr_press=tk.Label(wthrFrm, text="1024 hPa",  bg=wthr_bg, font="Arial 8 bold")
+        self.wthr_press.grid(row=3, column=1,  columnspan=2, sticky=tk.W)
+        self.wthr_wind=tk.Label(wthrFrm, text="2.7 m/s",  bg=wthr_bg, font="Arial 8 bold")
+        self.wthr_wind.grid(row=4, column=1,  columnspan=2, sticky=tk.W)
 
         wthrFrm.pack(side=tk.LEFT, padx=5, pady=5, fill=tk.BOTH, expand=tk.YES)
 
 
 
-    def init_clock_window(self):
+     def init_clock_window(self):
         #----------------------
         #  panel buttons left
         #----------------------
@@ -236,7 +253,18 @@ def time_thread():
                break
           update_guiDateTime(gui)
 
+
 #======== Weather Thread ======
+def weather_thread():
+     global gui,exit
+     while True:          
+          if exit:
+               break
+          info = wthr.get_weather_info()
+          if exit:
+               break          
+          gui.update_weather(info)
+          tm.sleep(10)
 
 
 #======== lanIp Thread ========          
@@ -259,9 +287,13 @@ tm_thrd.start()
 # start lanIp thread
 lan_thrd=thrd.Thread(target=lanIp_thread)
 lan_thrd.start()
+# start lanIp thread
+wether_thrd=thrd.Thread(target=weather_thread)
+wether_thrd.start()
 
 gui.run()
 tm_thrd.join()
 lan_thrd.join()
+wether_thrd.join()
 
 print("End...")
