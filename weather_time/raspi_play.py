@@ -236,6 +236,9 @@ def time_thread():
                break
           update_guiDateTime(gui)
 
+#======== Weather Thread ======
+
+
 #======== lanIp Thread ========          
 def lanIp_thread():
      global gui,exit
