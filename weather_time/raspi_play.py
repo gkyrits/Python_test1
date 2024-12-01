@@ -8,6 +8,7 @@ LCD_SIZE = "320x240"
 FULL_SCREEN = 1
 
 exit = False
+wthr_count = 0
 
 def get_month(date):    
      if date==1:
@@ -92,12 +93,13 @@ class Gui:
 
      def update_weather(self,info):
           if info['Error']=='':
-               self.wthr_temper.config(text=info['Temper'])
+               self.wthr_temper.config(text='{:.1f}°C'.format(info['Temper']))
                self.wthr_descript.config(text=info['Descript'])
-               self.wthr_like.config(text=info['Like'])
-               self.wthr_humid.config(text=info['Humidity'])
-               self.wthr_press.config(text=info['Pressure'])
-               self.wthr_wind.config(text=info['Wind'])
+               self.wthr_like.config(text='{:.1f}°C'.format(info['Like']))
+               self.wthr_humid.config(text='{}%'.format(info['Humidity']))
+               self.wthr_press.config(text='{} hPa'.format(info['Pressure']))
+               self.wthr_wind.config(text='{} m/s'.format(info['Wind']))
+               self.wthr_count.config(text=wthr_count)
          
        
      def btn_exit(self):
@@ -177,33 +179,39 @@ class Gui:
      def weather_panel(self,parent):        
         global img
         wthr_bg = "light steel blue"        
-        temperCol="red"   
+        temperCol="red"  
+        infoCol="blue" 
         test_img='13.png'
-        rows_num=5
         img = tk.PhotoImage(file=test_img)        
         wthrFrm=tk.Frame(parent,bg=wthr_bg)
-        for row in range(rows_num):
-            wthrFrm.rowconfigure(row, weight=1)
-        self.wthr_descript=tk.Label(wthrFrm, text="Clear Sky", fg="blue", bg=wthr_bg, font="Arial 10 bold", width=20, anchor=tk.W)
-        self.wthr_descript.grid(row=0, column=1, columnspan=2, sticky=tk.E)
-        self.wthr_temper=tk.Label(wthrFrm, text="24°C",      fg=temperCol,  bg=wthr_bg, font="Arial 14 bold")
-        self.wthr_temper.grid(row=0, sticky=tk.W)
+        for row in range(6): # 6 rows
+            wthrFrm.rowconfigure(row, weight=1) #resize grid height
+
+        self.wthr_descript=tk.Label(wthrFrm, text="Clear Sky", fg="blue", bg=wthr_bg, font="Arial 10 bold", anchor=tk.W)
+        self.wthr_descript.grid(row=0, columnspan=3, sticky=tk.W)
+
+        self.wthr_temper=tk.Label(wthrFrm, text="24°C", fg=temperCol,  bg=wthr_bg, font="Arial 20 bold")
+        self.wthr_temper.grid(row=1, columnspan=2, sticky=tk.W)
+
         self.wthr_image=tk.Label(wthrFrm, image=img,  bg=wthr_bg)
-        self.wthr_image.grid(row=1, rowspan=2, column=2, sticky=tk.E)
+        self.wthr_image.grid(row=1, column=2, sticky=tk.W)
 
-        tk.Label(wthrFrm, text="Feels Like",  bg=wthr_bg, font="Arial 8").grid(row=1, sticky=tk.W)
-        tk.Label(wthrFrm, text="Humidity",    bg=wthr_bg, font="Arial 8").grid(row=2, sticky=tk.W)
-        tk.Label(wthrFrm, text="Pressure",    bg=wthr_bg, font="Arial 8").grid(row=3, sticky=tk.W)
-        tk.Label(wthrFrm, text="Wind",        bg=wthr_bg, font="Arial 8").grid(row=4, sticky=tk.W)
+        tk.Label(wthrFrm, text="Feels Like",  bg=wthr_bg, font="Arial 8").grid(row=2, sticky=tk.W)
+        tk.Label(wthrFrm, text="Humidity",    bg=wthr_bg, font="Arial 8").grid(row=3, sticky=tk.W)
+        tk.Label(wthrFrm, text="Pressure",    bg=wthr_bg, font="Arial 8").grid(row=4, sticky=tk.W)
+        tk.Label(wthrFrm, text="Wind",        bg=wthr_bg, font="Arial 8").grid(row=5, sticky=tk.W)
 
-        self.wthr_like=tk.Label(wthrFrm, text="23°C",  bg=wthr_bg, font="Arial 8 bold")
-        self.wthr_like.grid(row=1, column=1, sticky=tk.W)
-        self.wthr_humid=tk.Label(wthrFrm, text="36%",  bg=wthr_bg, font="Arial 8 bold")
-        self.wthr_humid.grid(row=2, column=1, sticky=tk.W)
-        self.wthr_press=tk.Label(wthrFrm, text="1024 hPa",  bg=wthr_bg, font="Arial 8 bold")
-        self.wthr_press.grid(row=3, column=1,  columnspan=2, sticky=tk.W)
-        self.wthr_wind=tk.Label(wthrFrm, text="2.7 m/s",  bg=wthr_bg, font="Arial 8 bold")
-        self.wthr_wind.grid(row=4, column=1,  columnspan=2, sticky=tk.W)
+        self.wthr_like=tk.Label(wthrFrm, text="23°C",  fg=infoCol, bg=wthr_bg, font="Arial 8 bold")
+        self.wthr_like.grid(row=2, column=1, sticky=tk.W)
+        self.wthr_humid=tk.Label(wthrFrm, text="36%",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
+        self.wthr_humid.grid(row=3, column=1, sticky=tk.W)
+        self.wthr_press=tk.Label(wthrFrm, text="1024 hPa",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
+        self.wthr_press.grid(row=4, column=1,  columnspan=2, sticky=tk.W)
+        self.wthr_wind=tk.Label(wthrFrm, text="2.7 m/s",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
+        self.wthr_wind.grid(row=5, column=1,  columnspan=2, sticky=tk.W)
+
+        self.wthr_count=tk.Label(wthrFrm, text="4",  bg=wthr_bg, font="Arial 8 bold")
+        self.wthr_count.grid(row=5, column=3,  columnspan=2, sticky=tk.E)        
 
         wthrFrm.pack(side=tk.LEFT, padx=5, pady=5, fill=tk.BOTH, expand=tk.YES)
 
@@ -262,15 +270,16 @@ def time_thread():
 
 #======== Weather Thread ======
 def weather_thread():
-     global gui,exit
+     global gui,exit,wthr_count
      while True:          
           if exit:
                break
+          wthr_count += 1
           info = wthr.get_weather_info()
           if exit:
                break          
           gui.update_weather(info)
-          tm.sleep(10)
+          tm.sleep(60)
 
 
 #======== lanIp Thread ========          
