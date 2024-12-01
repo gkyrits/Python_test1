@@ -153,19 +153,23 @@ class Gui:
         lanIpFont= "Arial 10 bold"
         wanIPcol="green"
         lanIPcol="SlateBlue4"
+        IPheight=30
+        IPwidth=100
         IPInfoFrm = tk.Frame(parent, bg=datetm_bg)
           #-----sub panel for Lan info
-        lanInfoFrm=tk.Frame(IPInfoFrm,bg=datetm_bg)
+        lanInfoFrm=tk.Frame(IPInfoFrm,bg=datetm_bg, height=IPheight, width=IPwidth)
         tk.Label(lanInfoFrm,text="Lan:", bg=datetm_bg, fg=lanIPcol, font=lanLblFont).pack(side=tk.TOP, anchor=tk.W)
-        self.ethIp = tk.Label(lanInfoFrm,text="0.0.0.0", bg=datetm_bg, fg=lanIPcol, font=lanIpFont, width=12, anchor=tk.W)
+        self.ethIp = tk.Label(lanInfoFrm,text="0.0.0.0", bg=datetm_bg, fg=lanIPcol, font=lanIpFont, anchor=tk.W)
         self.ethIp.pack(side=tk.TOP, anchor=tk.W)
         lanInfoFrm.pack(side=tk.TOP, anchor=tk.W)
+        lanInfoFrm.pack_propagate(False)
           #-----sub panel for Wan info
-        wanInfoFrm=tk.Frame(IPInfoFrm,bg=datetm_bg)  
+        wanInfoFrm=tk.Frame(IPInfoFrm,bg=datetm_bg, height=IPheight, width=IPwidth)  
         tk.Label(wanInfoFrm,text="Wan:", bg=datetm_bg, fg=wanIPcol, font=lanLblFont).pack(side=tk.TOP, anchor=tk.W)
-        self.wanIp = tk.Label(wanInfoFrm,text="0.0.0.0", bg=datetm_bg, fg=wanIPcol, font=lanIpFont)
+        self.wanIp = tk.Label(wanInfoFrm,text="255.255.255.255", bg=datetm_bg, fg=wanIPcol, font=lanIpFont)
         self.wanIp.pack(side=tk.TOP, anchor=tk.W)
-        wanInfoFrm.pack(side=tk.TOP, anchor=tk.W)        
+        wanInfoFrm.pack(side=tk.TOP, anchor=tk.W)   
+        wanInfoFrm.pack_propagate(False)
         #--close panel IPinfo
         IPInfoFrm.pack(side=tk.LEFT, padx=5, pady=5, fill=tk.BOTH, expand=tk.YES)        
 
@@ -175,10 +179,12 @@ class Gui:
         wthr_bg = "light steel blue"        
         temperCol="red"   
         test_img='13.png'
+        rows_num=5
         img = tk.PhotoImage(file=test_img)        
         wthrFrm=tk.Frame(parent,bg=wthr_bg)
-
-        self.wthr_descript=tk.Label(wthrFrm, text="Clear Sky", fg="blue", bg=wthr_bg, font="Arial 10 bold", width=10, anchor=tk.W)
+        for row in range(rows_num):
+            wthrFrm.rowconfigure(row, weight=1)
+        self.wthr_descript=tk.Label(wthrFrm, text="Clear Sky", fg="blue", bg=wthr_bg, font="Arial 10 bold", width=20, anchor=tk.W)
         self.wthr_descript.grid(row=0, column=1, columnspan=2, sticky=tk.E)
         self.wthr_temper=tk.Label(wthrFrm, text="24°C",      fg=temperCol,  bg=wthr_bg, font="Arial 14 bold")
         self.wthr_temper.grid(row=0, sticky=tk.W)
