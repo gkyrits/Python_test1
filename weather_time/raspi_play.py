@@ -189,13 +189,13 @@ class Gui:
             wthrFrm.rowconfigure(row, weight=1) #resize grid height
 
         self.wthr_descript=tk.Label(wthrFrm, text="Clear Sky", fg="blue", bg=wthr_bg, font="Arial 10 bold", anchor=tk.W)
-        self.wthr_descript.grid(row=0, columnspan=3, sticky=tk.W)
-
+        self.wthr_descript.grid(row=0, columnspan=4, sticky=tk.W)
+        
         self.wthr_temper=tk.Label(wthrFrm, text="24°C", fg=temperCol,  bg=wthr_bg, font="Arial 20 bold")
         self.wthr_temper.grid(row=1, columnspan=2, sticky=tk.W)
 
         self.wthr_image=tk.Label(wthrFrm, image=img,  bg=wthr_bg)
-        self.wthr_image.grid(row=1, column=2, sticky=tk.W)
+        self.wthr_image.grid(row=1, column=2,  columnspan=2, rowspan=3, sticky=tk.W)
 
         tk.Label(wthrFrm, text="Feels Like",  bg=wthr_bg, font="Arial 8").grid(row=2, sticky=tk.W)
         tk.Label(wthrFrm, text="Humidity",    bg=wthr_bg, font="Arial 8").grid(row=3, sticky=tk.W)
@@ -212,7 +212,7 @@ class Gui:
         self.wthr_wind.grid(row=5, column=1,  columnspan=2, sticky=tk.W)
 
         self.wthr_count=tk.Label(wthrFrm, text="4",  bg=wthr_bg, font="Arial 8 bold")
-        self.wthr_count.grid(row=5, column=3,  columnspan=2, sticky=tk.E)        
+        self.wthr_count.grid(row=5, column=3,  sticky=tk.E) 
 
         wthrFrm.pack(side=tk.LEFT, padx=5, pady=5, fill=tk.BOTH, expand=tk.YES)
 
@@ -300,10 +300,10 @@ def screensaver_disable(disable):
     try:        
         if disable:
             os.run(["xset", "-dpms"])
-            os.run(["xset", "s off"])
+            os.run(["xset", "s","off"])
         else:    
             os.run(["xset", "+dpms"])
-            os.run(["xset", "s on"])
+            os.run(["xset", "s","on"])
     except:  
         return        
 
