@@ -94,10 +94,10 @@ class Gui:
 
      def update_weather(self,info):
           if info['Error']=='':
-               self.wthr_temper.config(text='{:.1f}°C'.format(info['Temper']))
+               self.wthr_temper.config(text='{:.1f}'.format(info['Temper']))
                self.wthr_descript.config(text=info['Descript'])
                self.wthr_like.config(text='{:.1f}°C'.format(info['Like']))
-               self.wthr_humid.config(text='{}%'.format(info['Humidity']))
+               self.wthr_humid.config(text='{} %'.format(info['Humidity']))
                self.wthr_press.config(text='{} hPa'.format(info['Pressure']))
                self.wthr_wind.config(text='{} m/s'.format(info['Wind']))
                self.wthr_count.config(text=wthr_count)
@@ -147,7 +147,7 @@ class Gui:
         dateFrm.pack(side=tk.TOP, fill=tk.X, padx=2)
         dateFrm.pack_propagate(False) #enable Frame height=40
         #--close panel datetm
-        datetmfrm.pack(side=tk.TOP, padx=5, pady=5, fill=tk.X)         
+        datetmfrm.pack(side=tk.TOP, padx=self.pnlPad, pady=self.pnlPad, fill=tk.X)         
 
 
      def ipInfo_panel(self,parent):
@@ -174,7 +174,7 @@ class Gui:
         wanInfoFrm.pack(side=tk.TOP, anchor=tk.W)   
         wanInfoFrm.pack_propagate(False)
         #--close panel IPinfo
-        IPInfoFrm.pack(side=tk.LEFT, padx=5, pady=5, fill=tk.BOTH, expand=tk.YES)        
+        IPInfoFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)        
 
 
      def weather_panel(self,parent):        
@@ -191,8 +191,11 @@ class Gui:
         self.wthr_descript=tk.Label(wthrFrm, text="Clear Sky", fg="blue", bg=wthr_bg, font="Arial 10 bold", anchor=tk.W)
         self.wthr_descript.grid(row=0, columnspan=4, sticky=tk.W)
         
-        self.wthr_temper=tk.Label(wthrFrm, text="24°C", fg=temperCol,  bg=wthr_bg, font="Arial 20 bold")
-        self.wthr_temper.grid(row=1, columnspan=2, sticky=tk.W)
+        temperFrm=tk.Frame(wthrFrm,bg=wthr_bg)
+        self.wthr_temper=tk.Label(temperFrm, text="24", fg=temperCol,  bg=wthr_bg, font="Arial 20 bold")
+        self.wthr_temper.pack(side=tk.LEFT)
+        tk.Label(temperFrm, text="°C", fg=temperCol,  bg=wthr_bg, font="Arial 12 bold").pack(side=tk.TOP)
+        temperFrm.grid(row=1, columnspan=2, sticky=tk.W)
 
         self.wthr_image=tk.Label(wthrFrm, image=img,  bg=wthr_bg)
         self.wthr_image.grid(row=1, column=2,  columnspan=2, rowspan=3, sticky=tk.W)
@@ -214,11 +217,12 @@ class Gui:
         self.wthr_count=tk.Label(wthrFrm, text="4",  bg=wthr_bg, font="Arial 8 bold")
         self.wthr_count.grid(row=5, column=3,  sticky=tk.E) 
 
-        wthrFrm.pack(side=tk.LEFT, padx=5, pady=5, fill=tk.BOTH, expand=tk.YES)
+        wthrFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)
 
 
 
      def init_clock_window(self):
+        self.pnlPad=3  #default panel padx, pady
         #----------------------
         #  panel buttons left
         #----------------------
