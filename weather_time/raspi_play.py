@@ -3,6 +3,7 @@ import time as tm
 import threading as thrd
 import ipaddr as ip
 import weather as wthr
+import subprocess as os
 
 LCD_SIZE = "320x240"
 FULL_SCREEN = 1
@@ -293,8 +294,22 @@ def lanIp_thread():
           if exit:
                break          
           tm.sleep(5)
+
+#======== Sreen Saver ========
+def screensaver_disable(disable):
+    try:        
+        if disable:
+            os.run(["xset", "-dpms"])
+            os.run(["xset", "s off"])
+        else:    
+            os.run(["xset", "+dpms"])
+            os.run(["xset", "s on"])
+    except:  
+        return        
+
                
-#======== Main ===============        
+#======== Main =============== 
+screensaver_disable(True)
 gui = Gui()
 # start time thread
 tm_thrd=thrd.Thread(target=time_thread)
@@ -311,4 +326,5 @@ tm_thrd.join()
 lan_thrd.join()
 wether_thrd.join()
 
+screensaver_disable(False)
 print("End...")
