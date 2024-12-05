@@ -54,6 +54,13 @@ def get_weekDay(wday):
      elif wday==6:
         return "Sunday"         
           
+icon_map_day = {200:14,201:14,202:14,210:15,211:15,212:15,221:15,230:14,231:14,232:14,
+                300:12,301:12,310:12,302:10,311:10,312:10,313:10,314:10,321:10,
+                500:13,501:13,520:13,502:11,503:11,521:11,504:25,522:25,531:25,511:20,
+                611:20,612:20,613:20,615:20,616:20,600:19,612:19,601:24,600:24,612:24,620:18,602:16,621:17,622:17,
+                701:19,711:19,721:19,731:19,741:19,751:19,761:19,762:19,771:19,781:19,
+                800:2,801:3,802:4,803:6,804:7}
+icon_night_map = {15:33,13:32,19:35,24:34,3:27,4:28,6:30,2:26}
     
 #======== Gui Class =========
 class Gui:
@@ -63,6 +70,7 @@ class Gui:
         self.root.geometry(LCD_SIZE+'+0+0')
         if(FULL_SCREEN):
               self.root.overrideredirect(1)  
+        self.nightTime=False      
         self.init_clock_window()
 
      def __str__(self):
@@ -77,7 +85,12 @@ class Gui:
         main_time = time_part[0]+":"+time_part[1]
         sec_time = ":"+time_part[2]        
         self.clkMain_lbl.config(text=main_time)
-        self.clkSec_lbl.config(text=sec_time)        
+        self.clkSec_lbl.config(text=sec_time)
+        if int(time_part[0]) >= 20:
+            self.nightTime=True
+        else:
+            self.nightTime=False
+
 
      def update_date(self,date):
         date_part = date.split("/")
@@ -94,6 +107,7 @@ class Gui:
 
      def update_weather(self,info):
           if info['Error']=='':
+               global img
                self.wthr_temper.config(text='{:.1f}'.format(info['Temper']))
                self.wthr_descript.config(text=info['Descript'])
                self.wthr_like.config(text='{:.1f}°C'.format(info['Like']))
@@ -101,6 +115,13 @@ class Gui:
                self.wthr_press.config(text='{} hPa'.format(info['Pressure']))
                self.wthr_wind.config(text='{} m/s'.format(info['Wind']))
                self.wthr_count.config(text=wthr_count)
+               icon_num=icon_map_day[info['Id']]
+               if self.nightTime :
+                  if icon_num in icon_night_map.keys():
+                     icon_num=icon_night_map[icon_num]
+               icon_file='icons/'+str(icon_num)+'.png'
+               img=tk.PhotoImage(file=icon_file)
+               self.wthr_image.config(image=img)
          
        
      def btn_exit(self):
@@ -182,7 +203,7 @@ class Gui:
         wthr_bg = "light steel blue"        
         temperCol="red"  
         infoCol="blue" 
-        test_img='13.png'
+        test_img='icons/13.png'
         img = tk.PhotoImage(file=test_img)        
         wthrFrm=tk.Frame(parent,bg=wthr_bg)
         for row in range(6): # 6 rows
