@@ -10,7 +10,7 @@ parameters = {'appid': API_KEY,
               'lat': '37.93820','lon': '23.70925','units': 'metric','lang':'el'}
 
 url = "https://api.openweathermap.org/data/2.5/weather"
-parameters['lat']='asdf'
+#parameters['lat']='asdf'
 data = requests.get(url, parameters).json()
 
 print('--------------')

@@ -86,7 +86,8 @@ class Gui:
         sec_time = ":"+time_part[2]        
         self.clkMain_lbl.config(text=main_time)
         self.clkSec_lbl.config(text=sec_time)
-        if int(time_part[0]) >= 20:
+        h_time = int(time_part[0])
+        if (h_time>=20) or (h_time<=6):
             self.nightTime=True
         else:
             self.nightTime=False
@@ -203,8 +204,7 @@ class Gui:
         wthr_bg = "light steel blue"        
         temperCol="red"  
         infoCol="blue" 
-        test_img='icons/13.png'
-        img = tk.PhotoImage(file=test_img)        
+        img = tk.PhotoImage(file='icons/13.png')        
         wthrFrm=tk.Frame(parent,bg=wthr_bg)
         for row in range(6): # 6 rows
             wthrFrm.rowconfigure(row, weight=1) #resize grid height
@@ -218,7 +218,7 @@ class Gui:
         tk.Label(temperFrm, text="°C", fg=temperCol,  bg=wthr_bg, font="Arial 12 bold").pack(side=tk.TOP)
         temperFrm.grid(row=1, columnspan=2, sticky=tk.W)
 
-        self.wthr_image=tk.Label(wthrFrm, image=img,  bg=wthr_bg)
+        self.wthr_image=tk.Label(wthrFrm, image=img,  bg=wthr_bg, anchor=tk.W)
         self.wthr_image.grid(row=1, column=2,  columnspan=2, rowspan=3, sticky=tk.W)
 
         tk.Label(wthrFrm, text="Feels Like",  bg=wthr_bg, font="Arial 8").grid(row=2, sticky=tk.W)
