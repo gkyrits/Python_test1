@@ -38,7 +38,6 @@ def get_month(date):
          return "December"
 
 def get_weekDay(wday):
-
      if wday==0:
          return "Monday"
      elif wday==1:
@@ -52,7 +51,28 @@ def get_weekDay(wday):
      elif wday==5:
          return "Saturday"
      elif wday==6:
-        return "Sunday"         
+        return "Sunday"       
+
+def get_windDir(deg):
+    if deg<=22 or deg>337:
+        return "B"
+    elif deg<=67 and deg>22:
+        return "ΒΔ"
+    elif deg<=112 and deg>67:
+        return "Δ"
+    elif deg<=157 and deg>112:
+        return "NΔ"
+    elif deg<=202 and deg>157:
+        return "N"
+    elif deg<=247 and deg>202:
+        return "NA"
+    elif deg<=292 and deg>247:
+        return "A"
+    elif deg<=337 and deg>292:
+        return "BA"
+    else:
+        return "?"
+    
           
 icon_map_day = {200:14,201:14,202:14,210:15,211:15,212:15,221:15,230:14,231:14,232:14,
                 300:12,301:12,310:12,302:10,311:10,312:10,313:10,314:10,321:10,
@@ -115,6 +135,7 @@ class Gui:
                self.wthr_humid.config(text='{} %'.format(info['Humidity']))
                self.wthr_press.config(text='{} hPa'.format(info['Pressure']))
                self.wthr_wind.config(text='{} m/s'.format(info['Wind']))
+               self.wthr_windDir.config(text=get_windDir(info['WindDeg']))
                self.wthr_count.config(text=wthr_count)
                icon_num=icon_map_day[info['Id']]
                if self.nightTime :
@@ -233,7 +254,9 @@ class Gui:
         self.wthr_press=tk.Label(wthrFrm, text="1024 hPa",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
         self.wthr_press.grid(row=4, column=1,  columnspan=2, sticky=tk.W)
         self.wthr_wind=tk.Label(wthrFrm, text="2.7 m/s",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
-        self.wthr_wind.grid(row=5, column=1,  columnspan=2, sticky=tk.W)
+        self.wthr_wind.grid(row=5, column=1,  sticky=tk.W)
+        self.wthr_windDir=tk.Label(wthrFrm, text="NA",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
+        self.wthr_windDir.grid(row=5, column=2,  sticky=tk.W)        
 
         self.wthr_count=tk.Label(wthrFrm, text="4",  bg=wthr_bg, font="Arial 8 bold")
         self.wthr_count.grid(row=5, column=3,  sticky=tk.E) 

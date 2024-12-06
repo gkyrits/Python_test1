@@ -18,7 +18,7 @@ meteo_place_url = "https://www.meteosource.com/api/v1/free/nearest_place"
 meteo_point_url = 'https://www.meteosource.com/api/v1/free/point'
 
 #---return info
-info = {'Place':'', 'Descript':'', 'Temper':0.0, 'Like':0.0, 'Humidity':0, 'Pressure':0, 'Wind':0.0, 'Id':0, 'Error':''}
+info = {'Place':'', 'Descript':'', 'Temper':0.0, 'Like':0.0, 'Humidity':0, 'Pressure':0, 'Wind':0.0, 'WindDeg':0, 'Id':0, 'Error':''}
 
 
 def get_meteo_weather_info(lat, lon):    
@@ -37,6 +37,7 @@ def get_meteo_weather_info(lat, lon):
     info['Humidity']='-'
     info['Pressure']='-'
     info['Wind']='-'
+    info['WindDeg']='-'
     info['Id']=0
     return info
 
@@ -60,6 +61,7 @@ def get_open_weather_info(lat, lon):
     info['Humidity']=data['main']['humidity']
     info['Pressure']=data['main']['pressure']
     info['Wind']=data['wind']['speed']
+    info['WindDeg']=data['wind']['deg']
     info['Id']=data['weather'][0]['id']
     return info
 

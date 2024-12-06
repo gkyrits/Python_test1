@@ -11,7 +11,7 @@ def print_info(info):
         print('Feels Like : {} °C'.format(info['Like']))
         print('Humidity   : {} %'.format(info['Humidity']))
         print('Pressure   : {} hPa'.format(info['Pressure']))
-        print('Wind       : {} m/s'.format(info['Wind']))
+        print('Wind       : {} m/s ({})'.format(info['Wind'],info['WindDeg']))
     print('') 
 
 
