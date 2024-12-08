@@ -81,6 +81,12 @@ icon_map_day = {200:14,201:14,202:14,210:15,211:15,212:15,221:15,230:14,231:14,2
                 701:19,711:19,721:19,731:19,741:19,751:19,761:19,762:19,771:19,781:19,
                 800:2,801:3,802:4,803:6,804:7}
 icon_night_map = {15:33,13:32,19:35,24:34,3:27,4:28,6:30,2:26}
+
+
+def bind_tree(widget, event, callback):
+    widget.bind(event, callback)
+    for child in widget.children.values():
+        bind_tree(child, event, callback)
     
 #======== Gui Class =========
 class Gui:
@@ -90,12 +96,31 @@ class Gui:
         self.root.geometry(LCD_SIZE+'+0+0')
         if(FULL_SCREEN):
               self.root.overrideredirect(1)  
-        self.nightTime=False      
+        self.nightTime=False        
         self.init_clock_window()
 
      def __str__(self):
         """ description """
-        return "Gui Class"        
+        return "Gui Class"
+
+     def clockPanel_dblClick(self,e):
+        print('Clock click! :%s' % e.widget)
+
+     def infoPanel_dblClick(self,e):
+        print('Info click! :%s' % e.widget)
+
+     def weatherPanel_dblClick(self,e):
+        print('Weather click! :%s' % e.widget)
+
+     def key1_press(self):
+        print('Key1 press!')
+
+     def key2_press(self):
+        print('Key2 press!')
+
+     def key3_press(self):
+        print('Key3 press!')        
+        self.btn_exit()
 
      def run(self):
         self.root.mainloop()
@@ -154,9 +179,9 @@ class Gui:
 
      def keys_panel(self,parent):
         pnl_bt_col = "pink"
-        tk.Button(parent,text="1", bg=pnl_bt_col).pack(side=tk.TOP, expand=tk.YES) #Button.width: in text size
-        tk.Button(parent,text="2", bg=pnl_bt_col).pack(side=tk.TOP, expand=tk.YES)
-        tk.Button(parent,text="3", bg=pnl_bt_col, command=self.btn_exit).pack(side=tk.TOP, expand=tk.YES)
+        tk.Button(parent,text="1", bg=pnl_bt_col, command=self.key1_press).pack(side=tk.TOP, expand=tk.YES) #Button.width: in text size
+        tk.Button(parent,text="2", bg=pnl_bt_col, command=self.key2_press).pack(side=tk.TOP, expand=tk.YES)
+        tk.Button(parent,text="3", bg=pnl_bt_col, command=self.key3_press).pack(side=tk.TOP, expand=tk.YES)
 
 
      def clock_panel(self,parent):
@@ -282,6 +307,7 @@ class Gui:
         pnlClock =  tk.Frame(self.root, bg=win_col, relief=tk.GROOVE, borderwidth=2)
         self.clock_panel(pnlClock)
         pnlClock.pack(side=tk.TOP, fill=tk.X)
+        bind_tree(pnlClock,'<Double-Button-1>',self.clockPanel_dblClick)
 
         #----------------
         # panel bottom 
@@ -291,10 +317,12 @@ class Gui:
         pnlCpuInfo = tk.Frame(pnlBottom, bg=win_col, relief=tk.GROOVE, borderwidth=2)        
         self.ipInfo_panel(pnlCpuInfo)        
         pnlCpuInfo.pack(side=tk.LEFT, fill=tk.BOTH, expand=tk.YES, anchor=tk.W)
+        bind_tree(pnlCpuInfo,'<Double-Button-1>',self.infoPanel_dblClick)
         #--panel Weather
         weatherFrm = tk.Frame(pnlBottom, bg=win_col, relief=tk.GROOVE, borderwidth=2)
         self.weather_panel(weatherFrm)
         weatherFrm.pack(side=tk.LEFT, fill=tk.BOTH, expand=tk.YES, anchor=tk.W)
+        bind_tree(weatherFrm,'<Double-Button-1>',self.weatherPanel_dblClick)
         #--close panel Bottom  
         pnlBottom.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=tk.YES)
 
@@ -343,6 +371,10 @@ def lanIp_thread():
                break          
           tm.sleep(5)
 
+#======== cansel thread sleep  ========
+def cansel_threads():
+    pass
+
 #======== Sreen Saver ========
 def screensaver_disable(disable):
     try:        
@@ -370,6 +402,7 @@ wether_thrd=thrd.Thread(target=weather_thread)
 wether_thrd.start()
 
 gui.run()
+cansel_threads()
 tm_thrd.join()
 lan_thrd.join()
 wether_thrd.join()
