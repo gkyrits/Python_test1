@@ -1,7 +1,7 @@
 import tkinter as tk
 
 WIN_TITLE = 'Test 4 V0.1'
-LARG_SREEN = 0
+LARG_SREEN = 1
 
 #-----------------------------------------------------------------------------
 def buildWin1(frm,win):

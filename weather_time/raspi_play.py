@@ -103,27 +103,51 @@ class Gui:
         """ description """
         return "Gui Class"
 
+     #events-----------------------
      def clockPanel_dblClick(self,e):
-        print('Clock click! :%s' % e.widget)
+        #print('Clock click! :%s' % e.widget)
+        self.__info_window('Clock click!')
 
      def infoPanel_dblClick(self,e):
-        print('Info click! :%s' % e.widget)
+        #print('Info click! :%s' % e.widget)
+        self.__info_window('Info click!')
 
      def weatherPanel_dblClick(self,e):
-        print('Weather click! :%s' % e.widget)
+        #print('Weather click! :%s' % e.widget)
+        self.__info_window('Weather click!')
 
      def key1_press(self):
-        print('Key1 press!')
+        self.__info_window('Key1 press!')
 
      def key2_press(self):
-        print('Key2 press!')
+        self.__info_window('Key2 press!')
 
      def key3_press(self):
         print('Key3 press!')        
         self.btn_exit()
 
+    #-----------------------------    
      def run(self):
         self.root.mainloop()
+
+     def __set_modal(self,win): #'__' means private
+        win.grab_set()
+        win.wait_window()
+        win.grab_release()        
+
+     def __info_window(self,info):
+         win=tk.Toplevel(bg="green")
+         win.geometry('220x80+50+80')
+         win.overrideredirect(1)
+         bg_col="yellow green"
+         frm=tk.Frame(win, bg=bg_col, relief=tk.GROOVE, borderwidth=2)
+         tk.Label(frm,text=info, bg=bg_col, font='bold').pack(side=tk.TOP)
+         tk.Button(frm,text="Ok", command=win.destroy).place(relx=0.5, rely=0.6, relheight=0.4, relwidth=0.5, anchor=tk.CENTER)
+         frm.pack(padx=5, pady=5, fill=tk.BOTH, expand=tk.YES)
+         tmout=thrd.Timer(10, lambda :win.destroy())
+         tmout.start()
+         self.__set_modal(win)         
+         tmout.cancel()       
 
      def update_clock(self,time):
         time_part = time.split(":")
@@ -161,6 +185,7 @@ class Gui:
                self.wthr_press.config(text='{} hPa'.format(info['Pressure']))
                self.wthr_wind.config(text='{} m/s'.format(info['Wind']))
                self.wthr_windDir.config(text=get_windDir(info['WindDeg']))
+               self.wthr_id.config(text=info['Id'])
                self.wthr_count.config(text=wthr_count)
                icon_num=icon_map_day[info['Id']]
                if self.nightTime :
@@ -285,6 +310,8 @@ class Gui:
 
         self.wthr_count=tk.Label(wthrFrm, text="4",  bg=wthr_bg, font="Arial 8 bold")
         self.wthr_count.grid(row=5, column=3,  sticky=tk.E) 
+        self.wthr_id=tk.Label(wthrFrm, text="800",  bg=wthr_bg, font="Arial 6 bold")
+        self.wthr_id.grid(row=4, column=3,  sticky=tk.E)
 
         wthrFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)
 
@@ -346,17 +373,24 @@ def time_thread():
 
 
 #======== Weather Thread ======
-def weather_thread():
-     global gui,exit,wthr_count
+def weather_thread(tmout):
+     global gui,exit,wthr_count     
+     tm_cnt=0
+     wthr_count=1
+     info = wthr.get_weather_info()
+     gui.update_weather(info)
      while True:          
           if exit:
                break
-          wthr_count += 1
-          info = wthr.get_weather_info()
-          if exit:
-               break          
-          gui.update_weather(info)
-          tm.sleep(60)
+          tm_cnt += 1
+          if tm_cnt>tmout:
+            wthr_count += 1
+            info = wthr.get_weather_info()
+            if exit:
+               break            
+            gui.update_weather(info)
+            tm_cnt=0
+          tm.sleep(1)
 
 
 #======== lanIp Thread ========          
@@ -398,7 +432,7 @@ tm_thrd.start()
 lan_thrd=thrd.Thread(target=lanIp_thread)
 lan_thrd.start()
 # start lanIp thread
-wether_thrd=thrd.Thread(target=weather_thread)
+wether_thrd=thrd.Thread(target=weather_thread, args=(120,)) # sec update
 wether_thrd.start()
 
 gui.run()
