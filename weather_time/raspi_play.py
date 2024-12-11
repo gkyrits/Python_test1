@@ -409,6 +409,19 @@ def lanIp_thread():
 def cansel_threads():
     pass
 
+#======== register display keys =======
+def register_keys():
+    try:
+        from gpiozero import Button
+    except:
+        return
+    key1 = Button(18)
+    key2 = Button(23)
+    key3 = Button(24)
+    key1.when_pressed = gui.key1_press
+    key2.when_pressed = gui.key2_press
+    key3.when_pressed = gui.key3_press
+
 #======== Sreen Saver ========
 def screensaver_disable(disable):
     try:        
@@ -425,6 +438,8 @@ def screensaver_disable(disable):
 #======== Main =============== 
 screensaver_disable(True)
 gui = Gui()
+# register Keys
+register_keys()
 # start time thread
 tm_thrd=thrd.Thread(target=time_thread)
 tm_thrd.start()
