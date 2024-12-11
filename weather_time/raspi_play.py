@@ -123,7 +123,7 @@ class Gui:
         self.__info_window('Key2 press!')
 
      def key3_press(self):
-        print('Key3 press!')        
+        print('Key3 press! - Exit')
         self.btn_exit()
 
     #-----------------------------    
@@ -414,13 +414,16 @@ def register_keys():
     try:
         from gpiozero import Button
     except:
+        print('Fail register Keys')
         return
+    global key1,key2,key3
     key1 = Button(18)
     key2 = Button(23)
     key3 = Button(24)
     key1.when_pressed = gui.key1_press
     key2.when_pressed = gui.key2_press
     key3.when_pressed = gui.key3_press
+
 
 #======== Sreen Saver ========
 def screensaver_disable(disable):
