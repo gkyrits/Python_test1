@@ -185,7 +185,7 @@ class Gui:
                self.wthr_press.config(text='{} hPa'.format(info['Pressure']))
                self.wthr_wind.config(text='{} m/s'.format(info['Wind']))
                self.wthr_windDir.config(text=get_windDir(info['WindDeg']))
-               self.wthr_id.config(text=info['Id'])
+               self.wthr_id.config(text='{}-{}'.format(info['Id'],info['Clouds']))
                self.wthr_count.config(text=wthr_count)
                icon_num=icon_map_day[info['Id']]
                if self.nightTime :

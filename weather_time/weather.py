@@ -18,7 +18,7 @@ meteo_place_url = "https://www.meteosource.com/api/v1/free/nearest_place"
 meteo_point_url = 'https://www.meteosource.com/api/v1/free/point'
 
 #---return info
-info = {'Place':'', 'Descript':'', 'Temper':0.0, 'Like':0.0, 'Humidity':0, 'Pressure':0, 'Wind':0.0, 'WindDeg':0, 'Id':0, 'Error':''}
+info = {'Place':'', 'Descript':'', 'Temper':0.0, 'Like':0.0, 'Humidity':0, 'Pressure':0, 'Wind':0.0, 'WindDeg':0, 'Clouds':0, 'Id':0, 'Error':''}
 
 
 def get_meteo_weather_info(lat, lon):    
@@ -38,6 +38,7 @@ def get_meteo_weather_info(lat, lon):
     info['Pressure']='-'
     info['Wind']='-'
     info['WindDeg']='-'
+    info['Clouds']='-'
     info['Id']=0
     return info
 
@@ -62,6 +63,7 @@ def get_open_weather_info(lat, lon):
     info['Pressure']=data['main']['pressure']
     info['Wind']=data['wind']['speed']
     info['WindDeg']=data['wind']['deg']
+    info['Clouds']=data['clouds']['all']
     info['Id']=data['weather'][0]['id']
     return info
 
@@ -89,5 +91,7 @@ if __name__ == '__main__':
         print('Feels Like : {} °C'.format(info['Like']))
         print('Humidity   : {} %'.format(info['Humidity']))
         print('Pressure   : {} hPa'.format(info['Pressure']))
+        print('Clouds     : {} %'.format(info['Clouds']))
         print('Wind       : {} m/s'.format(info['Wind']))
+        print('Wind Deg   : {} m/s'.format(info['WindDeg']))
     print('')    
