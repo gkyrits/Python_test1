@@ -119,10 +119,14 @@ class Gui:
         self.__info_window('Weather click!')
 
      def key1_press(self):
+        print('Key1 press!')     
         self.__info_window('Key1 press!')
+        print('Key1 ok!')
 
      def key2_press(self):
+        print('Key2 press!')
         self.__info_window('Key2 press!')
+        print('Key2 ok!')
 
      def key3_press(self):
         print('Key3 press! - Exit')
@@ -178,13 +182,13 @@ class Gui:
          self.wanIp.config(text=IpAddr)
 
      def update_cpu(self,usage,temper):
-         self.cpuUsage.config(text='{}%'.format(usage))
+         self.cpuUsage.config(text='{} %'.format(usage))
          self.cpuTemp.config(text='{}'.format(temper))
 
-     def update_battery(self,current,percent):
+     def update_battery(self,percent,current):
          if percent!=0:
             self.Batt.config(text='{:4.1f} %'.format(percent))
-            self.Curr.config(text='{:6.3f} A'.format(current))
+            self.Curr.config(text='{:5.3f} A'.format(current))
          else:
             self.Batt.config(text='')
             self.Curr.config(text='')
@@ -438,12 +442,22 @@ def cpuInfo_thread():
           if exit:
                break
           cpu_usage=cpu.get_cpuUsage()
+          if exit:
+               break
           cpu_temp=cpu.get_cpuTemp()
+          if exit:
+               break          
           gui.update_cpu(cpu_usage,cpu_temp)
           gui.update_ethIp(ip.get_ip_address("eth0"))
+          if exit:
+               break 
           gui.update_wanIp(ip.get_ip_address("wlan0"))
+          if exit:
+               break
           if battery.exist():
                bat_info=batt.get_baterry_info(battery)
+               if exit:         
+                   break
                gui.update_battery(bat_info['Percent'],bat_info['Current'])
           else:
                gui.update_battery(0,0)    
@@ -466,9 +480,9 @@ def register_keys():
     key1 = Button(18)
     key2 = Button(23)
     key3 = Button(24)
-    key1.when_pressed = gui.key1_press
-    key2.when_pressed = gui.key2_press
-    key3.when_pressed = gui.key3_press
+    key1.when_released = gui.key1_press
+    key2.when_released = gui.key2_press
+    key3.when_released = gui.key3_press
 
 
 #======== Sreen Saver ========
