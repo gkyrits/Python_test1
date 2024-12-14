@@ -8,7 +8,7 @@ def get_cpuTemp():
         import gpiozero as gpio
     except:
         return ''
-    return gpio.CPUTemperature().value
+    return int(gpio.CPUTemperature().value*100)
 
 
 
