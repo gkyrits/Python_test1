@@ -249,6 +249,9 @@ class Gui:
         lanIpFont= "Arial 10 bold"
         wanIPcol="green"
         lanIPcol="SlateBlue4"
+        cpuLblFont="Arial 8"
+        cpuValFont="Arial 8 bold"
+        cpuCol="Blue4"        
         IPheight=30
         IPwidth=100
         IPInfoFrm = tk.Frame(parent, bg=datetm_bg)
@@ -266,7 +269,25 @@ class Gui:
         self.wanIp.pack(side=tk.TOP, anchor=tk.W)
         wanInfoFrm.pack(side=tk.TOP, anchor=tk.W)   
         wanInfoFrm.pack_propagate(False)
-        #--close panel IPinfo
+          #----sub panel cpu/batt info
+        cpuInfoFrm=tk.Frame(IPInfoFrm,bg=datetm_bg, width=IPwidth)
+        for row in range(4): # 4 rows
+            cpuInfoFrm.rowconfigure(row, weight=1) #resize grid height                
+        tk.Label(cpuInfoFrm,text="usage", bg=datetm_bg, font=cpuLblFont).grid(row=0, column=0, sticky=tk.W)
+        self.cpuUsage=tk.Label(cpuInfoFrm,text="100%", bg=datetm_bg, fg=cpuCol, font=cpuValFont)
+        self.cpuUsage.grid(row=0, column=1, sticky=tk.W)
+        tk.Label(cpuInfoFrm,text="temper", bg=datetm_bg, font=cpuLblFont).grid(row=1, column=0, sticky=tk.W)
+        self.cpuTemp=tk.Label(cpuInfoFrm,text="45", bg=datetm_bg, fg=cpuCol, font=cpuValFont)
+        self.cpuTemp.grid(row=1, column=1, sticky=tk.W)
+        tk.Label(cpuInfoFrm,text="Butt", bg=datetm_bg, font=cpuLblFont).grid(row=2, column=0, sticky=tk.W)
+        self.Butt=tk.Label(cpuInfoFrm,text="100%", bg=datetm_bg, fg=cpuCol, font=cpuValFont)
+        self.Butt.grid(row=2, column=1, sticky=tk.W)
+        tk.Label(cpuInfoFrm,text="curr", bg=datetm_bg, font=cpuLblFont).grid(row=3, column=0, sticky=tk.W)
+        self.Curr=tk.Label(cpuInfoFrm,text="0.300", bg=datetm_bg, fg=cpuCol, font=cpuValFont)
+        self.Curr.grid(row=3, column=1, sticky=tk.W)
+        cpuInfoFrm.pack(side=tk.TOP, anchor=tk.W,pady=4)   
+        cpuInfoFrm.pack_propagate(False)
+        #--close panel IPinfo        
         IPInfoFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)        
 
 
@@ -299,7 +320,7 @@ class Gui:
 
         self.wthr_like=tk.Label(wthrFrm, text="23°C",  fg=infoCol, bg=wthr_bg, font="Arial 8 bold")
         self.wthr_like.grid(row=2, column=1, sticky=tk.W)
-        self.wthr_humid=tk.Label(wthrFrm, text="36%",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
+        self.wthr_humid=tk.Label(wthrFrm, text="36%",  bg=wthr_bg, fg="red4", font="Arial 9 bold")
         self.wthr_humid.grid(row=3, column=1, sticky=tk.W)
         self.wthr_press=tk.Label(wthrFrm, text="1024 hPa",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
         self.wthr_press.grid(row=4, column=1,  columnspan=2, sticky=tk.W)
