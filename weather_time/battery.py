@@ -72,7 +72,10 @@ class INA219:
         self._cal_value = 0
         self._current_lsb = 0
         self._power_lsb = 0
-        self.set_calibration_32V_2A()
+        try:
+            self.set_calibration_32V_2A()
+        except:
+             self.bus=None
 
     def read(self,address):
         if self.bus==None:
@@ -221,11 +224,17 @@ info = {'Voltage':0, 'Current':0, 'Percent':0}
 
 def get_baterry_info(ina219):
     if not ina219.exist():
-        return info       
-    bus_voltage = ina219.getBusVoltage_V()         # voltage on V- (load side)
-    #shunt_voltage = ina219.getShuntVoltage_mV() / 1000 # voltage between V+ and V- across the shunt
-    current = ina219.getCurrent_mA()                   # current in mA
-    #power = ina219.getPower_W()                        # power in W
+        return info      
+    try:     
+        bus_voltage = ina219.getBusVoltage_V()         # voltage on V- (load side)
+        #shunt_voltage = ina219.getShuntVoltage_mV() / 1000 # voltage between V+ and V- across the shunt
+        current = ina219.getCurrent_mA()                   # current in mA
+        #power = ina219.getPower_W()                        # power in W
+    except:
+        info['Voltage']=0
+        info['Current']=0
+        info['Percent']=0
+        return info
     p = (bus_voltage - 9)/3.6*100
     if(p > 100):p = 100
     if(p < 0):p = 0
