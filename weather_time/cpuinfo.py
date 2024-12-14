@@ -8,7 +8,7 @@ def get_cpuTemp():
         import gpiozero as gpio
     except:
         return ''
-    return gpio.LoadAverage().value
+    return gpio.CPUTemperature().value
 
 
 
