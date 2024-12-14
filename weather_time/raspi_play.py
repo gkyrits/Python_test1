@@ -4,6 +4,7 @@ import threading as thrd
 import ipaddr as ip
 import cpuinfo as cpu
 import weather as wthr
+import battery as batt
 import subprocess as os
 
 LCD_SIZE = "320x240"
@@ -179,6 +180,15 @@ class Gui:
      def update_cpu(self,usage,temper):
          self.cpuUsage.config(text='{}%'.format(usage))
          self.cpuTemp.config(text='{}'.format(temper))
+
+     def update_battery(self,current,percent):
+         if percent!=0:
+            self.Batt.config(text='{:4.1f} %'.format(percent))
+            self.Curr.config(text='{:6.3f} A'.format(current))
+         else:
+            self.Batt.config(text='')
+            self.Curr.config(text='')
+                
          
 
      def update_weather(self,info):
@@ -285,9 +295,9 @@ class Gui:
         tk.Label(cpuInfoFrm,text="temper", bg=datetm_bg, font=cpuLblFont).grid(row=1, column=0, sticky=tk.W)
         self.cpuTemp=tk.Label(cpuInfoFrm,text="45", bg=datetm_bg, fg=cpuCol, font=cpuValFont)
         self.cpuTemp.grid(row=1, column=1, sticky=tk.W)
-        tk.Label(cpuInfoFrm,text="Butt", bg=datetm_bg, font=cpuLblFont).grid(row=2, column=0, sticky=tk.W)
-        self.Butt=tk.Label(cpuInfoFrm,text="100%", bg=datetm_bg, fg=cpuCol, font=cpuValFont)
-        self.Butt.grid(row=2, column=1, sticky=tk.W)
+        tk.Label(cpuInfoFrm,text="Batt", bg=datetm_bg, font=cpuLblFont).grid(row=2, column=0, sticky=tk.W)
+        self.Batt=tk.Label(cpuInfoFrm,text="100%", bg=datetm_bg, fg=cpuCol, font=cpuValFont)
+        self.Batt.grid(row=2, column=1, sticky=tk.W)
         tk.Label(cpuInfoFrm,text="curr", bg=datetm_bg, font=cpuLblFont).grid(row=3, column=0, sticky=tk.W)
         self.Curr=tk.Label(cpuInfoFrm,text="0.300", bg=datetm_bg, fg=cpuCol, font=cpuValFont)
         self.Curr.grid(row=3, column=1, sticky=tk.W)
@@ -421,8 +431,9 @@ def weather_thread(tmout):
 
 
 #======== lanIp Thread ========          
-def lanIp_thread():
+def cpuInfo_thread():
      global gui,exit
+     battery = batt.INA219()
      while True:          
           if exit:
                break
@@ -431,6 +442,11 @@ def lanIp_thread():
           gui.update_cpu(cpu_usage,cpu_temp)
           gui.update_ethIp(ip.get_ip_address("eth0"))
           gui.update_wanIp(ip.get_ip_address("wlan0"))
+          if battery.exist():
+               bat_info=batt.get_baterry_info(battery)
+               gui.update_battery(bat_info['Percent'],bat_info['Current'])
+          else:
+               gui.update_battery(0,0)    
           if exit:
                break          
           tm.sleep(5)
@@ -477,8 +493,8 @@ register_keys()
 tm_thrd=thrd.Thread(target=time_thread)
 tm_thrd.start()
 # start lanIp thread
-lan_thrd=thrd.Thread(target=lanIp_thread)
-lan_thrd.start()
+cpu_thrd=thrd.Thread(target=cpuInfo_thread)
+cpu_thrd.start()
 # start lanIp thread
 wether_thrd=thrd.Thread(target=weather_thread, args=(120,)) # sec update
 wether_thrd.start()
@@ -486,7 +502,7 @@ wether_thrd.start()
 gui.run()
 cansel_threads()
 tm_thrd.join()
-lan_thrd.join()
+cpu_thrd.join()
 wether_thrd.join()
 
 screensaver_disable(False)

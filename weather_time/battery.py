@@ -59,7 +59,7 @@ class Mode:
 
 
 class INA219:
-    def __init__(self, i2c_bus=1, addr=0x40):
+    def __init__(self, i2c_bus=1, addr=0x41):
         try:
             import smbus
         except:
@@ -245,7 +245,7 @@ def get_baterry_info(ina219):
         
 if __name__=='__main__':
     # Create an INA219 instance.
-    ina219 = INA219(addr=0x41)
+    ina219 = INA219()
     if not ina219.exist():
         print('INA219 module not exist!')
         exit()
