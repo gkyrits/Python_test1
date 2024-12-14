@@ -2,6 +2,7 @@ import tkinter as tk
 import time as tm
 import threading as thrd
 import ipaddr as ip
+import cpuinfo as cpu
 import weather as wthr
 import subprocess as os
 
@@ -174,6 +175,11 @@ class Gui:
 
      def update_wanIp(self,IpAddr):
          self.wanIp.config(text=IpAddr)
+
+     def update_cpu(self,usage,temper):
+         self.cpuUsage.config(text='{}%'.format(usage))
+         self.cpuTemp.config(text='{}'.format(temper))
+         
 
      def update_weather(self,info):
           if info['Error']=='':
@@ -420,6 +426,9 @@ def lanIp_thread():
      while True:          
           if exit:
                break
+          cpu_usage=cpu.get_cpuUsage()
+          cpu_temp=cpu.get_cpuTemp()
+          gui.update_cpu(cpu_usage,cpu_temp)
           gui.update_ethIp(ip.get_ip_address("eth0"))
           gui.update_wanIp(ip.get_ip_address("wlan0"))
           if exit:
