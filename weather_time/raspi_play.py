@@ -182,7 +182,10 @@ class Gui:
          self.wanIp.config(text=IpAddr)
 
      def update_cpu(self,usage,temper):
-         self.cpuUsage.config(text='{} %'.format(usage))
+         if usage != '':
+            self.cpuUsage.config(text='{} %'.format(usage))
+         else:
+            self.cpuUsage.config(text='')
          self.cpuTemp.config(text='{}'.format(temper))
 
      def update_battery(self,percent,current):
@@ -363,8 +366,9 @@ class Gui:
         #----------------------
         #  panel buttons left
         #----------------------
-        win_col = "light yellow"        
-        pnlButton =  tk.Frame(self.root, bg=win_col, width=20, padx=1)
+        win_col = "light yellow"
+        btn_col = "green"
+        pnlButton =  tk.Frame(self.root, bg=btn_col, width=20, padx=1)
         self.keys_panel(pnlButton)
         pnlButton.pack(side=tk.LEFT, fill=tk.Y)
         pnlButton.pack_propagate(False) #enable Frame width=20

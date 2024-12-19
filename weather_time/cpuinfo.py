@@ -1,6 +1,9 @@
-import psutil
 
 def get_cpuUsage():
+    try:
+        import psutil
+    except:
+        return ''    
     return psutil.cpu_percent(interval=2)
 
 def get_cpuTemp():
