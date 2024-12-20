@@ -120,17 +120,18 @@ class Gui:
 
      def key1_press(self):
         print('Key1 press!')     
-        self.__info_window('Key1 press!')
-        print('Key1 ok!')
+        #self.__info_window('Key1 press!')
+        self.root.after(10,self.__info_window,'Key1 press!')
 
      def key2_press(self):
         print('Key2 press!')
-        self.__info_window('Key2 press!')
-        print('Key2 ok!')
+        #self.__info_window('Key2 press!')
+        self.root.after(10,self.__info_window,'Key2 press!')
 
      def key3_press(self):
         print('Key3 press! - Exit')
-        self.btn_exit()
+        #self.btn_exit()
+        self.root.after(10,self.btn_exit)
 
     #-----------------------------    
      def run(self):
@@ -367,7 +368,7 @@ class Gui:
         #  panel buttons left
         #----------------------
         win_col = "light yellow"
-        btn_col = "green"
+        btn_col = "sky blue"
         pnlButton =  tk.Frame(self.root, bg=btn_col, width=20, padx=1)
         self.keys_panel(pnlButton)
         pnlButton.pack(side=tk.LEFT, fill=tk.Y)
