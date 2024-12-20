@@ -138,6 +138,7 @@ class Gui:
         self.root.mainloop()
 
      def __set_modal(self,win): #'__' means private
+        win.wait_visibility()
         win.grab_set()
         win.wait_window()
         win.grab_release()        
