@@ -5,7 +5,9 @@ import ipaddr as ip
 import cpuinfo as cpu
 import weather as wthr
 import battery as batt
-import subprocess as os
+import subprocess as proc
+import sys
+import os
 
 LCD_SIZE = "320x240"
 FULL_SCREEN = 1
@@ -130,7 +132,8 @@ class Gui:
      def key1_press(self):
         print('Key1 press!')     
         #self.__info_window('Key1 press!')
-        self.root.after(10,self.__info_window,'Key1 press!')
+        #self.root.after(10,self.__info_window,'Key1 press!')
+        self.root.after(10,self.radio_play)
 
      def key2_press(self):
         print('Key2 press!')
@@ -170,6 +173,14 @@ class Gui:
          self.__set_modal(win)         
          tmout.cancel()   
          infoWin=False
+         
+     def radio_play(self):
+         rel_radio_path='/../radioPlayer'
+         path = os.getcwd()+rel_radio_path
+         sys.path.insert(0,path)
+         from radioplayer import radio_player
+         radio_player(rel_radio_path)            
+                 
 
      def update_clock(self,time):
         time_part = time.split(":")
@@ -512,11 +523,11 @@ def register_keys():
 def screensaver_disable(disable):
     try:        
         if disable:
-            os.run(["xset", "-dpms"])
-            os.run(["xset", "s","off"])
-        else:    
-            os.run(["xset", "+dpms"])
-            os.run(["xset", "s","on"])
+            proc.run(["xset", "-dpms"])
+            proc.run(["xset", "s","off"])
+        else:
+            proc.run(["xset", "+dpms"])
+            proc.run(["xset", "s","on"])
     except:  
         return        
 

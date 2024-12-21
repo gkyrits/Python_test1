@@ -1,14 +1,22 @@
-import sys, pygame
+#import sys
+import pygame
 from pygame.locals import *
 import time
 import subprocess
 import os
 import glob
-os.environ["SDL_FBDEV"] = "/dev/fb1"
-os.environ["SDL_MOUSEDEV"] = "/dev/input/touchscreen"
-os.environ["SDL_MOUSEDRV"] = "TSLIB"
-pygame.init()
 
+FULL_SCREEN = 1
+#define colours
+blue = 26, 0, 255
+cream = 254, 255, 25
+black = 0, 0, 0
+white = 255, 255, 255
+yellow = 255, 255, 0
+red = 255, 0, 0
+green = 0, 255, 0
+
+exit_req=False
 
 #define function that checks for mouse location
 def on_click():
@@ -57,6 +65,7 @@ def on_click():
 
 #define action on pressing buttons
 def button(number):
+	global exit_req
 	print("You pressed button ",number)
 	if number == 0:    #specific script when exiting
 		screen.fill(black)
@@ -65,7 +74,9 @@ def button(number):
 		screen.blit(label,(0,90))
 		pygame.display.flip()
 		time.sleep(1)
-		sys.exit()
+		#sys.exit()
+		exit_req=True
+		return
 
 	if number == 1:	
 		subprocess.call("mpc play ", shell=True)
@@ -101,7 +112,7 @@ def button(number):
 		refresh_menu_screen()	
 
 def refresh_menu_screen():
-#set up the fixed items on the menu
+	#set up the fixed items on the menu
 	screen.fill(white) #change the colours if needed
 	font=pygame.font.Font(None,24)
 	title_font=pygame.font.Font(None,34)
@@ -184,7 +195,9 @@ def refresh_menu_screen():
 	screen.blit(network_status_label, (215,75))
 	pygame.display.flip()
 	
-def main():
+	
+def main_loop():
+    global exit_req
     while 1:
         for event in pygame.event.get():
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -193,30 +206,45 @@ def main():
                 print(pos) #for checking
                 pygame.draw.circle(screen, white, pos, 2, 0) #for debugging purposes - adds a small dot where the screen is pressed
                 on_click()
+                if exit_req:
+                    return
 				#ensure there is always a safe way to end the program if the touch screen fails
                 if event.type == KEYDOWN:
                     if event.key == K_ESCAPE:
-                        sys.exit()
+                        #sys.exit()
+                        return
         time.sleep(0.2)
         pygame.display.update()
 
 
 #################### EVERTHING HAS NOW BEEN DEFINED ###########################
-
-#set size of the screen
-#size = width, height = 320, 240
-#screen = pygame.display.set_mode(size)
-screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-
-#define colours
-blue = 26, 0, 255
-cream = 254, 255, 25
-black = 0, 0, 0
-white = 255, 255, 255
-yellow = 255, 255, 0
-red = 255, 0, 0
-green = 0, 255, 0
-refresh_menu_screen()  #refresh the menu interface 
-main() #check for key presses and start emergency exit
-station_name()
+def radio_player(path=""):
+	global screen
+	#os.environ["SDL_FBDEV"] = "/dev/fb1"
+	#os.environ["SDL_MOUSEDEV"] = "/dev/input/touchscreen"
+	#os.environ["SDL_MOUSEDRV"] = "TSLIB"
+	run_path=os.getcwd()
+	print('Path:'+run_path)
+	if path!="":
+		radio_path=run_path+path
+		print('Radio Path:'+radio_path)
+		os.chdir(radio_path)
+	pygame.init()	
+	#set size of the screen
+	if FULL_SCREEN==0:
+		size = width, height = 320, 240
+		screen = pygame.display.set_mode(size)
+	else:
+		screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+	refresh_menu_screen()  #refresh the menu interface 
+	main_loop() #check for key presses and start emergency exit
+	#station_name()
+	pygame.display.quit()
+	pygame.quit()
+	print('End...')
+	os.chdir(run_path)
+	
+	
+if __name__ == '__main__':
+	radio_player()	
 
