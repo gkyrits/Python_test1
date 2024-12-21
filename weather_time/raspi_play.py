@@ -11,6 +11,7 @@ LCD_SIZE = "320x240"
 FULL_SCREEN = 1
 
 exit = False
+infoWin = False
 wthr_count = 0
 
 def get_month(date):    
@@ -106,6 +107,14 @@ class Gui:
         return "Gui Class"
 
      #events-----------------------
+     def buttonPanel_enter(self,e):
+        print('Enter event!')
+        self.pnlButton.configure(width=20)
+
+     def buttonPanel_leave(self,e):
+        print('Leave event!')
+        self.pnlButton.configure(width=4)
+
      def clockPanel_dblClick(self,e):
         #print('Clock click! :%s' % e.widget)
         self.__info_window('Clock click!')
@@ -144,6 +153,10 @@ class Gui:
         win.grab_release()        
 
      def __info_window(self,info):
+         global infoWin
+         if infoWin:
+            return
+         infoWin=True
          win=tk.Toplevel(bg="green")
          win.geometry('220x80+50+80')
          win.overrideredirect(1)
@@ -155,7 +168,8 @@ class Gui:
          tmout=thrd.Timer(10, lambda :win.destroy())
          tmout.start()
          self.__set_modal(win)         
-         tmout.cancel()       
+         tmout.cancel()   
+         infoWin=False
 
      def update_clock(self,time):
         time_part = time.split(":")
@@ -370,10 +384,13 @@ class Gui:
         #----------------------
         win_col = "light yellow"
         btn_col = "sky blue"
-        pnlButton =  tk.Frame(self.root, bg=btn_col, width=20, padx=1)
-        self.keys_panel(pnlButton)
-        pnlButton.pack(side=tk.LEFT, fill=tk.Y)
-        pnlButton.pack_propagate(False) #enable Frame width=20
+        self.pnlButton =  tk.Frame(self.root, bg=btn_col, width=20, padx=1)
+        self.keys_panel(self.pnlButton)
+        self.pnlButton.pack(side=tk.LEFT, fill=tk.Y)
+        self.pnlButton.pack_propagate(False) #enable Frame width=20
+        self.pnlButton.bind('<Enter>',self.buttonPanel_enter)
+        self.pnlButton.bind('<Leave>',self.buttonPanel_leave)
+        self.buttonPanel_leave(None)
 
         #----------------
         #  panel right
@@ -381,7 +398,7 @@ class Gui:
         pnlClock =  tk.Frame(self.root, bg=win_col, relief=tk.GROOVE, borderwidth=2)
         self.clock_panel(pnlClock)
         pnlClock.pack(side=tk.TOP, fill=tk.X)
-        bind_tree(pnlClock,'<Double-Button-1>',self.clockPanel_dblClick)
+        bind_tree(pnlClock,'<Button-1>',self.clockPanel_dblClick)
 
         #----------------
         # panel bottom 
@@ -391,12 +408,12 @@ class Gui:
         pnlCpuInfo = tk.Frame(pnlBottom, bg=win_col, relief=tk.GROOVE, borderwidth=2)        
         self.ipInfo_panel(pnlCpuInfo)        
         pnlCpuInfo.pack(side=tk.LEFT, fill=tk.BOTH, expand=tk.YES, anchor=tk.W)
-        bind_tree(pnlCpuInfo,'<Double-Button-1>',self.infoPanel_dblClick)
+        bind_tree(pnlCpuInfo,'<Button-1>',self.infoPanel_dblClick)
         #--panel Weather
         weatherFrm = tk.Frame(pnlBottom, bg=win_col, relief=tk.GROOVE, borderwidth=2)
         self.weather_panel(weatherFrm)
         weatherFrm.pack(side=tk.LEFT, fill=tk.BOTH, expand=tk.YES, anchor=tk.W)
-        bind_tree(weatherFrm,'<Double-Button-1>',self.weatherPanel_dblClick)
+        bind_tree(weatherFrm,'<Button-1>',self.weatherPanel_dblClick)
         #--close panel Bottom  
         pnlBottom.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=tk.YES)
 
