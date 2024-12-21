@@ -219,10 +219,11 @@ def main_loop():
 
 #################### EVERTHING HAS NOW BEEN DEFINED ###########################
 def radio_player(path=""):
-	global screen
+	global screen,exit_req
 	#os.environ["SDL_FBDEV"] = "/dev/fb1"
 	#os.environ["SDL_MOUSEDEV"] = "/dev/input/touchscreen"
 	#os.environ["SDL_MOUSEDRV"] = "TSLIB"
+	exit_req=False
 	run_path=os.getcwd()
 	print('Path:'+run_path)
 	if path!="":
