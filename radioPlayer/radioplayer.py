@@ -64,7 +64,7 @@ def button(number):
 		label=font.render("Radioplayer will continue in background", 1, (white))
 		screen.blit(label,(0,90))
 		pygame.display.flip()
-		time.sleep(3)
+		time.sleep(1)
 		sys.exit()
 
 	if number == 1:	
@@ -204,8 +204,9 @@ def main():
 #################### EVERTHING HAS NOW BEEN DEFINED ###########################
 
 #set size of the screen
-size = width, height = 320, 240
-screen = pygame.display.set_mode(size)
+#size = width, height = 320, 240
+#screen = pygame.display.set_mode(size)
+screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
 
 #define colours
 blue = 26, 0, 255
