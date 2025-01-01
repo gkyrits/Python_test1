@@ -9,8 +9,8 @@ tn = TonalBuzzer(25)
 #ld = LED(25)
 
 TIME=4.0
-MAX_RED=20
-MAX_GREEN=15
+MAX_RED=100
+MAX_GREEN=100
 MAX_BLUE=100
 
 red_wait=TIME/MAX_RED
@@ -39,7 +39,7 @@ def green_play() :
         led.green=r
         sleep(green_wait)
     led.green=1
-    sleep(0.1)        
+    sleep(0.1)
     for rx in range(MAX_GREEN,0,-1) :
         r = rx / 100.0
         print("rx=%d green=%.2f" % (rx,r))
@@ -54,7 +54,7 @@ def blue_play() :
         led.blue=r
         sleep(blue_wait)
     led.blue=1
-    sleep(0.1) 		
+    sleep(0.1)
     for rx in range(MAX_BLUE,0,-1) :
         r = rx / 100.0
         print("rx=%d blue=%.2f" % (rx,r))
@@ -85,31 +85,31 @@ def play_tone() :
     tn.play("A4")
     sleep(0.1)
     tn.play("A5")
-    sleep(0.1)  
+    sleep(0.1)
     tn.stop()
-    
+
 def demo_tone() :
     for note in 'C4 D4 E4 F4 G4 A4 B4 C5'.split() :
         tone = Tone(note)
         print(repr(tone))
         tn.play(tone)
         sleep(0.3)
-        tn.stop()    
-    
-    
+        tn.stop()
+
+
 def play_freq() :
     for n in range(0,10000,1) :
         ld.toggle()
-        
+
 
 def play_buzzer() :
     bz.beep(0.05,0,1)
-    
+
 def play_all() :
     #play_buzzer()
     #play_freq()
-    #play_tone()
-    demo_tone()
+    play_tone()
+    #demo_tone()
     led.color=(0,0,0)
     red_play()
     play_buzzer()
@@ -118,11 +118,11 @@ def play_all() :
     blue_play()
     play_buzzer()
     led.color=(0,0,0)
-    #color_play()    
-    
+    color_play()
+
 
 
 while True :
     play_all()
-    
+
 
