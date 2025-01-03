@@ -121,9 +121,10 @@ class Gui:
         #print('Clock click! :%s' % e.widget)
         self.__info_window('Clock click!')
 
-     def infoPanel_dblClick(self,e):
+     def sensePanel_dblClick(self,e):
         #print('Info click! :%s' % e.widget)
-        self.__info_window('Info click!')
+        #self.__info_window('Info click!')
+        self.sensePanel_change()
 
      def weatherPanel_dblClick(self,e):
         #print('Weather click! :%s' % e.widget)
@@ -178,9 +179,13 @@ class Gui:
          rel_radio_path='/../radioPlayer'
          path = os.getcwd()+rel_radio_path
          sys.path.insert(0,path)
-         from radioplayer import radio_player
-         radio_player(rel_radio_path)            
-                 
+         try:
+            from radioplayer import radio_player
+            radio_player(rel_radio_path)
+         except:
+            print('fail run radio_player')
+            return   
+
 
      def update_clock(self,time):
         time_part = time.split(":")
@@ -304,23 +309,23 @@ class Gui:
         cpuCol="Blue4"        
         IPheight=30
         IPwidth=100
-        IPInfoFrm = tk.Frame(parent, bg=datetm_bg)
+        self.IPInfoFrm = tk.Frame(parent, bg=datetm_bg)
           #-----sub panel for Lan info
-        lanInfoFrm=tk.Frame(IPInfoFrm,bg=datetm_bg, height=IPheight, width=IPwidth)
+        lanInfoFrm=tk.Frame(self.IPInfoFrm,bg=datetm_bg, height=IPheight, width=IPwidth)
         tk.Label(lanInfoFrm,text="Lan:", bg=datetm_bg, fg=lanIPcol, font=lanLblFont).pack(side=tk.TOP, anchor=tk.W)
         self.ethIp = tk.Label(lanInfoFrm,text="0.0.0.0", bg=datetm_bg, fg=lanIPcol, font=lanIpFont, anchor=tk.W)
         self.ethIp.pack(side=tk.TOP, anchor=tk.W)
         lanInfoFrm.pack(side=tk.TOP, anchor=tk.W)
         lanInfoFrm.pack_propagate(False)
           #-----sub panel for Wan info
-        wanInfoFrm=tk.Frame(IPInfoFrm,bg=datetm_bg, height=IPheight, width=IPwidth)  
+        wanInfoFrm=tk.Frame(self.IPInfoFrm,bg=datetm_bg, height=IPheight, width=IPwidth)  
         tk.Label(wanInfoFrm,text="Wan:", bg=datetm_bg, fg=wanIPcol, font=lanLblFont).pack(side=tk.TOP, anchor=tk.W)
         self.wanIp = tk.Label(wanInfoFrm,text="255.255.255.255", bg=datetm_bg, fg=wanIPcol, font=lanIpFont)
         self.wanIp.pack(side=tk.TOP, anchor=tk.W)
         wanInfoFrm.pack(side=tk.TOP, anchor=tk.W)   
         wanInfoFrm.pack_propagate(False)
           #----sub panel cpu/batt info
-        cpuInfoFrm=tk.Frame(IPInfoFrm,bg=datetm_bg, width=IPwidth)
+        cpuInfoFrm=tk.Frame(self.IPInfoFrm,bg=datetm_bg, width=IPwidth)
         for row in range(4): # 4 rows
             cpuInfoFrm.rowconfigure(row, weight=1) #resize grid height                
         tk.Label(cpuInfoFrm,text="usage", bg=datetm_bg, font=cpuLblFont).grid(row=0, column=0, sticky=tk.W)
@@ -338,13 +343,55 @@ class Gui:
         cpuInfoFrm.pack(side=tk.TOP, anchor=tk.W,pady=4)   
         cpuInfoFrm.pack_propagate(False)
         #--close panel IPinfo        
-        IPInfoFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)        
+        self.IPInfoFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)        
+
+
+     def senseInfo_panel(self,parent):
+        sense_bg = "light steel blue"        
+        tempLblCol= "SlateBlue4"
+        temperCol="purple"
+        humidCol="dark green"
+        self.SensorFrm = tk.Frame(parent, bg=sense_bg)
+        #---SensorFrm
+        for row in range(4): # 4 rows
+            self.SensorFrm.rowconfigure(row, weight=1) #resize grid height         
+        tk.Label(self.SensorFrm,text="ROOM", bg=sense_bg, fg="blue", font="Arial 7").grid(row=0)
+        tk.Label(self.SensorFrm,text="temperature", bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=1, sticky=tk.W)
+        #-temper frame
+        temperFrm=tk.Frame(self.SensorFrm,bg=sense_bg)
+        tk.Label(temperFrm, text=" ", fg=temperCol,  bg=sense_bg, font="Arial 20 bold").pack(side=tk.LEFT)
+        self.room_temper=tk.Label(temperFrm, text="21.6", fg=temperCol,  bg=sense_bg, font="Arial 20 bold")
+        self.room_temper.pack(side=tk.LEFT)
+        tk.Label(temperFrm, text="°C", fg=temperCol,  bg=sense_bg, font="Arial 12 bold").pack(side=tk.TOP)
+        temperFrm.grid(row=2, sticky=tk.E)
+        #-Humidity
+        tk.Label(self.SensorFrm,text="Humidity", bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=3, sticky=tk.W)
+        self.room_humid=tk.Label(self.SensorFrm,text="56%", bg=sense_bg, fg=humidCol, font="Arial 14 bold")
+        self.room_humid.grid(row=4, sticky=tk.E)
+        #--close panel SensorFrm
+        self.SensorFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES) 
+        
+
+
+     def sensePanel_change(self):
+        if self.IPInfoFrm != None:
+            self.IPInfoFrm.pack_forget()
+            self.IPInfoFrm=None
+            self.senseInfo_panel(self.pnlSenseInfo)
+            bind_tree(self.SensorFrm,'<Button-1>',self.sensePanel_dblClick)
+        else:
+            if self.SensorFrm !=None:
+                self.SensorFrm.pack_forget()
+                self.SensorFrm=None  
+            self.ipInfo_panel(self.pnlSenseInfo)
+            bind_tree(self.IPInfoFrm,'<Button-1>',self.sensePanel_dblClick)
 
 
      def weather_panel(self,parent):        
         global img
         wthr_bg = "light steel blue"        
         temperCol="red"  
+        humidCol="red4"
         infoCol="blue" 
         img = tk.PhotoImage(file='icons/13.png')        
         wthrFrm=tk.Frame(parent,bg=wthr_bg)
@@ -370,7 +417,7 @@ class Gui:
 
         self.wthr_like=tk.Label(wthrFrm, text="23°C",  fg=infoCol, bg=wthr_bg, font="Arial 8 bold")
         self.wthr_like.grid(row=2, column=1, sticky=tk.W)
-        self.wthr_humid=tk.Label(wthrFrm, text="36%",  bg=wthr_bg, fg="red4", font="Arial 9 bold")
+        self.wthr_humid=tk.Label(wthrFrm, text="36%",  bg=wthr_bg, fg=humidCol, font="Arial 9 bold")
         self.wthr_humid.grid(row=3, column=1, sticky=tk.W)
         self.wthr_press=tk.Label(wthrFrm, text="1024 hPa",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
         self.wthr_press.grid(row=4, column=1,  columnspan=2, sticky=tk.W)
@@ -415,11 +462,12 @@ class Gui:
         # panel bottom 
         #----------------
         pnlBottom = tk.Frame(self.root)
-        #--panel IPinfo
-        pnlCpuInfo = tk.Frame(pnlBottom, bg=win_col, relief=tk.GROOVE, borderwidth=2)        
-        self.ipInfo_panel(pnlCpuInfo)        
-        pnlCpuInfo.pack(side=tk.LEFT, fill=tk.BOTH, expand=tk.YES, anchor=tk.W)
-        bind_tree(pnlCpuInfo,'<Button-1>',self.infoPanel_dblClick)
+        #--panel Senseinfo
+        self.pnlSenseInfo = tk.Frame(pnlBottom, bg=win_col, relief=tk.GROOVE, borderwidth=2)
+        self.ipInfo_panel(self.pnlSenseInfo)
+        self.pnlSenseInfo.pack(side=tk.LEFT, fill=tk.BOTH, expand=tk.YES, anchor=tk.W)
+        bind_tree(self.pnlSenseInfo,'<Button-1>',self.sensePanel_dblClick)
+
         #--panel Weather
         weatherFrm = tk.Frame(pnlBottom, bg=win_col, relief=tk.GROOVE, borderwidth=2)
         self.weather_panel(weatherFrm)
