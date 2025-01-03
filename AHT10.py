@@ -28,11 +28,11 @@ def read_aht10():
     #print(data)
     temp = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
     ctemp = ((temp*200) / 1048576) - 50
-    print(u'Temperature: {0:.1f}°C'.format(ctemp))
+    print(u'Temperature  : {0:.1f}°C'.format(ctemp))
     tmp = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
     #print(tmp)
     ctmp = int(tmp * 100 / 1048576)
-    print(u'Humidity: {0}%'.format(ctmp))
+    print(u'Humidity %RH : {0:.1f}%'.format(ctmp))
 
 while True:
     read_aht10()
