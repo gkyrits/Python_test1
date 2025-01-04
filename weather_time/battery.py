@@ -65,7 +65,7 @@ class INA219:
         except:
             self.bus=None
             return        
-        self.bus = smbus.SMBus(i2c_bus);
+        self.bus = smbus.SMBus(i2c_bus)
         self.addr = addr
 
         # Set chip to known config values to start

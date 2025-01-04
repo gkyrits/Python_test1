@@ -5,6 +5,7 @@ import ipaddr as ip
 import cpuinfo as cpu
 import weather as wthr
 import battery as batt
+import aht10sense as sense1
 import subprocess as proc
 import sys
 import os
@@ -15,6 +16,7 @@ FULL_SCREEN = 1
 exit = False
 infoWin = False
 wthr_count = 0
+update_sense = False
 
 def get_month(date):    
      if date==1:
@@ -101,7 +103,9 @@ class Gui:
         self.root.geometry(LCD_SIZE+'+0+0')
         if(FULL_SCREEN):
               self.root.overrideredirect(1)  
-        self.nightTime=False        
+        self.nightTime=False
+        self.IPInfoFrm=None
+        self.SensorFrm=None
         self.init_clock_window()
 
      def __str__(self):
@@ -249,6 +253,13 @@ class Gui:
                icon_file='icons/'+str(icon_num)+'.png'
                img=tk.PhotoImage(file=icon_file)
                self.wthr_image.config(image=img)
+
+
+     def update_sensor(self,info):
+        if not self.senseinfo_active():
+            return
+        self.room_temper.config(text='{:.1f}'.format(info['Temperature']))
+        self.room_humid.config(text='{} %'.format(info['Humidity']))
          
        
      def btn_exit(self):
@@ -374,11 +385,13 @@ class Gui:
 
 
      def sensePanel_change(self):
+        global update_sense
+        update_sense=True
         if self.IPInfoFrm != None:
             self.IPInfoFrm.pack_forget()
             self.IPInfoFrm=None
             self.senseInfo_panel(self.pnlSenseInfo)
-            bind_tree(self.SensorFrm,'<Button-1>',self.sensePanel_dblClick)
+            bind_tree(self.SensorFrm,'<Button-1>',self.sensePanel_dblClick)            
         else:
             if self.SensorFrm !=None:
                 self.SensorFrm.pack_forget()
@@ -386,6 +399,18 @@ class Gui:
             self.ipInfo_panel(self.pnlSenseInfo)
             bind_tree(self.IPInfoFrm,'<Button-1>',self.sensePanel_dblClick)
 
+
+     def cpuinfo_active(self):
+        if self.IPInfoFrm != None:
+            return True
+        else:
+            return False
+        
+     def senseinfo_active(self):
+        if self.SensorFrm != None:
+            return True
+        else:
+            return False        
 
      def weather_panel(self,parent):        
         global img
@@ -516,6 +541,28 @@ def weather_thread(tmout):
           tm.sleep(1)
 
 
+#======== Sensor Thread ======
+def sensor_thread(tmout):
+    global gui,exit,update_sense
+    tm_cnt=0    
+    info = sense1.get_sensor_info()
+    gui.update_sensor(info)
+    while True:          
+        if exit:
+            break
+        if update_sense:
+           tm_cnt=tmout
+           update_sense=False 
+        tm_cnt += 1        
+        if tm_cnt>tmout:            
+            info = sense1.get_sensor_info()
+            if exit:
+               break            
+            gui.update_sensor(info)
+            tm_cnt=0
+        tm.sleep(1)
+
+
 #======== lanIp Thread ========          
 def cpuInfo_thread():
      global gui,exit
@@ -523,6 +570,10 @@ def cpuInfo_thread():
      while True:          
           if exit:
                break
+          if not gui.cpuinfo_active():
+              tm.sleep(1)
+              continue
+          #print('get cpu info...')
           cpu_usage=cpu.get_cpuUsage()
           if exit:
                break
@@ -591,15 +642,19 @@ tm_thrd.start()
 # start lanIp thread
 cpu_thrd=thrd.Thread(target=cpuInfo_thread)
 cpu_thrd.start()
-# start lanIp thread
+# start wheather thread
 wether_thrd=thrd.Thread(target=weather_thread, args=(120,)) # sec update
 wether_thrd.start()
+# start sensor thread
+sensor_thrd=thrd.Thread(target=sensor_thread, args=(60,)) # sec update
+sensor_thrd.start()
 
 gui.run()
 cansel_threads()
 tm_thrd.join()
 cpu_thrd.join()
 wether_thrd.join()
+sensor_thrd.join()
 
 screensaver_disable(False)
 print("End...")
