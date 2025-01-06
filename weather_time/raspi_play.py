@@ -106,7 +106,7 @@ class Gui:
         self.root.geometry(LCD_SIZE+'+0+0')
         if(FULL_SCREEN):
               self.root.overrideredirect(1)
-        self.root.config(cursor='target')
+        self.root.config(cursor='cross')
         self.nightTime=False
         self.IPInfoFrm=None
         self.SensorFrm=None
@@ -336,14 +336,14 @@ class Gui:
           #-----sub panel for Lan info
         lanInfoFrm=tk.Frame(self.IPInfoFrm,bg=datetm_bg, height=IPheight, width=IPwidth)
         tk.Label(lanInfoFrm,text="Lan:", bg=datetm_bg, fg=lanIPcol, font=lanLblFont).pack(side=tk.TOP, anchor=tk.W)
-        self.ethIp = tk.Label(lanInfoFrm,text="0.0.0.0", bg=datetm_bg, fg=lanIPcol, font=lanIpFont, anchor=tk.W)
+        self.ethIp = tk.Label(lanInfoFrm,text="--.--.--.--", bg=datetm_bg, fg=lanIPcol, font=lanIpFont, anchor=tk.W)
         self.ethIp.pack(side=tk.TOP, anchor=tk.W)
         lanInfoFrm.pack(side=tk.TOP, anchor=tk.W)
         lanInfoFrm.pack_propagate(False)
           #-----sub panel for Wan info
         wanInfoFrm=tk.Frame(self.IPInfoFrm,bg=datetm_bg, height=IPheight, width=IPwidth)  
         tk.Label(wanInfoFrm,text="Wan:", bg=datetm_bg, fg=wanIPcol, font=lanLblFont).pack(side=tk.TOP, anchor=tk.W)
-        self.wanIp = tk.Label(wanInfoFrm,text="255.255.255.255", bg=datetm_bg, fg=wanIPcol, font=lanIpFont)
+        self.wanIp = tk.Label(wanInfoFrm,text="--.--.--.--", bg=datetm_bg, fg=wanIPcol, font=lanIpFont)
         self.wanIp.pack(side=tk.TOP, anchor=tk.W)
         wanInfoFrm.pack(side=tk.TOP, anchor=tk.W)   
         wanInfoFrm.pack_propagate(False)
@@ -352,16 +352,16 @@ class Gui:
         for row in range(4): # 4 rows
             cpuInfoFrm.rowconfigure(row, weight=1) #resize grid height                
         tk.Label(cpuInfoFrm,text="usage", bg=datetm_bg, font=cpuLblFont).grid(row=0, column=0, sticky=tk.W)
-        self.cpuUsage=tk.Label(cpuInfoFrm,text="100%", bg=datetm_bg, fg=cpuCol, font=cpuValFont)
+        self.cpuUsage=tk.Label(cpuInfoFrm,text="--%", bg=datetm_bg, fg=cpuCol, font=cpuValFont)
         self.cpuUsage.grid(row=0, column=1, sticky=tk.W)
         tk.Label(cpuInfoFrm,text="temper", bg=datetm_bg, font=cpuLblFont).grid(row=1, column=0, sticky=tk.W)
-        self.cpuTemp=tk.Label(cpuInfoFrm,text="45", bg=datetm_bg, fg=cpuCol, font=cpuValFont)
+        self.cpuTemp=tk.Label(cpuInfoFrm,text="--", bg=datetm_bg, fg=cpuCol, font=cpuValFont)
         self.cpuTemp.grid(row=1, column=1, sticky=tk.W)
         tk.Label(cpuInfoFrm,text="Batt", bg=datetm_bg, font=cpuLblFont).grid(row=2, column=0, sticky=tk.W)
-        self.Batt=tk.Label(cpuInfoFrm,text="100%", bg=datetm_bg, fg=cpuCol, font=cpuValFont)
+        self.Batt=tk.Label(cpuInfoFrm,text="--%", bg=datetm_bg, fg=cpuCol, font=cpuValFont)
         self.Batt.grid(row=2, column=1, sticky=tk.W)
         tk.Label(cpuInfoFrm,text="curr", bg=datetm_bg, font=cpuLblFont).grid(row=3, column=0, sticky=tk.W)
-        self.Curr=tk.Label(cpuInfoFrm,text="0.300", bg=datetm_bg, fg=cpuCol, font=cpuValFont)
+        self.Curr=tk.Label(cpuInfoFrm,text="-.---", bg=datetm_bg, fg=cpuCol, font=cpuValFont)
         self.Curr.grid(row=3, column=1, sticky=tk.W)
         cpuInfoFrm.pack(side=tk.TOP, anchor=tk.W,pady=4)   
         cpuInfoFrm.pack_propagate(False)
@@ -390,21 +390,21 @@ class Gui:
         #-temper frame
         temperFrm=tk.Frame(self.SensorFrm,bg=sense_bg)
         tk.Label(temperFrm, text=" ", fg=temperCol,  bg=sense_bg, font="Arial 20 bold").pack(side=tk.LEFT)
-        self.room_temper=tk.Label(temperFrm, text="21.6", fg=temperCol,  bg=sense_bg, font="Arial 20 bold")
+        self.room_temper=tk.Label(temperFrm, text="--.-", fg=temperCol,  bg=sense_bg, font="Arial 20 bold")
         self.room_temper.pack(side=tk.LEFT)
         tk.Label(temperFrm, text="°C", fg=temperCol,  bg=sense_bg, font="Arial 12 bold").pack(side=tk.TOP)
         temperFrm.grid(row=2, sticky=tk.E)
         if (self.sense_id==1) or (self.sense_id==2):
             #-Humidity
             tk.Label(self.SensorFrm,text="Humidity", bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=3, sticky=tk.W)
-            self.room_humid=tk.Label(self.SensorFrm,text="56%", bg=sense_bg, fg=humidCol, font="Arial 14 bold")
+            self.room_humid=tk.Label(self.SensorFrm,text="--%", bg=sense_bg, fg=humidCol, font="Arial 14 bold")
             self.room_humid.grid(row=4, sticky=tk.E)
         elif self.sense_id==3:
             tk.Label(self.SensorFrm,text="Pressure", bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=3, sticky=tk.W)
-            self.room_press=tk.Label(self.SensorFrm,text="1022.3 hPa", bg=sense_bg, fg=humidCol, font="Arial 10 bold")
+            self.room_press=tk.Label(self.SensorFrm,text="----.- hPa", bg=sense_bg, fg=humidCol, font="Arial 10 bold")
             self.room_press.grid(row=4, sticky=tk.E)
             tk.Label(self.SensorFrm,text="Altitude", bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=5, sticky=tk.W)
-            self.room_altit=tk.Label(self.SensorFrm,text="128 m", bg=sense_bg, fg=altitCol, font="Arial 10 bold")
+            self.room_altit=tk.Label(self.SensorFrm,text="- m", bg=sense_bg, fg=altitCol, font="Arial 10 bold")
             self.room_altit.grid(row=6, sticky=tk.E)            
         #--close panel SensorFrm
         self.SensorFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES) 

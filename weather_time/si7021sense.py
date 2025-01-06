@@ -3,7 +3,7 @@
 #import smbus
 import time
 
-info = {'Temperature':0.0, 'Humidity':0.0}
+info = {'Temperature':0.0, 'Humidity':0}
 
 # SI7021 address, 0x40(64)
 
@@ -34,7 +34,7 @@ def __read_SI7021():
     #print ("Humidity %%RH : %.1f%%" %humidity)	
 	#print ("Temperature Fahrenheit: %.2f°F" %fTemp)    
     info['Temperature']=cTemp
-    info['Humidity']=humidity
+    info['Humidity']=int(humidity)
 
 def get_sensor_info():
     try:

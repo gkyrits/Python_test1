@@ -3,7 +3,7 @@
 #import smbus
 import time
 
-info = {'Temperature':0.0, 'Humidity':0.0}
+info = {'Temperature':0.0, 'Humidity':0}
 
 def __read_ATH10():
     import smbus    
