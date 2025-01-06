@@ -11,8 +11,8 @@ def __read_ATH10():
     #bus = smbus.SMBus(0)  # Rev 1 Pi uses 0
     bus = smbus.SMBus(1)   # Rev 2 Pi uses 1
     # when you have a 121 IO Error, uncomment the next pause
-    # time.sleep(1) #wait here to avoid 121 IO Error
-    config = [0x08, 0x00]
+    # time.sleep(1) #wait here to avoid 121 IO Error    
+    config = [0x08, 0x00]    
     bus.write_i2c_block_data(0x38, 0xE1, config)
     time.sleep(0.5)
     byt = bus.read_byte(0x38)
@@ -41,3 +41,10 @@ def get_sensor_info():
         info['Humidity']=0.0
         return info
     
+if __name__ == '__main__':
+    while True:
+        info = get_sensor_info()
+        print('Temperature : {:.1f} °C'.format(info['Temperature']))
+        print('Humidity    : {} %'.format(info['Humidity']))
+        print('')
+        time.sleep(2)

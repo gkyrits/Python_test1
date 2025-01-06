@@ -6,6 +6,8 @@ import cpuinfo as cpu
 import weather as wthr
 import battery as batt
 import aht10sense as sense1
+import si7021sense as sense2
+import mpl3115sense as sense3
 import subprocess as proc
 import sys
 import os
@@ -17,6 +19,7 @@ exit = False
 infoWin = False
 wthr_count = 0
 update_sense = False
+sense_tm_cnt=0
 
 def get_month(date):    
      if date==1:
@@ -102,10 +105,12 @@ class Gui:
         self.root.title("raspi play v0.1")
         self.root.geometry(LCD_SIZE+'+0+0')
         if(FULL_SCREEN):
-              self.root.overrideredirect(1)  
+              self.root.overrideredirect(1)
+        self.root.config(cursor='target')
         self.nightTime=False
         self.IPInfoFrm=None
         self.SensorFrm=None
+        self.sense_id=-1
         self.init_clock_window()
 
      def __str__(self):
@@ -128,7 +133,7 @@ class Gui:
      def sensePanel_dblClick(self,e):
         #print('Info click! :%s' % e.widget)
         #self.__info_window('Info click!')
-        self.sensePanel_change()
+        self.sensePanel_nextShow()
 
      def weatherPanel_dblClick(self,e):
         #print('Weather click! :%s' % e.widget)
@@ -256,10 +261,17 @@ class Gui:
 
 
      def update_sensor(self,info):
+        print('update_sensor...')
         if not self.senseinfo_active():
             return
+        sense_txt='SENSOR '+str(self.sense_id)
+        self.room_sensor.config(text=sense_txt)
         self.room_temper.config(text='{:.1f}'.format(info['Temperature']))
-        self.room_humid.config(text='{} %'.format(info['Humidity']))
+        if (self.sense_id==1) or (self.sense_id==2):
+            self.room_humid.config(text='{} %'.format(info['Humidity']))
+        elif self.sense_id==3:
+            self.room_press.config(text='{:.1f} hPa'.format(info['Pressure']))
+            self.room_altit.config(text='{:.1f} m'.format(info['Altitude']))
          
        
      def btn_exit(self):
@@ -362,11 +374,18 @@ class Gui:
         tempLblCol= "SlateBlue4"
         temperCol="purple"
         humidCol="dark green"
+        altitCol="blue1" 
+        sense_txt='SENSOR '+str(self.sense_id)
+        if self.sense_id==3:
+            rows=6
+        else:
+            rows=4    
         self.SensorFrm = tk.Frame(parent, bg=sense_bg)
-        #---SensorFrm
-        for row in range(4): # 4 rows
-            self.SensorFrm.rowconfigure(row, weight=1) #resize grid height         
-        tk.Label(self.SensorFrm,text="ROOM", bg=sense_bg, fg="blue", font="Arial 7").grid(row=0)
+        #---SensorFrm        
+        for row in range(rows): # 4 rows
+            self.SensorFrm.rowconfigure(row, weight=1) #resize grid height
+        self.room_sensor = tk.Label(self.SensorFrm,text=sense_txt, bg=sense_bg, fg="blue", font="Arial 7")
+        self.room_sensor.grid(row=0)
         tk.Label(self.SensorFrm,text="temperature", bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=1, sticky=tk.W)
         #-temper frame
         temperFrm=tk.Frame(self.SensorFrm,bg=sense_bg)
@@ -375,14 +394,21 @@ class Gui:
         self.room_temper.pack(side=tk.LEFT)
         tk.Label(temperFrm, text="°C", fg=temperCol,  bg=sense_bg, font="Arial 12 bold").pack(side=tk.TOP)
         temperFrm.grid(row=2, sticky=tk.E)
-        #-Humidity
-        tk.Label(self.SensorFrm,text="Humidity", bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=3, sticky=tk.W)
-        self.room_humid=tk.Label(self.SensorFrm,text="56%", bg=sense_bg, fg=humidCol, font="Arial 14 bold")
-        self.room_humid.grid(row=4, sticky=tk.E)
+        if (self.sense_id==1) or (self.sense_id==2):
+            #-Humidity
+            tk.Label(self.SensorFrm,text="Humidity", bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=3, sticky=tk.W)
+            self.room_humid=tk.Label(self.SensorFrm,text="56%", bg=sense_bg, fg=humidCol, font="Arial 14 bold")
+            self.room_humid.grid(row=4, sticky=tk.E)
+        elif self.sense_id==3:
+            tk.Label(self.SensorFrm,text="Pressure", bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=3, sticky=tk.W)
+            self.room_press=tk.Label(self.SensorFrm,text="1022.3 hPa", bg=sense_bg, fg=humidCol, font="Arial 10 bold")
+            self.room_press.grid(row=4, sticky=tk.E)
+            tk.Label(self.SensorFrm,text="Altitude", bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=5, sticky=tk.W)
+            self.room_altit=tk.Label(self.SensorFrm,text="128 m", bg=sense_bg, fg=altitCol, font="Arial 10 bold")
+            self.room_altit.grid(row=6, sticky=tk.E)            
         #--close panel SensorFrm
         self.SensorFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES) 
         
-
 
      def sensePanel_change(self):
         global update_sense
@@ -398,6 +424,30 @@ class Gui:
                 self.SensorFrm=None  
             self.ipInfo_panel(self.pnlSenseInfo)
             bind_tree(self.IPInfoFrm,'<Button-1>',self.sensePanel_dblClick)
+
+
+     def sensePanel_nextShow(self):
+        global sense_tm_cnt
+        if self.sense_id < 0:
+            self.sense_id=1            
+            self.senseInfo_panel(self.pnlSenseInfo)
+            sense_tm_cnt=1000
+        elif self.sense_id == 0:
+            self.sense_id=1            
+            self.sensePanel_change()
+            sense_tm_cnt=1000
+        elif self.sense_id == 1:
+            self.sense_id=2
+            sense_tm_cnt=1000
+        elif self.sense_id == 2:
+            self.sense_id=3
+            self.SensorFrm.pack_forget()
+            self.senseInfo_panel(self.pnlSenseInfo)
+            bind_tree(self.SensorFrm,'<Button-1>',self.sensePanel_dblClick)            
+            sense_tm_cnt=1000            
+        elif self.sense_id == 3:
+            self.sense_id=0
+            self.sensePanel_change()            
 
 
      def cpuinfo_active(self):
@@ -489,7 +539,7 @@ class Gui:
         pnlBottom = tk.Frame(self.root)
         #--panel Senseinfo
         self.pnlSenseInfo = tk.Frame(pnlBottom, bg=win_col, relief=tk.GROOVE, borderwidth=2)
-        self.ipInfo_panel(self.pnlSenseInfo)
+        self.sensePanel_nextShow()
         self.pnlSenseInfo.pack(side=tk.LEFT, fill=tk.BOTH, expand=tk.YES, anchor=tk.W)
         bind_tree(self.pnlSenseInfo,'<Button-1>',self.sensePanel_dblClick)
 
@@ -542,24 +592,36 @@ def weather_thread(tmout):
 
 
 #======== Sensor Thread ======
+def get_sensor_module():
+    global gui
+    if gui.sense_id==1:
+        sense_mod=sense1
+    elif gui.sense_id==2:
+        sense_mod=sense2
+    elif gui.sense_id==3:
+        sense_mod=sense3 
+    else:
+        sense_mod=sense1    
+    return sense_mod    
+
 def sensor_thread(tmout):
-    global gui,exit,update_sense
-    tm_cnt=0    
-    info = sense1.get_sensor_info()
+    global gui,exit,update_sense,sense_tm_cnt
+    sense_tm_cnt=0       
+    info = get_sensor_module().get_sensor_info()
     gui.update_sensor(info)
     while True:          
         if exit:
             break
         if update_sense:
-           tm_cnt=tmout
+           sense_tm_cnt=tmout
            update_sense=False 
-        tm_cnt += 1        
-        if tm_cnt>tmout:            
-            info = sense1.get_sensor_info()
+        sense_tm_cnt += 1        
+        if sense_tm_cnt>tmout:
+            info = get_sensor_module().get_sensor_info()
             if exit:
                break            
             gui.update_sensor(info)
-            tm_cnt=0
+            sense_tm_cnt=0
         tm.sleep(1)
 
 
