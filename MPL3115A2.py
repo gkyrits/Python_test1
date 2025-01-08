@@ -20,12 +20,23 @@ def read_mpl3115():
 	# Select data configuration register, 0x13(19)
 	#		0x07(07)	Data ready event enabled for altitude, pressure, temperature
 	bus.write_byte_data(0x60, 0x13, 0x07)
+
+	# read Sea level pressure
+	#bus.write_byte_data(0x60,0x14,0xC7)
+	#bus.write_byte_data(0x60,0x15,0x6A)
+
+	data = bus.read_i2c_block_data(0x60, 0x14, 2)
+	sea_press= ((data[0]*256 + data[1]) *2) /100
+	print('User Sea Pressure : %d ' %sea_press)
+	print('')
+
+
 	# MPL3115A2 address, 0x60(96)
 	# Select control register, 0x26(38)
 	#		0xB9(185)	Active mode, OSR = 128, Altimeter mode
 	bus.write_byte_data(0x60, 0x26, 0xB9)
 	time.sleep(1)
-	
+
 	# MPL3115A2 address, 0x60(96)
 	# Read data back from 0x00(00), 6 bytes
 	# status, tHeight MSB1, tHeight MSB, tHeight LSB, temp MSB, temp LSB
@@ -59,8 +70,13 @@ def read_mpl3115():
 	print("Altitude    : %.1f m" %altitude)
 	#print("Temperature in Fahrenheit  : %.2f F" %fTemp)
 
+def set_sea_level(sea_press):
+	sea_level = int((sea_press * 100) /2)
+	data = list(sea_level.to_bytes(2,byteorder='big'))
+	bus.write_i2c_block_data(0x60,0x14,data)
 
+set_sea_level(1022)
 while True:
     read_mpl3115()
     print("")
-    time.sleep(10)		
+    time.sleep(10)
