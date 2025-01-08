@@ -18,6 +18,7 @@ FULL_SCREEN = 1
 exit = False
 infoWin = False
 wthr_count = 0
+wthr_pressure = 1013  #for set MPL3115 sea pressure
 update_sense = False
 sense_tm_cnt=0
 
@@ -572,10 +573,11 @@ def time_thread():
 
 #======== Weather Thread ======
 def weather_thread(tmout):
-     global gui,exit,wthr_count     
+     global gui,exit,wthr_count,wthr_pressure
      tm_cnt=0
      wthr_count=1
      info = wthr.get_weather_info()
+     wthr_pressure = info['Pressure'] 
      gui.update_weather(info)
      while True:          
           if exit:
@@ -584,30 +586,41 @@ def weather_thread(tmout):
           if tm_cnt>tmout:
             wthr_count += 1
             info = wthr.get_weather_info()
+            wthr_pressure = info['Pressure']
             if exit:
                break            
-            gui.update_weather(info)
+            gui.update_weather(info)            
             tm_cnt=0
           tm.sleep(1)
 
 
 #======== Sensor Thread ======
-def get_sensor_module():
+def update_mpl1315_seaPressure(info):
+    global wthr_pressure
+    seaPress = info['SeaPressure']
+    if seaPress != wthr_pressure:
+         sense3.set_sea_pressure(wthr_pressure)
+         print('Update mpl1315 sea pressure : %d' %wthr_pressure)
+
+def get_sensors_info():
     global gui
     if gui.sense_id==1:
         sense_mod=sense1
     elif gui.sense_id==2:
         sense_mod=sense2
     elif gui.sense_id==3:
-        sense_mod=sense3 
+        sense_mod=sense3
     else:
-        sense_mod=sense1    
-    return sense_mod    
+        sense_mod=sense1
+    info = sense_mod.get_sensor_info()
+    if gui.sense_id==3:
+        update_mpl1315_seaPressure(info)
+    return info
 
 def sensor_thread(tmout):
     global gui,exit,update_sense,sense_tm_cnt
     sense_tm_cnt=0       
-    info = get_sensor_module().get_sensor_info()
+    info = get_sensors_info()
     gui.update_sensor(info)
     while True:          
         if exit:
@@ -617,7 +630,7 @@ def sensor_thread(tmout):
            update_sense=False 
         sense_tm_cnt += 1        
         if sense_tm_cnt>tmout:
-            info = get_sensor_module().get_sensor_info()
+            info = get_sensors_info()
             if exit:
                break            
             gui.update_sensor(info)

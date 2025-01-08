@@ -3,7 +3,7 @@
 #import smbus
 import time
 
-info = {'Temperature':0.0, 'Pressure':0.0, 'Altitude':0.0}
+info = {'Temperature':0.0, 'Pressure':0.0, 'Altitude':0.0, 'SeaPressure':0}
 
 # MPL3115A2 address, 0x60(96)
 
@@ -18,6 +18,12 @@ def __read_mpl3115():
 	# Select data configuration register, 0x13(19)
 	#		0x07(07)	Data ready event enabled for altitude, pressure, temperature
     bus.write_byte_data(0x60, 0x13, 0x07)
+
+	# read Sea level pressure
+    data = bus.read_i2c_block_data(0x60, 0x14, 2)
+    sea_press= ((data[0]*256 + data[1]) *2) / 100
+    #print('User Sea Pressure : %d ' %sea_press)
+
 	# MPL3115A2 address, 0x60(96)
 	# Select control register, 0x26(38)
 	#		0xB9(185)	Active mode, OSR = 128, Altimeter mode
@@ -59,7 +65,20 @@ def __read_mpl3115():
     info['Temperature']=cTemp
     info['Pressure']=pressure
     info['Altitude']=altitude
+    info['SeaPressure']=sea_press
 
+def __set_mpl3115_seaPress(seaPress):
+    import smbus
+    bus = smbus.SMBus(1)
+    sea_level = int((sea_press * 100) /2)
+    data = list(sea_level.to_bytes(2,byteorder='big'))
+    bus.write_i2c_block_data(0x60,0x14,data)
+
+def set_sea_pressure(seaPress):
+    try:
+        __set_mpl3115_seaPress(seaPress)
+    except:
+        print('Fail set mpl3115 sea pressure')
 
 def get_sensor_info():
     try:
@@ -69,11 +88,14 @@ def get_sensor_info():
         info['Temperature']=0.0
         info['Pressure']=0.0
         info['Altitude']=0.0
+        info['SeaPressure']=0
         return info
     
 if __name__ == '__main__':
     while True:
         info = get_sensor_info()
+        print('SeaPressure : {} hPa'.format(info['SeaPressure']))
+        print('')        
         print('Temperature : {:.1f} °C'.format(info['Temperature']))
         print('Pressure    : {:.1f} hPa'.format(info['Pressure']))
         print('Altitude    : {:.1f} m'.format(info['Altitude']))
