@@ -1,6 +1,6 @@
 import weather as whr
 
-def print_info(info):
+def print_weather(info):
     print('')
     if info['Error'] != '':
         print('Error: '+info['Error'])
@@ -14,9 +14,26 @@ def print_info(info):
         print('Wind       : {} m/s ({})'.format(info['Wind'],info['WindDeg']))
     print('') 
 
+def print_forecast(info):
+    print('')
+    if info['Error'] != '':
+        print('Error: ' + info['Error'])
+    else:
+        item_cnt=info['Items']
+        for x in range(item_cnt):
+            if info['List'][x]['Hour']=='00':
+                print()
+            print('Date:%s  Hour:%s' % (
+                info['List'][x]['Date'],
+                info['List'][x]['Hour'],
+                ))
+    print('')
 
-print('openweather info:')
-print_info(whr.get_weather_info())
 print('meteosource info:')
-print_info(whr.get_weather_info(source='meteo'))
+print_weather(whr.get_weather_info(source='meteo'))
+print('openweather info:')
+print_weather(whr.get_weather_info())
+print('openweather forecast:')
+print_forecast(whr.get_forecast_info())
+
 

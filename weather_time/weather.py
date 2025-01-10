@@ -4,21 +4,29 @@ import requests
 #loc Nea Smyrni from google map
 #37.938209123871076, 23.709251306382026
 
+#loc Nea Smyrni
+LAT     = '37.93820'
+LON     = '23.70925'
+
 #---openweather
 OPEN_API_KEY = 'cc60f5942123b44409393d80500ce975'
 open_param = {'appid': OPEN_API_KEY,
-              'lat': '37.93820','lon': '23.70925','units': 'metric','lang':'el'}
-open_url = 'https://api.openweathermap.org/data/2.5/weather'
+              'lat': LAT,'lon': LON,'units': 'metric','lang':'el'}
+open_weather_url  = 'https://api.openweathermap.org/data/2.5/weather'
+open_forecast_url = "https://api.openweathermap.org/data/2.5/forecast"
 
 #---meteosource
 METEO_API_KEY = '8r3xztnjqi6uj9vqu11dg6wxnzoowpts066hr9s1'
 meteo_param = {'key': METEO_API_KEY,
-              'lat': '37.93820','lon': '23.70925'}
+              'lat': LAT,'lon': LON}
 meteo_place_url = "https://www.meteosource.com/api/v1/free/nearest_place"
 meteo_point_url = 'https://www.meteosource.com/api/v1/free/point'
 
 #---return info
 info = {'Place':'', 'Descript':'', 'Temper':0.0, 'Like':0.0, 'Humidity':0, 'Pressure':0, 'Wind':0.0, 'WindDeg':0, 'Clouds':0, 'Id':0, 'Error':''}
+
+forecast_item = {'Date':'', 'Hour':'', 'Temper':0.0, 'Humidity':0, 'Pressure':0, 'Wind':0.0, 'WindDeg':0, 'Clouds':0, 'Id':0}
+forecast_inf  = {'Items':0, 'Error':'', 'List':[]}
 
 
 def get_meteo_weather_info(lat, lon):    
@@ -30,6 +38,7 @@ def get_meteo_weather_info(lat, lon):
     except:
         info['Error']='request exception'    
         return info
+    info['Error']=''
     info['Place']=data_place['name']+' '+data_place['country']
     info['Descript']=data_point['current']['summary']
     info['Temper']=data_point['current']['temperature']
@@ -44,17 +53,18 @@ def get_meteo_weather_info(lat, lon):
 
 
 
-def get_open_weather_info(lat, lon):    
+def get_open_weather_info(lat, lon):
     open_param['lat']=lat
     open_param['lon']=lon
     try:
-        data = requests.get(open_url, open_param).json()
+        data = requests.get(open_weather_url, open_param).json()
     except:
         info['Error']='request exception'    
         return info
     if data['cod'] != 200:
         info['Error']=data['message']
         return info
+    info['Error']=''
     info['Place']=data['name']+' '+data['sys']['country']
     info['Descript']=data['weather'][0]['description']
     info['Temper']=data['main']['temp']
@@ -68,15 +78,38 @@ def get_open_weather_info(lat, lon):
     return info
 
 
+def get_open_forecast_info(lat, lon):
+    open_param['lat']=lat
+    open_param['lon']=lon
+    try:
+        data = requests.get(open_forecast_url, open_param).json()
+    except:
+        forecast_inf['Error']='request exception'    
+        return forecast_inf
+    if data['cod'] != '200':
+        forecast_inf['Error']=data['message']
+        return forecast_inf
+    forecast_inf['Error']=''
+    items_cnt=data['cnt']
+    forecast_inf['Items']=items_cnt
+    for x in range(items_cnt):
+        datetime = data['list'][x]['dt_txt']
+        forecast_item['Date']=datetime.split(' ')[0]
+        forecast_item['Hour']=datetime.split(' ')[1].split(':')[0]
+        #....        
+        forecast_inf['List'].append(forecast_item.copy())
+    return forecast_inf
 
 
-def get_weather_info(lat='37.93820', lon='23.70925', source='open'):
+def get_weather_info(lat=LAT, lon=LON, source='open'):
     if source=='open':
         return get_open_weather_info(lat,lon)
     else:
         return get_meteo_weather_info(lat,lon)
 
 
+def get_forecast_info(lat=LAT, lon=LON, source='open'):
+    return get_open_forecast_info(lat,lon)
 
 
 if __name__ == '__main__':
@@ -94,4 +127,4 @@ if __name__ == '__main__':
         print('Clouds     : {} %'.format(info['Clouds']))
         print('Wind       : {} m/s'.format(info['Wind']))
         print('Wind Deg   : {} m/s'.format(info['WindDeg']))
-    print('')    
+    print('')
