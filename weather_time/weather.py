@@ -96,7 +96,13 @@ def get_open_forecast_info(lat, lon):
         datetime = data['list'][x]['dt_txt']
         forecast_item['Date']=datetime.split(' ')[0]
         forecast_item['Hour']=datetime.split(' ')[1].split(':')[0]
-        #....        
+        forecast_item['Temper']=float(data['list'][x]['main']['temp'])
+        forecast_item['Humidity']=data['list'][x]['main']['humidity']
+        forecast_item['Pressure']=data['list'][x]['main']['pressure']
+        forecast_item['Wind']=float(data['list'][x]['wind']['speed'])
+        forecast_item['WindDeg']=data['list'][x]['wind']['deg']
+        forecast_item['Clouds']=data['list'][x]['clouds']['all']
+        forecast_item['Id']=data['list'][x]['weather'][0]['id']
         forecast_inf['List'].append(forecast_item.copy())
     return forecast_inf
 
