@@ -111,7 +111,8 @@ class Gui:
         self.nightTime=False
         self.IPInfoFrm=None
         self.SensorFrm=None
-        self.sense_id=-1
+        self.sense_id=-1        
+        self.wthrFrm_on=True
         self.init_clock_window()
 
      def __str__(self):
@@ -138,7 +139,8 @@ class Gui:
 
      def weatherPanel_dblClick(self,e):
         #print('Weather click! :%s' % e.widget)
-        self.__info_window('Weather click!')
+        #self.__info_window('Weather click!')       
+        self.weatherPanel_change()
 
      def key1_press(self):
         print('Key1 press!')     
@@ -288,6 +290,8 @@ class Gui:
         tk.Button(parent,text="3", bg=pnl_bt_col, command=self.key3_press).pack(side=tk.TOP, expand=tk.YES)
 
 
+     #-----------------------------------------------------------------------------
+     #-----------------------------------------------------------------------------
      def clock_panel(self,parent):
         #--panel datetime
         datetm_bg = "light steel blue"
@@ -322,6 +326,8 @@ class Gui:
         datetmfrm.pack(side=tk.TOP, padx=self.pnlPad, pady=self.pnlPad, fill=tk.X)         
 
 
+     #-----------------------------------------------------------------------------
+     #-----------------------------------------------------------------------------
      def ipInfo_panel(self,parent):
         datetm_bg = "light steel blue"
         lanLblFont="Arial 8 bold italic"
@@ -448,7 +454,27 @@ class Gui:
             sense_tm_cnt=1000            
         elif self.sense_id == 3:
             self.sense_id=0
-            self.sensePanel_change()            
+            self.sensePanel_change()  
+
+
+     def sensePanel_visible(self,visible):        
+        if not visible:
+            global update_sense
+            update_sense=False            
+            if self.IPInfoFrm != None:
+                self.IPInfoFrm.pack_forget()
+                self.IPInfoFrm=None
+            if self.SensorFrm !=None:
+                self.SensorFrm.pack_forget()
+                self.SensorFrm=None
+            self.pnlSenseInfo.pack_forget()
+        if visible:        
+            self.sense_id=-1
+            self.sensePanel_nextShow()            
+            self.weatherFrm.pack_forget()
+            self.pnlSenseInfo.pack(side=tk.LEFT, fill=tk.BOTH, expand=tk.YES, anchor=tk.W)                        
+            self.weatherFrm.pack(side=tk.LEFT, fill=tk.BOTH, expand=tk.YES, anchor=tk.W)
+            bind_tree(self.pnlSenseInfo,'<Button-1>',self.sensePanel_dblClick)
 
 
      def cpuinfo_active(self):
@@ -461,8 +487,10 @@ class Gui:
         if self.SensorFrm != None:
             return True
         else:
-            return False        
+            return False    
 
+     #-----------------------------------------------------------------------------
+     #----------------------------------------------------------------------------- 
      def weather_panel(self,parent):        
         global img
         wthr_bg = "light steel blue"        
@@ -470,47 +498,69 @@ class Gui:
         humidCol="red4"
         infoCol="blue" 
         img = tk.PhotoImage(file='icons/13.png')        
-        wthrFrm=tk.Frame(parent,bg=wthr_bg)
+        self.wthrFrm=tk.Frame(parent,bg=wthr_bg)
         for row in range(6): # 6 rows
-            wthrFrm.rowconfigure(row, weight=1) #resize grid height
+            self.wthrFrm.rowconfigure(row, weight=1) #resize grid height
 
-        self.wthr_descript=tk.Label(wthrFrm, text="Clear Sky", fg="blue", bg=wthr_bg, font="Arial 10 bold", anchor=tk.W)
+        self.wthr_descript=tk.Label(self.wthrFrm, text="Clear Sky", fg="blue", bg=wthr_bg, font="Arial 10 bold", anchor=tk.W)
         self.wthr_descript.grid(row=0, columnspan=4, sticky=tk.W)
         
-        temperFrm=tk.Frame(wthrFrm,bg=wthr_bg)
+        temperFrm=tk.Frame(self.wthrFrm,bg=wthr_bg)
         self.wthr_temper=tk.Label(temperFrm, text="24", fg=temperCol,  bg=wthr_bg, font="Arial 20 bold")
         self.wthr_temper.pack(side=tk.LEFT)
         tk.Label(temperFrm, text="°C", fg=temperCol,  bg=wthr_bg, font="Arial 12 bold").pack(side=tk.TOP)
         temperFrm.grid(row=1, columnspan=2, sticky=tk.W)
 
-        self.wthr_image=tk.Label(wthrFrm, image=img,  bg=wthr_bg, anchor=tk.W)
+        self.wthr_image=tk.Label(self.wthrFrm, image=img,  bg=wthr_bg, anchor=tk.W)
         self.wthr_image.grid(row=1, column=2,  columnspan=2, rowspan=3, sticky=tk.W)
 
-        tk.Label(wthrFrm, text="Feels Like",  bg=wthr_bg, font="Arial 8").grid(row=2, sticky=tk.W)
-        tk.Label(wthrFrm, text="Humidity",    bg=wthr_bg, font="Arial 8").grid(row=3, sticky=tk.W)
-        tk.Label(wthrFrm, text="Pressure",    bg=wthr_bg, font="Arial 8").grid(row=4, sticky=tk.W)
-        tk.Label(wthrFrm, text="Wind",        bg=wthr_bg, font="Arial 8").grid(row=5, sticky=tk.W)
+        tk.Label(self.wthrFrm, text="Feels Like",  bg=wthr_bg, font="Arial 8").grid(row=2, sticky=tk.W)
+        tk.Label(self.wthrFrm, text="Humidity",    bg=wthr_bg, font="Arial 8").grid(row=3, sticky=tk.W)
+        tk.Label(self.wthrFrm, text="Pressure",    bg=wthr_bg, font="Arial 8").grid(row=4, sticky=tk.W)
+        tk.Label(self.wthrFrm, text="Wind",        bg=wthr_bg, font="Arial 8").grid(row=5, sticky=tk.W)
 
-        self.wthr_like=tk.Label(wthrFrm, text="23°C",  fg=infoCol, bg=wthr_bg, font="Arial 8 bold")
+        self.wthr_like=tk.Label(self.wthrFrm, text="23°C",  fg=infoCol, bg=wthr_bg, font="Arial 8 bold")
         self.wthr_like.grid(row=2, column=1, sticky=tk.W)
-        self.wthr_humid=tk.Label(wthrFrm, text="36%",  bg=wthr_bg, fg=humidCol, font="Arial 9 bold")
+        self.wthr_humid=tk.Label(self.wthrFrm, text="36%",  bg=wthr_bg, fg=humidCol, font="Arial 9 bold")
         self.wthr_humid.grid(row=3, column=1, sticky=tk.W)
-        self.wthr_press=tk.Label(wthrFrm, text="1024 hPa",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
+        self.wthr_press=tk.Label(self.wthrFrm, text="1024 hPa",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
         self.wthr_press.grid(row=4, column=1,  columnspan=2, sticky=tk.W)
-        self.wthr_wind=tk.Label(wthrFrm, text="2.7 m/s",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
+        self.wthr_wind=tk.Label(self.wthrFrm, text="2.7 m/s",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
         self.wthr_wind.grid(row=5, column=1,  sticky=tk.W)
-        self.wthr_windDir=tk.Label(wthrFrm, text="NA",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
+        self.wthr_windDir=tk.Label(self.wthrFrm, text="NA",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
         self.wthr_windDir.grid(row=5, column=2,  sticky=tk.W)        
 
-        self.wthr_count=tk.Label(wthrFrm, text="4",  bg=wthr_bg, font="Arial 8 bold")
+        self.wthr_count=tk.Label(self.wthrFrm, text="4",  bg=wthr_bg, font="Arial 8 bold")
         self.wthr_count.grid(row=5, column=3,  sticky=tk.E) 
-        self.wthr_id=tk.Label(wthrFrm, text="800",  bg=wthr_bg, font="Arial 6 bold")
+        self.wthr_id=tk.Label(self.wthrFrm, text="800",  bg=wthr_bg, font="Arial 6 bold")
         self.wthr_id.grid(row=4, column=3,  sticky=tk.E)
 
-        wthrFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)
+        self.wthrFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)
 
 
+     def forecast_panel(self,parent):
+        wthr_bg = "light steel blue"
+        self.forcstFrm=tk.Frame(parent,bg=wthr_bg)
+        #...
+        self.forcstFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)
+        bind_tree(self.forcstFrm,'<Button-1>',self.weatherPanel_dblClick)       
 
+
+     def weatherPanel_change(self):
+        if self.wthrFrm_on:
+           self.sensePanel_visible(False)
+           self.wthrFrm.pack_forget()
+           self.wthrFrm_on=False
+           self.forecast_panel(self.weatherFrm)
+        else:
+           self.forcstFrm.pack_forget()
+           self.forcstFrm=None           
+           self.sensePanel_visible(True)
+           self.wthrFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)
+           self.wthrFrm_on=True
+     
+     #-----------------------------------------------------------------------------
+     #-----------------------------------------------------------------------------
      def init_clock_window(self):
         self.pnlPad=3  #default panel padx, pady
         #----------------------
@@ -545,10 +595,10 @@ class Gui:
         bind_tree(self.pnlSenseInfo,'<Button-1>',self.sensePanel_dblClick)
 
         #--panel Weather
-        weatherFrm = tk.Frame(pnlBottom, bg=win_col, relief=tk.GROOVE, borderwidth=2)
-        self.weather_panel(weatherFrm)
-        weatherFrm.pack(side=tk.LEFT, fill=tk.BOTH, expand=tk.YES, anchor=tk.W)
-        bind_tree(weatherFrm,'<Button-1>',self.weatherPanel_dblClick)
+        self.weatherFrm = tk.Frame(pnlBottom, bg=win_col, relief=tk.GROOVE, borderwidth=2)
+        self.weather_panel(self.weatherFrm)
+        self.weatherFrm.pack(side=tk.LEFT, fill=tk.BOTH, expand=tk.YES, anchor=tk.W)
+        bind_tree(self.weatherFrm,'<Button-1>',self.weatherPanel_dblClick)
         #--close panel Bottom  
         pnlBottom.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=tk.YES)
 
