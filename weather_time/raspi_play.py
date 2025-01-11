@@ -98,6 +98,26 @@ def bind_tree(widget, event, callback):
     widget.bind(event, callback)
     for child in widget.children.values():
         bind_tree(child, event, callback)
+
+
+def forecast_find_day(info,day):
+        info_range = [0,0]
+        item_cnt=info['Items']        
+        if day>0:
+            bay_cnt=0
+            for x in range(item_cnt):
+                 if (info['List'][x]['Hour']=='00'):
+                     bay_cnt += 1
+                     if bay_cnt==day:
+                        info_range[0]=x
+                        break                         
+        for x in range(info_range[0]+1,item_cnt):
+            if (info['List'][x]['Hour']=='00'):
+                info_range[1]=x
+                break
+        if(info_range[1]==0):
+            info_range[1]=item_cnt-1
+        return info_range         
     
 #======== Gui Class =========
 class Gui:
@@ -113,6 +133,7 @@ class Gui:
         self.SensorFrm=None
         self.sense_id=-1        
         self.wthrFrm_on=True
+        self.smlimg = [None,None,None,None,None,None,None,None]
         self.init_clock_window()
 
      def __str__(self):
@@ -243,8 +264,7 @@ class Gui:
          
 
      def update_weather(self,info):
-          if info['Error']=='':
-               global img
+          if info['Error']=='':               
                self.wthr_temper.config(text='{:.1f}'.format(info['Temper']))
                self.wthr_descript.config(text=info['Descript'])
                self.wthr_like.config(text='{:.1f}°C'.format(info['Like']))
@@ -259,8 +279,8 @@ class Gui:
                   if icon_num in icon_night_map.keys():
                      icon_num=icon_night_map[icon_num]
                icon_file='icons/'+str(icon_num)+'.png'
-               img=tk.PhotoImage(file=icon_file)
-               self.wthr_image.config(image=img)
+               self.img=tk.PhotoImage(file=icon_file)
+               self.wthr_image.config(image=self.img)
 
 
      def update_sensor(self,info):
@@ -491,13 +511,12 @@ class Gui:
 
      #-----------------------------------------------------------------------------
      #----------------------------------------------------------------------------- 
-     def weather_panel(self,parent):        
-        global img
+     def weather_panel(self,parent):                
         wthr_bg = "light steel blue"        
         temperCol="red"  
         humidCol="red4"
         infoCol="blue" 
-        img = tk.PhotoImage(file='icons/13.png')        
+        self.img = tk.PhotoImage(file='icons/13.png')        
         self.wthrFrm=tk.Frame(parent,bg=wthr_bg)
         for row in range(6): # 6 rows
             self.wthrFrm.rowconfigure(row, weight=1) #resize grid height
@@ -511,7 +530,7 @@ class Gui:
         tk.Label(temperFrm, text="°C", fg=temperCol,  bg=wthr_bg, font="Arial 12 bold").pack(side=tk.TOP)
         temperFrm.grid(row=1, columnspan=2, sticky=tk.W)
 
-        self.wthr_image=tk.Label(self.wthrFrm, image=img,  bg=wthr_bg, anchor=tk.W)
+        self.wthr_image=tk.Label(self.wthrFrm, image=self.img,  bg=wthr_bg, anchor=tk.W)
         self.wthr_image.grid(row=1, column=2,  columnspan=2, rowspan=3, sticky=tk.W)
 
         tk.Label(self.wthrFrm, text="Feels Like",  bg=wthr_bg, font="Arial 8").grid(row=2, sticky=tk.W)
@@ -538,20 +557,69 @@ class Gui:
         self.wthrFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)
 
 
-     def forecast_panel(self,parent):
+     def forecast_print(self,parent,prnt_bg,info,day):
+        temperCol="purple"
+        humidCol="dark green"
+        windCol="green"
+        pressCol="blue"
+        #for x in range(6):
+        #    info_rng=forecast_find_day(info,x)
+        #    print(info_rng)
+        info_rng=forecast_find_day(info,day)
+        print(info_rng)
+        for row in range(7): # 7 rows
+            parent.rowconfigure(row, weight=1) #resize grid height
+        for col in range(9): # 9 rows
+            parent.columnconfigure(col, weight=1) #resize grid height            
+        daytxt=info['List'][info_rng[0]]['Date']
+        tk.Label(parent, text=daytxt, bg=prnt_bg, fg=pressCol, font="Arial 8 bold").grid(row=0, columnspan=9)
+        tk.Label(parent, text='Hr',     bg=prnt_bg, font="Arial 8").grid(row=1, sticky=tk.W)
+        #tk.Label(parent, text='Icon',     bg=prnt_bg, font="Arial 8").grid(row=2, sticky=tk.W)
+        tk.Label(parent, text='°C',   bg=prnt_bg, font="Arial 8").grid(row=3, sticky=tk.W)
+        tk.Label(parent, text='%', bg=prnt_bg, font="Arial 8").grid(row=4, sticky=tk.W)
+        tk.Label(parent, text='hPa', bg=prnt_bg, font="Arial 8").grid(row=5, sticky=tk.W)
+        tk.Label(parent, text='m/s',     bg=prnt_bg, font="Arial 8").grid(row=6, sticky=tk.W)
+        for idx in range(info_rng[0],info_rng[1]):
+            col=idx-info_rng[0]
+            hour = info['List'][idx]['Hour']+':'
+            tk.Label(parent, text=hour,  bg=prnt_bg, font="Arial 8").grid(row=1, column=col+1)
+            icon_num=icon_map_day[info['List'][idx]['Id']]
+            if hour>='20':            
+                if icon_num in icon_night_map.keys():
+                    icon_num=icon_night_map[icon_num]
+            icon_file='small_icons/'+str(icon_num)+'.png'            
+            self.smlimg[col] = tk.PhotoImage(file=icon_file)
+            tk.Label(parent, image=self.smlimg[col],  bg=prnt_bg).grid(row=2, column=col+1)
+            temper='{:.1f}'.format(info['List'][idx]['Temper'])
+            tk.Label(parent, text=temper,  bg=prnt_bg, fg=temperCol, font="Arial 8 bold").grid(row=3, column=col+1, sticky=tk.W)
+            humid='{}'.format(info['List'][idx]['Humidity'])
+            tk.Label(parent, text=humid,  bg=prnt_bg, fg=humidCol, font="Arial 8 bold").grid(row=4, column=col+1, sticky=tk.W)
+            press='{}'.format(info['List'][idx]['Pressure'])
+            tk.Label(parent, text=press,  bg=prnt_bg, fg=pressCol, font="Arial 8").grid(row=5, column=col+1, sticky=tk.W)
+            wind='{:.1f}'.format(info['List'][idx]['Wind'])
+            windDeg=get_windDir(info['List'][idx]['WindDeg'])
+            tk.Label(parent, text=wind+windDeg, bg=prnt_bg, fg=windCol, font="Arial 8").grid(row=6, column=col+1, sticky=tk.W)
+
+
+
+     def forecast_panel(self,parent,info):
         wthr_bg = "light steel blue"
         self.forcstFrm=tk.Frame(parent,bg=wthr_bg)
         #...
+        self.forecast_print(self.forcstFrm,wthr_bg,info,1)
         self.forcstFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)
         bind_tree(self.forcstFrm,'<Button-1>',self.weatherPanel_dblClick)       
 
 
      def weatherPanel_change(self):
         if self.wthrFrm_on:
+           info = wthr.get_forecast_info()
+           if info['Error'] != '':
+               return
            self.sensePanel_visible(False)
            self.wthrFrm.pack_forget()
            self.wthrFrm_on=False
-           self.forecast_panel(self.weatherFrm)
+           self.forecast_panel(self.weatherFrm,info)
         else:
            self.forcstFrm.pack_forget()
            self.forcstFrm=None           
