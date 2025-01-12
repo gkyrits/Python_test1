@@ -587,9 +587,14 @@ class Gui:
             if hour>='20':            
                 if icon_num in icon_night_map.keys():
                     icon_num=icon_night_map[icon_num]
-            icon_file='small_icons/'+str(icon_num)+'.png'            
+            icon_file='small_icons/'+str(icon_num)+'.png'
             self.smlimg[col] = tk.PhotoImage(file=icon_file)
-            tk.Label(parent, image=self.smlimg[col],  bg=prnt_bg).grid(row=2, column=col+1)
+            imgLbl=tk.Label(parent, image=self.smlimg[col],  bg=prnt_bg)
+            imgLbl.grid(row=2, column=col+1)
+            if idx==info_rng[0]:
+                self.frcstBack=imgLbl
+            if idx==info_rng[1]-1:
+                self.frcstForw=imgLbl    
             temper='{:.1f}'.format(info['List'][idx]['Temper'])
             tk.Label(parent, text=temper,  bg=prnt_bg, fg=temperCol, font="Arial 8 bold").grid(row=3, column=col+1, sticky=tk.W)
             humid='{}'.format(info['List'][idx]['Humidity'])
@@ -600,26 +605,45 @@ class Gui:
             windDeg=get_windDir(info['List'][idx]['WindDeg'])
             tk.Label(parent, text=wind+windDeg, bg=prnt_bg, fg=windCol, font="Arial 8").grid(row=6, column=col+1, sticky=tk.W)
 
+     def forcast_next_event(self,forw):
+        print('Next '+str(forw))
+        if forw:
+            self.frcst_day += 1
+            if self.frcst_day > 5:
+                self.frcst_day=5
+        else:
+            self.frcst_day -= 1
+            if self.frcst_day < 0:
+                self.frcst_day=0            
+        self.forcstFrm.pack_forget()
+        self.forecast_panel(self.weatherFrm,self.frcst_info)
+
+
+     #bind back-force image ivents
+     def bind_next(self):
+        self.frcstBack.bind('<Button-1>', lambda e, forw=False : self.forcast_next_event(forw))
+        self.frcstForw.bind('<Button-1>', lambda e, forw=True : self.forcast_next_event(forw))
 
 
      def forecast_panel(self,parent,info):
         wthr_bg = "light steel blue"
-        self.forcstFrm=tk.Frame(parent,bg=wthr_bg)
-        #...
-        self.forecast_print(self.forcstFrm,wthr_bg,info,1)
+        self.forcstFrm=tk.Frame(parent,bg=wthr_bg)        
+        self.forecast_print(self.forcstFrm,wthr_bg,info,self.frcst_day)
         self.forcstFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)
-        bind_tree(self.forcstFrm,'<Button-1>',self.weatherPanel_dblClick)       
+        bind_tree(self.forcstFrm,'<Button-1>',self.weatherPanel_dblClick)        
+        self.bind_next()
 
 
      def weatherPanel_change(self):
         if self.wthrFrm_on:
-           info = wthr.get_forecast_info()
-           if info['Error'] != '':
+           self.frcst_info = wthr.get_forecast_info()
+           if self.frcst_info['Error'] != '':
                return
            self.sensePanel_visible(False)
            self.wthrFrm.pack_forget()
            self.wthrFrm_on=False
-           self.forecast_panel(self.weatherFrm,info)
+           self.frcst_day=1
+           self.forecast_panel(self.weatherFrm,self.frcst_info)
         else:
            self.forcstFrm.pack_forget()
            self.forcstFrm=None           
