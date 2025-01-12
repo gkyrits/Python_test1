@@ -133,6 +133,7 @@ class Gui:
         self.SensorFrm=None
         self.sense_id=-1        
         self.wthrFrm_on=True
+        self.frcst_tmout=None
         self.smlimg = [None,None,None,None,None,None,None,None]
         self.init_clock_window()
 
@@ -584,7 +585,7 @@ class Gui:
             hour = info['List'][idx]['Hour']+':'
             tk.Label(parent, text=hour,  bg=prnt_bg, font="Arial 8").grid(row=1, column=col+1)
             icon_num=icon_map_day[info['List'][idx]['Id']]
-            if hour>='20':            
+            if (hour>='20:') or (hour<='06:'):
                 if icon_num in icon_night_map.keys():
                     icon_num=icon_night_map[icon_num]
             icon_file='small_icons/'+str(icon_num)+'.png'
@@ -604,6 +605,7 @@ class Gui:
             wind='{:.1f}'.format(info['List'][idx]['Wind'])
             windDeg=get_windDir(info['List'][idx]['WindDeg'])
             tk.Label(parent, text=wind+windDeg, bg=prnt_bg, fg=windCol, font="Arial 8").grid(row=6, column=col+1, sticky=tk.W)
+
 
      def forcast_next_event(self,forw):
         print('Next '+str(forw))
@@ -632,10 +634,14 @@ class Gui:
         self.forcstFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)
         bind_tree(self.forcstFrm,'<Button-1>',self.weatherPanel_dblClick)        
         self.bind_next()
+        if self.frcst_tmout != None:
+            self.root.after_cancel(self.frcst_tmout)        
+        self.frcst_tmout=self.root.after(30000,self.weatherPanel_change)
 
 
      def weatherPanel_change(self):
         if self.wthrFrm_on:
+           print('get forcast info') 
            self.frcst_info = wthr.get_forecast_info()
            if self.frcst_info['Error'] != '':
                return
@@ -645,6 +651,9 @@ class Gui:
            self.frcst_day=1
            self.forecast_panel(self.weatherFrm,self.frcst_info)
         else:
+           if self.frcst_tmout != None:
+               self.root.after_cancel(self.frcst_tmout)
+           self.frcst_tmout=None    
            self.forcstFrm.pack_forget()
            self.forcstFrm=None           
            self.sensePanel_visible(True)

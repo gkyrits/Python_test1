@@ -92,6 +92,7 @@ def get_open_forecast_info(lat, lon):
     forecast_inf['Error']=''
     items_cnt=data['cnt']
     forecast_inf['Items']=items_cnt
+    forecast_inf['List']=[]
     for x in range(items_cnt):
         datetime = data['list'][x]['dt_txt']
         forecast_item['Date']=datetime.split(' ')[0]
