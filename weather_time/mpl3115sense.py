@@ -70,7 +70,7 @@ def __read_mpl3115():
 def __set_mpl3115_seaPress(seaPress):
     import smbus
     bus = smbus.SMBus(1)
-    sea_level = int((sea_press * 100) /2)
+    sea_level = int((seaPress * 100) /2)
     data = list(sea_level.to_bytes(2,byteorder='big'))
     bus.write_i2c_block_data(0x60,0x14,data)
 
