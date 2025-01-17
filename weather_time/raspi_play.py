@@ -19,8 +19,7 @@ exit = False
 infoWin = False
 wthr_count = 0
 wthr_pressure = 1013  #for set MPL3115 sea pressure
-update_sense = False
-sense_tm_cnt=0
+sense_need_update=False
 
 def get_month(date):    
      if date==1:
@@ -439,8 +438,6 @@ class Gui:
         
 
      def sensePanel_change(self):
-        global update_sense
-        update_sense=True
         if self.IPInfoFrm != None:
             self.IPInfoFrm.pack_forget()
             self.IPInfoFrm=None
@@ -455,24 +452,24 @@ class Gui:
 
 
      def sensePanel_nextShow(self):
-        global sense_tm_cnt
+        global sense_need_update
         if self.sense_id < 0:
             self.sense_id=1            
             self.senseInfo_panel(self.pnlSenseInfo)
-            sense_tm_cnt=1000
+            sense_need_update=True
         elif self.sense_id == 0:
             self.sense_id=1            
             self.sensePanel_change()
-            sense_tm_cnt=1000
+            sense_need_update=True
         elif self.sense_id == 1:
             self.sense_id=2
-            sense_tm_cnt=1000
+            sense_need_update=True
         elif self.sense_id == 2:
             self.sense_id=3
             self.SensorFrm.pack_forget()
             self.senseInfo_panel(self.pnlSenseInfo)
             bind_tree(self.SensorFrm,'<Button-1>',self.sensePanel_dblClick)            
-            sense_tm_cnt=1000            
+            sense_need_update=True
         elif self.sense_id == 3:
             self.sense_id=0
             self.sensePanel_change()  
@@ -480,8 +477,6 @@ class Gui:
 
      def sensePanel_visible(self,visible):        
         if not visible:
-            global update_sense
-            update_sense=False            
             if self.IPInfoFrm != None:
                 self.IPInfoFrm.pack_forget()
                 self.IPInfoFrm=None
@@ -489,7 +484,7 @@ class Gui:
                 self.SensorFrm.pack_forget()
                 self.SensorFrm=None
             self.pnlSenseInfo.pack_forget()
-        if visible:        
+        if visible:
             self.sense_id=-1
             self.sensePanel_nextShow()            
             self.weatherFrm.pack_forget()
@@ -746,6 +741,8 @@ def weather_thread(tmout):
 
 
 #======== Sensor Thread ======
+sensors_info = {'sens1':{}, 'sens2':{}, 'sens3':{}}
+
 def update_mpl1315_seaPressure(info):
     global wthr_pressure
     seaPress = info['SeaPressure']
@@ -753,39 +750,45 @@ def update_mpl1315_seaPressure(info):
          sense3.set_sea_pressure(wthr_pressure)
          print('Update mpl1315 sea pressure : %d' %wthr_pressure)
 
+def read_sensors_info():
+    print('*read_sensors_info*')
+    sensors_info['sens1'] = sense1.get_sensor_info()
+    sensors_info['sens2'] = sense2.get_sensor_info()
+    sensors_info['sens3'] = sense3.get_sensor_info()
+    update_mpl1315_seaPressure(sensors_info['sens3'])
+
 def get_sensors_info():
     global gui
     if gui.sense_id==1:
-        sense_mod=sense1
+        return sensors_info['sens1']
     elif gui.sense_id==2:
-        sense_mod=sense2
+        return sensors_info['sens2']
     elif gui.sense_id==3:
-        sense_mod=sense3
+        return sensors_info['sens3']    
     else:
-        sense_mod=sense1
-    info = sense_mod.get_sensor_info()
-    if gui.sense_id==3:
-        update_mpl1315_seaPressure(info)
-    return info
+        return sensors_info['sens1']
 
 def sensor_thread(tmout):
-    global gui,exit,update_sense,sense_tm_cnt
-    sense_tm_cnt=0       
+    global gui,exit,sense_need_update
+    sense_tm_cnt=0
+    read_sensors_info()
     info = get_sensors_info()
     gui.update_sensor(info)
     while True:          
         if exit:
             break
-        if update_sense:
-           sense_tm_cnt=tmout
-           update_sense=False 
         sense_tm_cnt += 1        
         if sense_tm_cnt>tmout:
-            info = get_sensors_info()
+            read_sensors_info()
             if exit:
-               break            
+               break             
+            info = get_sensors_info()           
             gui.update_sensor(info)
             sense_tm_cnt=0
+        if sense_need_update:
+            info = get_sensors_info()
+            gui.update_sensor(info)
+            sense_need_update=False
         tm.sleep(1)
 
 
