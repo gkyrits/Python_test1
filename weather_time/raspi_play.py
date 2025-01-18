@@ -8,6 +8,7 @@ import battery as batt
 import aht10sense as sense1
 import si7021sense as sense2
 import mpl3115sense as sense3
+import repository as repo
 import subprocess as proc
 import sys
 import os
@@ -741,7 +742,6 @@ def weather_thread(tmout):
 
 
 #======== Sensor Thread ======
-sensors_info = {'sens1':{}, 'sens2':{}, 'sens3':{}}
 
 def update_mpl1315_seaPressure(info):
     global wthr_pressure
@@ -752,21 +752,22 @@ def update_mpl1315_seaPressure(info):
 
 def read_sensors_info():
     print('*read_sensors_info*')
-    sensors_info['sens1'] = sense1.get_sensor_info()
-    sensors_info['sens2'] = sense2.get_sensor_info()
-    sensors_info['sens3'] = sense3.get_sensor_info()
-    update_mpl1315_seaPressure(sensors_info['sens3'])
+    repo.info['sens1'] = sense1.get_sensor_info()
+    repo.info['sens2'] = sense2.get_sensor_info()
+    repo.info['sens3'] = sense3.get_sensor_info()
+    update_mpl1315_seaPressure(repo.info['sens3'])
+    repo.save_info()
 
 def get_sensors_info():
     global gui
     if gui.sense_id==1:
-        return sensors_info['sens1']
+        return repo.info['sens1']
     elif gui.sense_id==2:
-        return sensors_info['sens2']
+        return repo.info['sens2']
     elif gui.sense_id==3:
-        return sensors_info['sens3']    
+        return repo.info['sens3']    
     else:
-        return sensors_info['sens1']
+        return repo.info['sens1']
 
 def sensor_thread(tmout):
     global gui,exit,sense_need_update
