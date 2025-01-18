@@ -38,7 +38,7 @@ def get_sensor_info():
         return info
     except:
         info['Temperature']=0.0
-        info['Humidity']=0.0
+        info['Humidity']=0
         return info
     
 if __name__ == '__main__':
