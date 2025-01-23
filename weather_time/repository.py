@@ -54,7 +54,7 @@ def save_info():
         print('Fail to save info to file:', e)
 
 
-RECID = 0xFF
+RECID = 0xEE
 # save info with timestamp to file in a binary using struct
 def save_info_binary():
     try:
@@ -124,15 +124,17 @@ def load_info():
 
 #load binary file return as a list of repo_info
 def load_info_binary():
+    repo_info_list = []
     try:
         os.makedirs(DIR, exist_ok=True)
         file_path = os.path.join(DIR, FILE + '-' + __get_year_month() + '.bin')
-        with open(file_path, 'rb') as f:
-            repo_info_list = []
+        with open(file_path, 'rb') as f:           
             while True:
                 rec_id = f.read(1)
                 if not rec_id:
-                    break
+                    break                
+                if rec_id[0] != RECID:
+                    continue
                 day = int.from_bytes(f.read(1), 'big')
                 time = ':'.join([str(int.from_bytes(f.read(1), 'big')) for i in range(3)])
                 sens1_temp, sens1_hum = struct.unpack('hc', f.read(3))                
@@ -146,7 +148,7 @@ def load_info_binary():
             return repo_info_list
     except Exception as e:
         print('Fail to load info from file:', e)
-        return []
+        return repo_info_list
 
     
 #test load_info()
