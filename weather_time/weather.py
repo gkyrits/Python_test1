@@ -24,6 +24,7 @@ meteo_point_url = 'https://www.meteosource.com/api/v1/free/point'
 
 #---return info
 info = {'Place':'', 'Descript':'', 'Temper':0.0, 'Like':0.0, 'Humidity':0, 'Pressure':0, 'Wind':0.0, 'WindDeg':0, 'Clouds':0, 'Id':0, 'Error':''}
+small_info = {'Temperature':0.0, 'Humidity':0}
 
 forecast_item = {'Date':'', 'Hour':'', 'Temper':0.0, 'Humidity':0, 'Pressure':0, 'Wind':0.0, 'WindDeg':0, 'Clouds':0, 'Id':0}
 forecast_inf  = {'Items':0, 'Error':'', 'List':[]}
@@ -43,12 +44,14 @@ def get_meteo_weather_info(lat, lon):
     info['Descript']=data_point['current']['summary']
     info['Temper']=data_point['current']['temperature']
     info['Like']='-'
-    info['Humidity']='-'
+    info['Humidity']=0
     info['Pressure']='-'
     info['Wind']='-'
     info['WindDeg']='-'
     info['Clouds']='-'
     info['Id']=0
+    small_info['Temperature']=info['Temper']
+    small_info['Humidity']=info['Humidity']
     return info
 
 
@@ -75,6 +78,8 @@ def get_open_weather_info(lat, lon):
     info['WindDeg']=data['wind']['deg']
     info['Clouds']=data['clouds']['all']
     info['Id']=data['weather'][0]['id']
+    small_info['Temperature']=info['Temper']
+    small_info['Humidity']=info['Humidity']
     return info
 
 
@@ -114,6 +119,8 @@ def get_weather_info(lat=LAT, lon=LON, source='open'):
     else:
         return get_meteo_weather_info(lat,lon)
 
+def get_small_info():
+    return small_info
 
 def get_forecast_info(lat=LAT, lon=LON, source='open'):
     return get_open_forecast_info(lat,lon)

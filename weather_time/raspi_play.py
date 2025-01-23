@@ -754,9 +754,10 @@ def read_sensors_info():
     print('*read_sensors_info*')
     repo.info['sens1'] = sense1.get_sensor_info()
     repo.info['sens2'] = sense2.get_sensor_info()
-    repo.info['sens3'] = sense3.get_sensor_info()
+    repo.info['sens3'] = sense3.get_sensor_info()    
     update_mpl1315_seaPressure(repo.info['sens3'])
-    repo.save_info()
+    repo.info['web'] = wthr.get_small_info()
+    repo.save_info_binary()
 
 def get_sensors_info():
     global gui
