@@ -15,6 +15,14 @@ def __get_year_month():
 def __get_year():
     return time.strftime('%Y', time.localtime())
 
+# get epoch time from year, month, day, hour, minute
+def get_epoch(year, month, day, hour, minute):
+    # Create a struct_time object
+    time_tuple = (year, month, day, hour, minute, 0, 0, 0, -1)
+    # Convert to epoch time
+    epoch_time = time.mktime(time_tuple)
+    return epoch_time
+
 # key mapping for renaming
 key_mapping = {
     'sens1' : 's1',
@@ -123,11 +131,30 @@ def load_info():
 
 
 #load binary file return as a list of repo_info
-def load_info_binary():
+def load_info_binary(year=0, month=0, day=0, hour=-1, min=-1, backhours=24):
+    #estimate start epoch time and back epoch time
+    if (year == 0) and (month == 0):
+        year_month_str  = __get_year_month()
+    elif (year == 0) and (month != 0):
+        year_month_str = __get_year() + '-' + str(month).zfill(2)
+    elif (year != 0) and (month == 0):
+        year_month_str = str(year) + '-' + __get_year_month().split('-')[1]
+    else:
+        year_month_str = str(year) + '-' + str(month).zfill(2)
+    if day == 0:
+        day = int(time.strftime('%d', time.localtime()))    
+    if hour == -1:
+        hour = int(time.strftime('%H', time.localtime()))
+    if min == -1:
+        min = int(time.strftime('%M', time.localtime()))
+    startepoch = get_epoch(int(year_month_str.split('-')[0]), int(year_month_str.split('-')[1]), day, hour, min)
+    backepoch = startepoch - backhours * 3600
+    #start read records from file
     repo_info_list = []
     try:
         os.makedirs(DIR, exist_ok=True)
-        file_path = os.path.join(DIR, FILE + '-' + __get_year_month() + '.bin')
+        file_path = os.path.join(DIR, FILE + '-' + year_month_str + '.bin')
+        print('file_path:', file_path)
         with open(file_path, 'rb') as f:           
             while True:
                 rec_id = f.read(1)
@@ -135,13 +162,16 @@ def load_info_binary():
                     break                
                 if rec_id[0] != RECID:
                     continue
-                day = int.from_bytes(f.read(1), 'big')
-                time = ':'.join([str(int.from_bytes(f.read(1), 'big')) for i in range(3)])
+                fday = int.from_bytes(f.read(1), 'big')
+                ftime = ':'.join([str(int.from_bytes(f.read(1), 'big')) for i in range(3)])
                 sens1_temp, sens1_hum = struct.unpack('hc', f.read(3))                
                 sens2_temp, sens2_hum = struct.unpack('hc', f.read(3))
                 sens3_temp, sens3_press, sens3_alt, sens3_sea = struct.unpack('hhhh', f.read(8))
                 web_temp, web_hum = struct.unpack('hc', f.read(3))
-                repo_info_list.append({'day': str(day), 'time': time, 'info': {'sens1': {'Temperature': sens1_temp/10, 'Humidity': sens1_hum[0]}, 
+                recordepoch = get_epoch(int(year_month_str.split('-')[0]), int(year_month_str.split('-')[1]), fday, int(ftime.split(':')[0]), int(ftime.split(':')[1]))
+                if(recordepoch < backepoch) or (recordepoch > startepoch):
+                    continue
+                repo_info_list.append({'day': str(fday), 'time': ftime, 'info': {'sens1': {'Temperature': sens1_temp/10, 'Humidity': sens1_hum[0]}, 
                                                                               'sens2': {'Temperature': sens2_temp/10, 'Humidity': sens2_hum[0]}, 
                                                                               'sens3': {'Temperature': sens3_temp/10, 'Pressure': sens3_press/10, 'Altitude': sens3_alt/10, 'SeaPressure': sens3_sea/10}, 
                                                                               'web': {'Temperature': web_temp/10, 'Humidity': web_hum[0]}}})
@@ -150,13 +180,20 @@ def load_info_binary():
         print('Fail to load info from file:', e)
         return repo_info_list
 
+#test load_info_binary()
+def test_load_info_binary():
+    #get month, day, backhours from stdin
+    month = int(input('Enter month:'))
+    day = int(input('Enter day:'))
+    backhours = int(input('Enter backhours:'))
+    info_list = load_info_binary(month=month, day=day, hour=23, min=59, backhours=backhours)
+    for info in info_list:
+        print(info)
     
 #test load_info()
 if __name__ == '__main__':
     #test_save_info_binary()
-    info_list = load_info_binary()
-    for info in info_list:
-        print(info)
+    test_load_info_binary()
     #print(load_info())
 
 
