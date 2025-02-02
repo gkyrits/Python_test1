@@ -12,6 +12,7 @@ LINE_WIDTH = 0.5
 
 CURRENT_PLOT = 1
 backhours = 48
+win_col = "light yellow"
 
 line_id=0
 axes = [None,None,None]
@@ -129,13 +130,17 @@ def btn_exit():
 
 def get_matplot_canvas(canvfrm):    
     plt.rcParams.update({'font.size': 6})
-    fig = plt.Figure()
+    fig = plt.Figure(figsize=(0.1, 0.1), dpi=100) #px, py = w*dpi, h*dpi  # pixels
     #fig = plt.Figure(tight_layout=False)
     axes[0] = fig.add_subplot()
     axes[1] = axes[0].twinx()
     axes[2] = axes[0].twinx()
-    for ax in axes:        
-        #ax.margins(0.01)
+    if web_temper_data :
+        global line_id
+        axes[0].plot(time_data, web_temper_data, label='web temper', color='r', linewidth=LINE_WIDTH)        
+        line_id = 1
+    for ax in axes:     
+        ax.margins(0.01)           
         ax.set_yticks([]) # Hide y-axis ticks
     fig.subplots_adjust(left=0, right=0.99, top=0.99, bottom=0.1)
     FigCanvas = FigureCanvasTkAgg(fig, master=canvfrm)
@@ -143,7 +148,9 @@ def get_matplot_canvas(canvfrm):
     return FigCanvas.get_tk_widget()
 
 
-def draw_form():
+def draw_form(root):
+    #get data from repository
+    get_initdata()
     #tools
     toolsfrm = tk.Frame(root, bg=win_col, height=25)
     tk.Button(toolsfrm, text='Next', command=btn_change).pack(side=tk.LEFT, padx=4)
@@ -160,14 +167,13 @@ def draw_form():
    
 
 ##################################################
-win_col = "light yellow"
-get_initdata()
-root = tk.Tk()
-root.title('Test Graph')
-root.geometry(LCD_SIZE+'+0+0')
-if FULL_SCREEN:
-    root.overrideredirect(1)    
-root.config(bg=win_col)
-draw_form()
 
-root.mainloop()
+if __name__ == '__main__':
+    root = tk.Tk()
+    root.title('Test Graph')
+    root.geometry(LCD_SIZE+'+0+0')
+    if FULL_SCREEN:
+        root.overrideredirect(1)    
+    root.config(bg=win_col)
+    draw_form(root)
+    root.mainloop()
