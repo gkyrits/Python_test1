@@ -8,6 +8,7 @@ import battery as batt
 import aht10sense as sense1
 import si7021sense as sense2
 import mpl3115sense as sense3
+import matplotgraph as plot
 import repository as repo
 import subprocess as proc
 import sys
@@ -152,7 +153,8 @@ class Gui:
 
      def clockPanel_dblClick(self,e):
         #print('Clock click! :%s' % e.widget)
-        self.__info_window('Clock click!')
+        #self.__info_window('Clock click!')
+        self.graph_window()
 
      def sensePanel_dblClick(self,e):
         #print('Info click! :%s' % e.widget)
@@ -219,6 +221,13 @@ class Gui:
          except:
             print('fail run radio_player')
             return   
+         
+
+     def graph_window(self):
+         win=tk.Toplevel()
+         win.geometry(LCD_SIZE+'+0+0')
+         win.overrideredirect(1)
+         plot.draw_form(win)         
 
 
      def update_clock(self,time):
