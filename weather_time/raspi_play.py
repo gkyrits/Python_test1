@@ -8,7 +8,8 @@ import battery as batt
 import aht10sense as sense1
 import si7021sense as sense2
 import mpl3115sense as sense3
-import matplotgraph as plot
+#import matplotgraph as plot
+import simplegraph as plot
 import repository as repo
 import subprocess as proc
 import sys
