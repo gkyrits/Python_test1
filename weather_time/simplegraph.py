@@ -12,27 +12,28 @@ win_col = "light yellow"
 line_id=0
 
 time_data = []
-web_temper_data = []
+web_temp_data = []
 web_humid_data = []
 sens_press_data = []
+sens_temp_data = []
+sens_humid_data = []
 
 web_temp_rng = [0,0]
 web_humid_rng = [0,0]
 sens_press_rng = [0,0]
-
-web_temp_plt = True
-web_humid_plt = False
-sens_press_plt = False
+sens_temp_rng = [0,0]
+sens_humid_rng = [0,0]
 
 ############################################################
 
 def clear_data():
-    global time_data,web_temper_data,web_humid_data
+    global time_data,web_temp_data,web_humid_data
     time_data.clear()    
-    web_temper_data.clear()
+    web_temp_data.clear()
     web_humid_data.clear()
     sens_press_data.clear()
-
+    sens_temp_data.clear()
+    sens_humid_data.clear()
 
 
 def parce_info(year,month,backepoch,info):
@@ -44,30 +45,34 @@ def parce_info(year,month,backepoch,info):
     rec_time = (recordepoch - backepoch)/60 #in minutes    
     rec_web_temp = web['Temperature']
     rec_web_humid = web['Humidity']
-    rec_web_press = sens3['Pressure']
+    rec_sens_press = sens3['Pressure']
+    rec_sens_temp = sens1['Temperature']
+    rec_sens_humid = sens1['Humidity']
     #check if data is in range
     if rec_web_temp < -20 or rec_web_temp > 50:
         return
     if rec_web_humid < 0 or rec_web_humid > 100:
         return
-    if rec_web_press < 900 or rec_web_press > 1100:
+    if rec_sens_press < 900 or rec_sens_press > 1100:
         return
     #check if data is not more diff from previous data
     if len(time_data) > 0:
-        last_web_temp = web_temper_data[-1]
+        last_web_temp = web_temp_data[-1]
         if abs(last_web_temp - rec_web_temp) > 10:
             return
         last_web_humid = web_humid_data[-1]
         if abs(last_web_humid - rec_web_humid) > 10:
             return
         last_web_press = sens_press_data[-1]
-        if abs(last_web_press - rec_web_press) > 5:
+        if abs(last_web_press - rec_sens_press) > 5:
             return
     #add data to lists
     time_data.append(rec_time)
-    web_temper_data.append(rec_web_temp)
+    web_temp_data.append(rec_web_temp)
     web_humid_data.append(rec_web_humid)
-    sens_press_data.append(rec_web_press)
+    sens_press_data.append(rec_sens_press)
+    sens_temp_data.append(rec_sens_temp)
+    sens_humid_data.append(rec_sens_humid)
 
 
 def get_initdata():
@@ -90,45 +95,34 @@ def get_initdata():
         for info in info_list:
             parce_info(year,month,backepoch,info)
     if len(time_data)>0 :
-        web_temp_rng[0] = min(web_temper_data)
-        web_temp_rng[1] = max(web_temper_data)
+        web_temp_rng[0] = min(web_temp_data)
+        web_temp_rng[1] = max(web_temp_data)
         web_humid_rng[0] = min(web_humid_data)
         web_humid_rng[1] = max(web_humid_data)
         sens_press_rng[0] = min(sens_press_data)
         sens_press_rng[1] = max(sens_press_data)
-    print('temp  min:%.1f max:%.1f' % ( web_temp_rng[0],  web_temp_rng[1]))    
-    print('humid min:%.1f max:%.1f' % ( web_humid_rng[0],  web_humid_rng[1])) 
-    print('press min:%.1f max:%.1f' % ( sens_press_rng[0],  sens_press_rng[1])) 
+        sens_temp_rng[0] = min(sens_temp_data)
+        sens_temp_rng[1] = max(sens_temp_data)
+        sens_humid_rng[0] = min(sens_humid_data)
+        sens_humid_rng[1] = max(sens_humid_data)
+    print('w  temp  min:%.1f max:%.1f' % ( web_temp_rng[0],  web_temp_rng[1]))    
+    print('w  humid min:%.1f max:%.1f' % ( web_humid_rng[0],  web_humid_rng[1])) 
+    print('w  press min:%.1f max:%.1f' % ( sens_press_rng[0],  sens_press_rng[1])) 
+    print('s1 temp  min:%.1f max:%.1f' % ( sens_temp_rng[0],  sens_temp_rng[1]))
+    print('s1 humid min:%.1f max:%.1f' % ( sens_humid_rng[0],  sens_humid_rng[1]))
 
 #################################################################
 
-def btn_change():
-    global line_id,canvas
-    global web_temp_plt,web_humid_plt,sens_press_plt
-    line_id += 1
-    if line_id > 2:
-        line_id = 0
-    if line_id==0:
-        web_temp_plt=True
-        web_humid_plt=False
-        sens_press_plt=False
-    elif line_id==1:
-        web_temp_plt=False
-        web_humid_plt=True
-        sens_press_plt=False   
-    elif line_id==2:
-        web_temp_plt=False
-        web_humid_plt=False
-        sens_press_plt=True              
+def btn_change():             
     draw_plots(canvas)
 
 
 def btn_both():
     global canvas
-    global web_temp_plt,web_humid_plt,sens_press_plt    
-    web_temp_plt=True
-    web_humid_plt=True
-    sens_press_plt=True
+    #global web_temp_var,web_humid_var,sens_press_var    
+    web_temp_var.set(True)
+    web_humid_var.set(True)
+    sens_press_var.set(True)    
     draw_plots(canvas)
 
 
@@ -154,10 +148,24 @@ def draw_plots(canvas):
     #draw rectangle
     canvas.create_rectangle(2,2,width-3,height-3,fill='white')
     #get limits
-    min_temp = web_temp_rng[0]
-    max_temp = web_temp_rng[1]
-    min_humid = web_humid_rng[0]
-    max_humid = web_humid_rng[1]
+    if web_temp_var.get() and sens_temp_var.get():
+        min_temp = min(web_temp_rng[0],sens_temp_rng[0])
+        max_temp = max(web_temp_rng[1],sens_temp_rng[1])
+    elif web_temp_var.get():
+        min_temp = web_temp_rng[0]
+        max_temp = web_temp_rng[1]
+    elif sens_temp_var.get():
+        min_temp = sens_temp_rng[0]
+        max_temp = sens_temp_rng[1]
+    if web_humid_var.get() and sens_humid_var.get():
+        min_humid = min(web_humid_rng[0],sens_humid_rng[0])
+        max_humid = max(web_humid_rng[1],sens_humid_rng[1])
+    elif web_humid_var.get():
+        min_humid = web_humid_rng[0]
+        max_humid = web_humid_rng[1]
+    elif sens_humid_var.get():
+        min_humid = sens_humid_rng[0]
+        max_humid = sens_humid_rng[1]            
     min_press = sens_press_rng[0]
     max_press = sens_press_rng[1]
     max_time = len(time_data)
@@ -166,21 +174,31 @@ def draw_plots(canvas):
     for i in range(max_time-1):
         x1 = find_screen_pos(0,max_time,i,5,width-5)
         x2 = find_screen_pos(0,max_time,i+1,5,width-5)
-        #draw web_temper_data
-        if web_temp_plt :
-            y1 = find_screen_pos(min_temp,max_temp,web_temper_data[i],height-5,5)
-            y2 = find_screen_pos(min_temp,max_temp,web_temper_data[i+1],height-5,5)
+        #draw web_temp_data
+        if web_temp_var.get() :
+            y1 = find_screen_pos(min_temp,max_temp,web_temp_data[i],height-5,5)
+            y2 = find_screen_pos(min_temp,max_temp,web_temp_data[i+1],height-5,5)
             canvas.create_line(x1,y1,x2,y2,fill='red')    
         #draw web_humid_data
-        if web_humid_plt :
+        if web_humid_var.get() :
             y1 = find_screen_pos(min_humid,max_humid,web_humid_data[i],height-5,5)
             y2 = find_screen_pos(min_humid,max_humid,web_humid_data[i+1],height-5,5)
             canvas.create_line(x1,y1,x2,y2,fill='blue')
         #draw sens_press_data
-        if sens_press_plt :
+        if sens_press_var.get() :
             y1 = find_screen_pos(min_press,max_press,sens_press_data[i],height-5,5)
             y2 = find_screen_pos(min_press,max_press,sens_press_data[i+1],height-5,5)
-            canvas.create_line(x1,y1,x2,y2,fill='green')    
+            canvas.create_line(x1,y1,x2,y2,fill='green')  
+        #draw sens_temp_data
+        if sens_temp_var.get() :
+            y1 = find_screen_pos(min_temp,max_temp,sens_temp_data[i],height-5,5)
+            y2 = find_screen_pos(min_temp,max_temp,sens_temp_data[i+1],height-5,5)
+            canvas.create_line(x1,y1,x2,y2,fill='pink')
+        #draw sens_humid_data
+        if sens_humid_var.get() :
+            y1 = find_screen_pos(min_humid,max_humid,sens_humid_data[i],height-5,5)
+            y2 = find_screen_pos(min_humid,max_humid,sens_humid_data[i+1],height-5,5)
+            canvas.create_line(x1,y1,x2,y2,fill='sky blue')
     print('plot end')
 
 
@@ -191,13 +209,34 @@ def on_resize(event):
 
 def draw_form(win):
     global canvas
+    global web_temp_var,web_humid_var,sens_press_var,sens_temp_var,sens_humid_var
+    web_temp_var = tk.BooleanVar(value=True)
+    web_humid_var = tk.BooleanVar()
+    sens_press_var = tk.BooleanVar()
+    sens_temp_var = tk.BooleanVar()
+    sens_humid_var = tk.BooleanVar()
     #get data from repository
     get_initdata()
     #tools
     toolsfrm = tk.Frame(win, bg=win_col, height=25)
-    tk.Button(toolsfrm, text='Next', command=btn_change).pack(side=tk.LEFT, padx=4)
-    tk.Button(toolsfrm, text='All', command=btn_both).pack(side=tk.LEFT, padx=4)
-    tk.Button(toolsfrm, text='Exit', command=lambda:btn_exit(win)).pack(side=tk.LEFT, padx=4)
+    tk.Button(toolsfrm, text='Draw', command=btn_change, width=4).pack(side=tk.LEFT, padx=2)
+    #tk.Button(toolsfrm, text='All', command=btn_both).pack(side=tk.LEFT, padx=4)
+    #webFrmTools
+    webFrmTools = tk.Frame(toolsfrm, relief=tk.GROOVE, borderwidth=2 , bg=win_col)
+    tk.Label(webFrmTools, text='W:', width=2).pack(side=tk.LEFT)
+    tk.Checkbutton(webFrmTools, text='T', bg='light pink', width=1, variable=web_temp_var).pack(side=tk.LEFT)
+    tk.Checkbutton(webFrmTools, text='H', bg='light blue', width=1, variable=web_humid_var).pack(side=tk.LEFT)
+    tk.Checkbutton(webFrmTools, text='P', bg='light green', width=1, variable=sens_press_var).pack(side=tk.LEFT)
+    webFrmTools.pack(side=tk.LEFT, padx=2)
+    #sens1FrmTools
+    sens1FrmTools = tk.Frame(toolsfrm, relief=tk.GROOVE, borderwidth=2 , bg=win_col)
+    tk.Label(sens1FrmTools, text='S:', width=2).pack(side=tk.LEFT)
+    tk.Checkbutton(sens1FrmTools, text='T', bg='light pink', width=1, variable=sens_temp_var).pack(side=tk.LEFT)
+    tk.Checkbutton(sens1FrmTools, text='H', bg='light blue', width=1, variable=sens_humid_var).pack(side=tk.LEFT)
+    sens1FrmTools.pack(side=tk.LEFT, padx=2)     
+
+
+    tk.Button(toolsfrm, text='Exit', command=lambda:btn_exit(win)).pack(side=tk.RIGHT, padx=2)
     toolsfrm.pack(side=tk.BOTTOM, padx=2, pady=2, fill=tk.X) 
     toolsfrm.pack_propagate(False) #enable Frame height
     #canvas
