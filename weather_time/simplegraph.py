@@ -11,15 +11,18 @@ win_col = "light yellow"
 
 line_id=0
 
-
 time_data = []
 web_temper_data = []
 web_humid_data = []
 sens_press_data = []
 
-web_temper_rng = [0.0,0.0]
-web_humid_rng = [0.0,0.0]
-sens_press_rng = [0.0,0.0]
+web_temp_rng = [0,0]
+web_humid_rng = [0,0]
+sens_press_rng = [0,0]
+
+web_temp_plt = True
+web_humid_plt = False
+sens_press_plt = False
 
 ############################################################
 
@@ -86,22 +89,48 @@ def get_initdata():
     if info_list:
         for info in info_list:
             parce_info(year,month,backepoch,info)
-    web_temper_rng[0] = min(web_temper_data)
-    web_temper_rng[1] = max(web_temper_data)
-    web_humid_rng[0] = min(web_humid_data)
-    web_humid_rng[1] = max(web_humid_data)
-    sens_press_rng[0] = min(sens_press_data)
-    sens_press_rng[1] = max(sens_press_data)
+    if len(time_data)>0 :
+        web_temp_rng[0] = min(web_temper_data)
+        web_temp_rng[1] = max(web_temper_data)
+        web_humid_rng[0] = min(web_humid_data)
+        web_humid_rng[1] = max(web_humid_data)
+        sens_press_rng[0] = min(sens_press_data)
+        sens_press_rng[1] = max(sens_press_data)
+    print('temp  min:%.1f max:%.1f' % ( web_temp_rng[0],  web_temp_rng[1]))    
+    print('humid min:%.1f max:%.1f' % ( web_humid_rng[0],  web_humid_rng[1])) 
+    print('press min:%.1f max:%.1f' % ( sens_press_rng[0],  sens_press_rng[1])) 
 
 #################################################################
 
 def btn_change():
-    global line_id
-    pass 
+    global line_id,canvas
+    global web_temp_plt,web_humid_plt,sens_press_plt
+    line_id += 1
+    if line_id > 2:
+        line_id = 0
+    if line_id==0:
+        web_temp_plt=True
+        web_humid_plt=False
+        sens_press_plt=False
+    elif line_id==1:
+        web_temp_plt=False
+        web_humid_plt=True
+        sens_press_plt=False   
+    elif line_id==2:
+        web_temp_plt=False
+        web_humid_plt=False
+        sens_press_plt=True              
+    draw_plots(canvas)
 
 
 def btn_both():
-    pass
+    global canvas
+    global web_temp_plt,web_humid_plt,sens_press_plt    
+    web_temp_plt=True
+    web_humid_plt=True
+    sens_press_plt=True
+    draw_plots(canvas)
+
 
 def btn_exit(win):
     win.destroy() 
@@ -121,39 +150,47 @@ def draw_plots(canvas):
     #get height and width of canvas    
     width = canvas.winfo_width()
     height = canvas.winfo_height()
-    print(width,height)    
+    #print(width,height)    
     #draw rectangle
     canvas.create_rectangle(2,2,width-3,height-3,fill='white')
     #get limits
-    min_temp = web_temper_rng[0]
-    max_temp = web_temper_rng[1]
+    min_temp = web_temp_rng[0]
+    max_temp = web_temp_rng[1]
     min_humid = web_humid_rng[0]
     max_humid = web_humid_rng[1]
     min_press = sens_press_rng[0]
     max_press = sens_press_rng[1]
     max_time = len(time_data)
-    #draw web_temper_data
+    print('plot start')
+    #draw info data
     for i in range(max_time-1):
         x1 = find_screen_pos(0,max_time,i,5,width-5)
         x2 = find_screen_pos(0,max_time,i+1,5,width-5)
-        y1 = find_screen_pos(min_temp,max_temp,web_temper_data[i],height-5,5)
-        y2 = find_screen_pos(min_temp,max_temp,web_temper_data[i+1],height-5,5)
-        canvas.create_line(x1,y1,x2,y2,fill='red')    
+        #draw web_temper_data
+        if web_temp_plt :
+            y1 = find_screen_pos(min_temp,max_temp,web_temper_data[i],height-5,5)
+            y2 = find_screen_pos(min_temp,max_temp,web_temper_data[i+1],height-5,5)
+            canvas.create_line(x1,y1,x2,y2,fill='red')    
         #draw web_humid_data
-        #y1 = find_screen_pos(min_humid,max_humid,web_humid_data[i],height-5,5)
-        #y2 = find_screen_pos(min_humid,max_humid,web_humid_data[i+1],height-5,5)
-        #canvas.create_line(x1,y1,x2,y2,fill='blue')
+        if web_humid_plt :
+            y1 = find_screen_pos(min_humid,max_humid,web_humid_data[i],height-5,5)
+            y2 = find_screen_pos(min_humid,max_humid,web_humid_data[i+1],height-5,5)
+            canvas.create_line(x1,y1,x2,y2,fill='blue')
         #draw sens_press_data
-        #y1 = find_screen_pos(min_press,max_press,sens_press_data[i],height-5,5)
-        #y2 = find_screen_pos(min_press,max_press,sens_press_data[i+1],height-5,5)
-        #canvas.create_line(x1,y1,x2,y2,fill='green')
+        if sens_press_plt :
+            y1 = find_screen_pos(min_press,max_press,sens_press_data[i],height-5,5)
+            y2 = find_screen_pos(min_press,max_press,sens_press_data[i+1],height-5,5)
+            canvas.create_line(x1,y1,x2,y2,fill='green')    
+    print('plot end')
 
 
 def on_resize(event):
-    # Redraw the plots when the canvas is resized
+    # Redraw the plots when the canvas is resized    
     draw_plots(event.widget)
 
+
 def draw_form(win):
+    global canvas
     #get data from repository
     get_initdata()
     #tools
