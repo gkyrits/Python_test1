@@ -248,11 +248,13 @@ def draw_form(win):
     sens_humid_var = tk.BooleanVar()
     #get data from repository
     get_initdata()
-    #tools Frame
+    #set background color to toplevel win
+    win.config(bg=win_col)
+    #tools Frame    
     toolsfrm = tk.Frame(win, bg=win_col, height=25)
     #webFrmTools
     webFrmTools = tk.Frame(toolsfrm, relief=tk.GROOVE, borderwidth=2 , bg=win_col)
-    tk.Label(webFrmTools, text='W:', width=1).pack(side=tk.LEFT)
+    tk.Label(webFrmTools, text='W:', width=2).pack(side=tk.LEFT)
     tk.Checkbutton(webFrmTools, text='T', bg='light pink', width=1, variable=web_temp_var).pack(side=tk.LEFT)
     tk.Checkbutton(webFrmTools, text='H', bg='light blue', width=1, variable=web_humid_var).pack(side=tk.LEFT)
     webFrmTools.pack(side=tk.LEFT, padx=2)
@@ -272,7 +274,7 @@ def draw_form(win):
     #left info Frame
     leftfrm = tk.Frame(topfrm, bg=win_col, width=30)
     tk.Label(leftfrm, text='Web:', bg='light yellow').pack(side=tk.TOP)
-    tk.Button(leftfrm, text='Draw', command=btn_change, width=3).pack(side=tk.BOTTOM, padx=0)
+    tk.Button(leftfrm, text='Drw', command=btn_change, width=3).pack(side=tk.BOTTOM, padx=0)
     leftfrm.pack(side=tk.LEFT, padx=2, pady=1, fill=tk.Y)
     leftfrm.pack_propagate(False) #enable Frame with
     #canvas Frame
