@@ -9,6 +9,8 @@ CURRENT_PLOT = 1
 backhours = 48
 win_col = "light yellow"
 canvas_col = "snow2"
+win_font=('Arial', 7)
+win_fontB=('Arial', 7, 'bold')
 
 canvas_inf_space = 18
 
@@ -24,6 +26,22 @@ web_humid_rng = [0,0]
 sens_press_rng = [0,0]
 sens_temp_rng = [0,0]
 sens_humid_rng = [0,0]
+
+web_temp_col = 'red'
+web_humid_col = 'blue'
+sens_press_col = 'green'
+sens_temp_col = 'magenta'
+sens_humid_col = 'steel blue'
+
+web_temp_val   = True
+web_humid_val  = False
+sens_press_val = False
+sens_temp_val  = False
+sens_humid_val = False 
+
+pltpadx=3
+replot_needed = False
+infofrm = None
 
 ############################################################
 
@@ -123,11 +141,18 @@ def get_initdata():
 
 #################################################################
 
-def btn_change():             
-    draw_plots(canvas)
+def plotCbx_change():
+    global replot_needed
+    replot_needed = True    
 
 
 def btn_exit(win):
+    global web_temp_val,web_humid_val,sens_press_val,sens_temp_val,sens_humid_val
+    web_temp_val = web_temp_var.get()
+    web_humid_val = web_humid_var.get()
+    sens_press_val = sens_press_var.get()
+    sens_temp_val = sens_temp_var.get()
+    sens_humid_val = sens_humid_var.get()    
     win.destroy() 
 
 
@@ -141,12 +166,44 @@ def find_screen_pos(min_val, max_val, val, min_pos, max_pos):
     value = round(fvalue)
     return value
 
+
 def draw_plot_time_info(canvas):
     width = canvas.winfo_width()
     height = canvas.winfo_height()
     #draw time info
-    canvas.create_text(10,height-10,text='0',anchor=tk.W)
-    canvas.create_text(width-10,height-10,text=str(len(time_data)),anchor=tk.E)
+    canvas.create_text(10,height-10,text='0', font=win_font, anchor=tk.W)
+    canvas.create_text(width-10,height-10,text=str(len(time_data)), font=win_font, anchor=tk.E)
+
+
+def draw_limits():
+    global leftfrm,infofrm
+    if infofrm:
+        infofrm.destroy()
+    infofrm = tk.Frame(leftfrm, bg=win_col)
+    rowidx=0
+    if web_temp_var.get() :
+        tk.Label(infofrm, text='W Temp:', bg=win_col, fg=web_temp_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='min:%.1f' % web_temp_rng[0], bg=win_col, fg=web_temp_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='max:%.1f' % web_temp_rng[1], bg=win_col, fg=web_temp_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
+    if sens_temp_var.get() :
+        tk.Label(infofrm, text='S Temp:', bg=win_col, fg=sens_temp_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='min:%.1f' % sens_temp_rng[0], bg=win_col, fg=sens_temp_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='max:%.1f' % sens_temp_rng[1], bg=win_col, fg=sens_temp_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1        
+    if web_humid_var.get() :
+        tk.Label(infofrm, text='W Humid:', bg=win_col, fg=web_humid_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='min:%.1f' % web_humid_rng[0], bg=win_col, fg=web_humid_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='max:%.1f' % web_humid_rng[1], bg=win_col, fg=web_humid_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
+    if sens_humid_var.get() :
+        tk.Label(infofrm, text='S Humid:', bg=win_col, fg=sens_humid_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='min:%.1f' % sens_humid_rng[0], bg=win_col, fg=sens_humid_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='max:%.1f' % sens_humid_rng[1], bg=win_col, fg=sens_humid_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
+    if sens_press_var.get() :
+        tk.Label(infofrm, text='S Press:', bg=win_col, fg=sens_press_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='min:%.1f' % sens_press_rng[0], bg=win_col, fg=sens_press_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='max:%.1f' % sens_press_rng[1], bg=win_col, fg=sens_press_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1        
+    for row in range(rowidx): 
+        infofrm.rowconfigure(row, weight=1) #resize grid height         
+    infofrm.pack(side=tk.TOP, fill=tk.Y)    
 
 
 def draw_plots(canvas):
@@ -200,52 +257,67 @@ def draw_plots(canvas):
         print(min_press,max_press)
     max_time = len(time_data)
     #print('plot start')
-    #----draw info data----
+    #----draw info data----    
     for i in range(max_time-1):
-        x1 = find_screen_pos(0,max_time,i,5,width-5)
-        x2 = find_screen_pos(0,max_time,i+1,5,width-5)
+        x1 = find_screen_pos(0,max_time,i,pltpadx,width-pltpadx)
+        x2 = find_screen_pos(0,max_time,i+1,pltpadx,width-pltpadx)
         #draw web_temp_data
         if web_temp_var.get() :
-            y1 = find_screen_pos(min_temp,max_temp,web_temp_data[i],height-5,5)
-            y2 = find_screen_pos(min_temp,max_temp,web_temp_data[i+1],height-5,5)
-            canvas.create_line(x1,y1,x2,y2,fill='red')    
+            y1 = find_screen_pos(min_temp,max_temp,web_temp_data[i],height-pltpadx,pltpadx)
+            y2 = find_screen_pos(min_temp,max_temp,web_temp_data[i+1],height-pltpadx,pltpadx)
+            canvas.create_line(x1,y1,x2,y2,fill=web_temp_col)    
         #draw web_humid_data
         if web_humid_var.get() :
-            y1 = find_screen_pos(min_humid,max_humid,web_humid_data[i],height-5,5)
-            y2 = find_screen_pos(min_humid,max_humid,web_humid_data[i+1],height-5,5)
-            canvas.create_line(x1,y1,x2,y2,fill='blue')
+            y1 = find_screen_pos(min_humid,max_humid,web_humid_data[i],height-pltpadx,pltpadx)
+            y2 = find_screen_pos(min_humid,max_humid,web_humid_data[i+1],height-pltpadx,pltpadx)
+            canvas.create_line(x1,y1,x2,y2,fill=web_humid_col)
         #draw sens_press_data
         if sens_press_var.get() :
-            y1 = find_screen_pos(min_press,max_press,sens_press_data[i],height-5,5)
-            y2 = find_screen_pos(min_press,max_press,sens_press_data[i+1],height-5,5)
-            canvas.create_line(x1,y1,x2,y2,fill='green')  
+            y1 = find_screen_pos(min_press,max_press,sens_press_data[i],height-pltpadx,pltpadx)
+            y2 = find_screen_pos(min_press,max_press,sens_press_data[i+1],height-pltpadx,pltpadx)
+            canvas.create_line(x1,y1,x2,y2,fill=sens_press_col)  
         #draw sens_temp_data
         if sens_temp_var.get() :
-            y1 = find_screen_pos(min_temp,max_temp,sens_temp_data[i],height-5,5)
-            y2 = find_screen_pos(min_temp,max_temp,sens_temp_data[i+1],height-5,5)
-            canvas.create_line(x1,y1,x2,y2,fill='magenta')
+            y1 = find_screen_pos(min_temp,max_temp,sens_temp_data[i],height-pltpadx,pltpadx)
+            y2 = find_screen_pos(min_temp,max_temp,sens_temp_data[i+1],height-pltpadx,pltpadx)
+            canvas.create_line(x1,y1,x2,y2,fill=sens_temp_col)
         #draw sens_humid_data
         if sens_humid_var.get() :
-            y1 = find_screen_pos(min_humid,max_humid,sens_humid_data[i],height-5,5)
-            y2 = find_screen_pos(min_humid,max_humid,sens_humid_data[i+1],height-5,5)
-            canvas.create_line(x1,y1,x2,y2,fill='steel blue')
+            y1 = find_screen_pos(min_humid,max_humid,sens_humid_data[i],height-pltpadx,pltpadx)
+            y2 = find_screen_pos(min_humid,max_humid,sens_humid_data[i+1],height-pltpadx,pltpadx)
+            canvas.create_line(x1,y1,x2,y2,fill=sens_humid_col)
     #print('plot end')
     draw_plot_time_info(canvas)
+    draw_limits()
 
 
-def on_resize(event):
+def canvas_resize(event):
     # Redraw the plots when the canvas is resized    
     draw_plots(event.widget)    
 
 
+def canvas_click(event):
+    global replot_needed
+    print('click at:',event.x,event.y)
+    if replot_needed:
+        draw_plots(canvas)
+        replot_needed = False
+        return
+    #get time from x
+    width = canvas.winfo_width()
+    #height = canvas.winfo_height()-canvas_inf_space
+    time = find_screen_pos(pltpadx,width-pltpadx,event.x,0,len(time_data))
+    print('time:',time)
+
+
 def draw_form(win):
-    global canvas
+    global canvas,leftfrm
     global web_temp_var,web_humid_var,sens_press_var,sens_temp_var,sens_humid_var
-    web_temp_var = tk.BooleanVar(value=True)
-    web_humid_var = tk.BooleanVar()
-    sens_press_var = tk.BooleanVar()
-    sens_temp_var = tk.BooleanVar()
-    sens_humid_var = tk.BooleanVar()
+    web_temp_var = tk.BooleanVar(value=web_temp_val)
+    web_humid_var = tk.BooleanVar(value=web_humid_val)
+    sens_press_var = tk.BooleanVar(value=sens_press_val)
+    sens_temp_var = tk.BooleanVar(value=sens_temp_val)
+    sens_humid_var = tk.BooleanVar(value=sens_humid_val)
     #get data from repository
     get_initdata()
     #set background color to toplevel win
@@ -254,28 +326,29 @@ def draw_form(win):
     toolsfrm = tk.Frame(win, bg=win_col, height=25)
     #webFrmTools
     webFrmTools = tk.Frame(toolsfrm, relief=tk.GROOVE, borderwidth=2 , bg=win_col)
-    tk.Label(webFrmTools, text='W:', width=2).pack(side=tk.LEFT)
-    tk.Checkbutton(webFrmTools, text='T', bg='light pink', width=1, variable=web_temp_var).pack(side=tk.LEFT)
-    tk.Checkbutton(webFrmTools, text='H', bg='light blue', width=1, variable=web_humid_var).pack(side=tk.LEFT)
+    tk.Label(webFrmTools, text='W:', font=win_font, width=2).pack(side=tk.LEFT)
+    tk.Checkbutton(webFrmTools, text='T', bg='light pink', font=win_font, width=1, variable=web_temp_var, command=plotCbx_change).pack(side=tk.LEFT)
+    tk.Checkbutton(webFrmTools, text='H', bg='light blue', font=win_font, width=1, variable=web_humid_var, command=plotCbx_change).pack(side=tk.LEFT)
     webFrmTools.pack(side=tk.LEFT, padx=2)
     #sensFrmTools
     sensFrmTools = tk.Frame(toolsfrm, relief=tk.GROOVE, borderwidth=2 , bg=win_col)
-    tk.Label(sensFrmTools, text='S:', width=1).pack(side=tk.LEFT)
-    tk.Checkbutton(sensFrmTools, text='T', bg='light pink', width=1, variable=sens_temp_var).pack(side=tk.LEFT)
-    tk.Checkbutton(sensFrmTools, text='H', bg='light blue', width=1, variable=sens_humid_var).pack(side=tk.LEFT)
-    tk.Checkbutton(sensFrmTools, text='P', bg='light green', width=1, variable=sens_press_var).pack(side=tk.LEFT)
+    tk.Label(sensFrmTools, text='S:', font=win_font, width=1).pack(side=tk.LEFT)
+    tk.Checkbutton(sensFrmTools, text='T', bg='light pink', font=win_font, width=1, variable=sens_temp_var, command=plotCbx_change).pack(side=tk.LEFT)
+    tk.Checkbutton(sensFrmTools, text='H', bg='light blue', font=win_font, width=1, variable=sens_humid_var, command=plotCbx_change).pack(side=tk.LEFT)
+    tk.Checkbutton(sensFrmTools, text='P', bg='light green', font=win_font, width=1, variable=sens_press_var, command=plotCbx_change).pack(side=tk.LEFT)
     sensFrmTools.pack(side=tk.LEFT, padx=6)     
     #exit button
-    tk.Button(toolsfrm, text='Exit', command=lambda:btn_exit(win)).pack(side=tk.RIGHT, padx=2)
+    tk.Button(toolsfrm, text='Exit', font=win_font, command=lambda:btn_exit(win)).pack(side=tk.RIGHT, padx=2)
     toolsfrm.pack(side=tk.BOTTOM, padx=2, pady=2, fill=tk.X) 
     toolsfrm.pack_propagate(False) #enable Frame height
     #top Frame
     topfrm = tk.Frame(win, bg=win_col)
     #left info Frame
-    leftfrm = tk.Frame(topfrm, bg=win_col, width=30)
-    tk.Label(leftfrm, text='Web:', bg='light yellow').pack(side=tk.TOP)
-    tk.Button(leftfrm, text='Drw', command=btn_change, width=3).pack(side=tk.BOTTOM, padx=0)
-    leftfrm.pack(side=tk.LEFT, padx=2, pady=1, fill=tk.Y)
+    leftfrm = tk.Frame(topfrm, bg=win_col, width=50)
+    #infofrm = tk.Frame(leftfrm, bg=win_col)
+    #tk.Label(infofrm, text='Web:', bg='light yellow', font=win_font).pack(side=tk.TOP)
+    #infofrm.pack(side=tk.TOP, fill=tk.BOTH, expand=tk.YES)
+    leftfrm.pack(side=tk.LEFT, padx=0, pady=0, fill=tk.Y)
     leftfrm.pack_propagate(False) #enable Frame with
     #canvas Frame
     canvfrm = tk.Frame(topfrm, relief=tk.GROOVE,  borderwidth=2)
@@ -284,7 +357,8 @@ def draw_form(win):
     canvas.pack(fill=tk.BOTH, expand=tk.YES)
     canvfrm.pack(side=tk.TOP, padx=0, pady=0, fill=tk.BOTH, expand=tk.YES)
     # Bind the resize event to update the canvas size
-    canvas.bind("<Configure>", on_resize)
+    canvas.bind("<Configure>", canvas_resize)
+    canvas.bind("<Button-1>",  canvas_click)
     topfrm.pack(side=tk.TOP, padx=2, pady=2, fill=tk.BOTH, expand=tk.YES)
    
 
