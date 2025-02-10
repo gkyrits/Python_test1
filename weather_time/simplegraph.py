@@ -182,25 +182,25 @@ def draw_limits():
     infofrm = tk.Frame(leftfrm, bg=win_col)
     rowidx=0
     if web_temp_var.get() :
-        tk.Label(infofrm, text='W Temp:', bg=win_col, fg=web_temp_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
-        tk.Label(infofrm, text='min:%.1f' % web_temp_rng[0], bg=win_col, fg=web_temp_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
-        tk.Label(infofrm, text='max:%.1f' % web_temp_rng[1], bg=win_col, fg=web_temp_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='W Temp:', fg='white', bg=web_temp_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='↑ %.1f' % web_temp_rng[1], bg=win_col, fg=web_temp_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1        
+        tk.Label(infofrm, text='↓ %.1f' % web_temp_rng[0], bg=win_col, fg=web_temp_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
     if sens_temp_var.get() :
-        tk.Label(infofrm, text='S Temp:', bg=win_col, fg=sens_temp_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
-        tk.Label(infofrm, text='min:%.1f' % sens_temp_rng[0], bg=win_col, fg=sens_temp_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
-        tk.Label(infofrm, text='max:%.1f' % sens_temp_rng[1], bg=win_col, fg=sens_temp_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1        
+        tk.Label(infofrm, text='S Temp:', fg='white', bg=sens_temp_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='↑ %.1f' % sens_temp_rng[1], bg=win_col, fg=sens_temp_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1           
+        tk.Label(infofrm, text='↓ %.1f' % sens_temp_rng[0], bg=win_col, fg=sens_temp_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
     if web_humid_var.get() :
-        tk.Label(infofrm, text='W Humid:', bg=win_col, fg=web_humid_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
-        tk.Label(infofrm, text='min:%.1f' % web_humid_rng[0], bg=win_col, fg=web_humid_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
-        tk.Label(infofrm, text='max:%.1f' % web_humid_rng[1], bg=win_col, fg=web_humid_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='W Humid:', fg='white', bg=web_humid_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='↑ %.1f' % web_humid_rng[1], bg=win_col, fg=web_humid_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1        
+        tk.Label(infofrm, text='↓ %.1f' % web_humid_rng[0], bg=win_col, fg=web_humid_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
     if sens_humid_var.get() :
-        tk.Label(infofrm, text='S Humid:', bg=win_col, fg=sens_humid_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
-        tk.Label(infofrm, text='min:%.1f' % sens_humid_rng[0], bg=win_col, fg=sens_humid_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
-        tk.Label(infofrm, text='max:%.1f' % sens_humid_rng[1], bg=win_col, fg=sens_humid_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='S Humid:', fg='white', bg=sens_humid_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='↑ %.1f' % sens_humid_rng[1], bg=win_col, fg=sens_humid_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1        
+        tk.Label(infofrm, text='↓ %.1f' % sens_humid_rng[0], bg=win_col, fg=sens_humid_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
     if sens_press_var.get() :
-        tk.Label(infofrm, text='S Press:', bg=win_col, fg=sens_press_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
-        tk.Label(infofrm, text='min:%.1f' % sens_press_rng[0], bg=win_col, fg=sens_press_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1
-        tk.Label(infofrm, text='max:%.1f' % sens_press_rng[1], bg=win_col, fg=sens_press_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1        
+        tk.Label(infofrm, text='S Press:', fg='white', bg=sens_press_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='↑ %.1f' % sens_press_rng[1], bg=win_col, fg=sens_press_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1         
+        tk.Label(infofrm, text='↓ %.1f' % sens_press_rng[0], bg=win_col, fg=sens_press_col, font=win_font).grid(row=rowidx, sticky=tk.W); rowidx += 1       
     for row in range(rowidx): 
         infofrm.rowconfigure(row, weight=1) #resize grid height         
     infofrm.pack(side=tk.TOP, fill=tk.Y)    
