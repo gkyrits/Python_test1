@@ -43,6 +43,7 @@ sens_humid_val = False
 pltpadx=3
 replot_needed = False
 backhours_changed = False
+backepoch = 0
 
 infofrm = None
 backhours_lbl = None
@@ -108,6 +109,7 @@ def parce_info(year,month,backepoch,info):
 
 
 def get_initdata():
+    global backepoch
     print('---read data file---')
     year = tm.localtime().tm_year
     if CURRENT_PLOT==1:
@@ -173,12 +175,15 @@ def find_screen_pos(min_val, max_val, val, min_pos, max_pos):
 
 
 def draw_plot_time_info(canvas):
+    global backepoch
     ypos=8; xpos=5
     width = canvas.winfo_width()
     height = canvas.winfo_height()
     #draw time info
-    canvas.create_text(xpos,height-ypos,text='0', font=win_font, anchor=tk.W)
-    canvas.create_text(width-xpos,height-ypos,text=str(len(time_data)), font=win_font, anchor=tk.E)
+    starttime=tm.strftime('%d/%H:%M',tm.localtime(backepoch+time_data[0]*60))
+    endtime=tm.strftime('%d/%H:%M',tm.localtime(backepoch+time_data[-1]*60))
+    canvas.create_text(xpos,height-ypos,text=starttime, font=win_font, anchor=tk.W)
+    canvas.create_text(width-xpos,height-ypos,text=endtime, font=win_font, anchor=tk.E)
 
 
 def draw_limits():
@@ -310,7 +315,7 @@ def canvas_resize(event):
 
 
 def canvas_click(event):
-    global replot_needed,backhours_changed
+    global replot_needed,backhours_changed,backepoch
     print('click at:',event.x,event.y)
     if backhours_changed:
         get_initdata()
@@ -324,8 +329,23 @@ def canvas_click(event):
     #get time from x
     width = canvas.winfo_width()
     #height = canvas.winfo_height()-canvas_inf_space
-    time = find_screen_pos(pltpadx,width-pltpadx,event.x,0,len(time_data))
-    print('time:',time)
+    timeidx = find_screen_pos(pltpadx,width-pltpadx,event.x,0,len(time_data))
+    if timeidx >= len(time_data):
+        timeidx = len(time_data)-1
+    if timeidx < 0:
+        timeidx = 0     
+    clicktime=tm.strftime('(%d/%H:%M)',tm.localtime(backepoch+time_data[timeidx]*60))
+    print('timeidx:%d date:%s' % (timeidx,clicktime))
+    #print clicktime to canvas    
+    height = canvas.winfo_height()
+    width = canvas.winfo_width()
+    ypos=8; xpos=(width-len(clicktime))/2-15
+    canvas.delete('clicktime')    
+    canvas.create_text(xpos,height-ypos, text=clicktime, font=win_font, anchor=tk.W, tags='clicktime')
+    #draw vertical line
+    canvas.delete('clickline')
+    canvas.create_line(event.x,0,event.x,height-13,fill='black',dash=(2,2),tags='clickline')
+
 
 
 def backhours_change(inc):
