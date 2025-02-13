@@ -180,10 +180,11 @@ def draw_plot_time_info(canvas):
     width = canvas.winfo_width()
     height = canvas.winfo_height()
     #draw time info
-    starttime=tm.strftime('%d/%H:%M',tm.localtime(backepoch+time_data[0]*60))
-    endtime=tm.strftime('%d/%H:%M',tm.localtime(backepoch+time_data[-1]*60))
-    canvas.create_text(xpos,height-ypos,text=starttime, font=win_font, anchor=tk.W)
-    canvas.create_text(width-xpos,height-ypos,text=endtime, font=win_font, anchor=tk.E)
+    if len(time_data)>0 :
+        starttime=tm.strftime('%d/%H:%M',tm.localtime(backepoch+time_data[0]*60))
+        endtime=tm.strftime('%d/%H:%M',tm.localtime(backepoch+time_data[-1]*60))
+        canvas.create_text(xpos,height-ypos,text=starttime, font=win_font, anchor=tk.W)
+        canvas.create_text(width-xpos,height-ypos,text=endtime, font=win_font, anchor=tk.E)
 
 
 def draw_limits():
@@ -325,6 +326,8 @@ def canvas_click(event):
     if replot_needed:
         draw_plots(canvas)
         replot_needed = False
+        return
+    if len(time_data)==0 :
         return
     #get time from x
     width = canvas.winfo_width()
