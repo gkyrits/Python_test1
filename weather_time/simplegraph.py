@@ -180,12 +180,28 @@ def draw_plot_time_info(canvas):
     width = canvas.winfo_width()
     height = canvas.winfo_height()
     #draw time info
-    if len(time_data)>0 :
-        starttime=tm.strftime('%d/%H:%M',tm.localtime(backepoch+time_data[0]*60))
-        endtime=tm.strftime('%d/%H:%M',tm.localtime(backepoch+time_data[-1]*60))
-        canvas.create_text(xpos,height-ypos,text=starttime, font=win_font, anchor=tk.W)
-        canvas.create_text(width-xpos,height-ypos,text=endtime, font=win_font, anchor=tk.E)
-
+    if len(time_data)==0 :
+        return
+    starttime=tm.strftime('%d/%H:%M',tm.localtime(backepoch+time_data[0]*60))
+    endtime=tm.strftime('%d/%H:%M',tm.localtime(backepoch+time_data[-1]*60))
+    canvas.create_text(xpos,height-ypos,text=starttime, font=win_font, anchor=tk.W)
+    canvas.create_text(width-xpos,height-ypos,text=endtime, font=win_font, anchor=tk.E)
+    #draw time grid lines at 00:00 
+    grid_draw=False    
+    for i in range(len(time_data)):       
+        rec_time = tm.localtime(backepoch+time_data[i]*60)
+        x1 = find_screen_pos(0,len(time_data),i,pltpadx,width-pltpadx)
+        if (rec_time.tm_min>10):
+            grid_draw=False        
+        if (rec_time.tm_hour==0) and (rec_time.tm_min<=10) and not grid_draw:
+            canvas.create_line(x1,0,x1,height-13,fill='black',dash=(2,2))
+            canvas.update() 
+            grid_draw=True
+        if backhours <= 48:
+            if (rec_time.tm_hour==12) and (rec_time.tm_min<=10) and not grid_draw:
+                canvas.create_line(x1,0,x1,height-13,fill='orange',dash=(2,2))
+                grid_draw=True  
+            
 
 def draw_limits():
     global leftfrm,infofrm
@@ -195,24 +211,24 @@ def draw_limits():
     rowidx=0
     if web_temp_var.get() :
         tk.Label(infofrm, text='W Temp:', fg='white', bg=web_temp_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
-        tk.Label(infofrm, text='↑ %.1f' % web_temp_rng[1], bg=win_col, fg=web_temp_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1        
-        tk.Label(infofrm, text='↓ %.1f' % web_temp_rng[0], bg=win_col, fg=web_temp_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='˄ %.1f' % web_temp_rng[1], bg=win_col, fg=web_temp_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1        
+        tk.Label(infofrm, text='˅ %.1f' % web_temp_rng[0], bg=win_col, fg=web_temp_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
     if sens_temp_var.get() :
         tk.Label(infofrm, text='S Temp:', fg='white', bg=sens_temp_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
-        tk.Label(infofrm, text='↑ %.1f' % sens_temp_rng[1], bg=win_col, fg=sens_temp_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1           
-        tk.Label(infofrm, text='↓ %.1f' % sens_temp_rng[0], bg=win_col, fg=sens_temp_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='˄ %.1f' % sens_temp_rng[1], bg=win_col, fg=sens_temp_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1           
+        tk.Label(infofrm, text='˅ %.1f' % sens_temp_rng[0], bg=win_col, fg=sens_temp_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
     if web_humid_var.get() :
         tk.Label(infofrm, text='W Humid:', fg='white', bg=web_humid_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
-        tk.Label(infofrm, text='↑ %.1f' % web_humid_rng[1], bg=win_col, fg=web_humid_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1        
-        tk.Label(infofrm, text='↓ %.1f' % web_humid_rng[0], bg=win_col, fg=web_humid_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='˄ %.1f' % web_humid_rng[1], bg=win_col, fg=web_humid_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1        
+        tk.Label(infofrm, text='˅ %.1f' % web_humid_rng[0], bg=win_col, fg=web_humid_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
     if sens_humid_var.get() :
         tk.Label(infofrm, text='S Humid:', fg='white', bg=sens_humid_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
-        tk.Label(infofrm, text='↑ %.1f' % sens_humid_rng[1], bg=win_col, fg=sens_humid_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1        
-        tk.Label(infofrm, text='↓ %.1f' % sens_humid_rng[0], bg=win_col, fg=sens_humid_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
+        tk.Label(infofrm, text='˄ %.1f' % sens_humid_rng[1], bg=win_col, fg=sens_humid_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1        
+        tk.Label(infofrm, text='˅ %.1f' % sens_humid_rng[0], bg=win_col, fg=sens_humid_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
     if sens_press_var.get() :
         tk.Label(infofrm, text='S Press:', fg='white', bg=sens_press_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1
-        tk.Label(infofrm, text='↑ %.1f' % sens_press_rng[1], bg=win_col, fg=sens_press_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1         
-        tk.Label(infofrm, text='↓ %.1f' % sens_press_rng[0], bg=win_col, fg=sens_press_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1       
+        tk.Label(infofrm, text='˄ %.1f' % sens_press_rng[1], bg=win_col, fg=sens_press_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1         
+        tk.Label(infofrm, text='˅ %.1f' % sens_press_rng[0], bg=win_col, fg=sens_press_col, font=win_fontB).grid(row=rowidx, sticky=tk.W); rowidx += 1       
     for row in range(rowidx): 
         infofrm.rowconfigure(row, weight=1) #resize grid height         
     infofrm.pack(side=tk.TOP, fill=tk.Y)    
@@ -337,17 +353,17 @@ def canvas_click(event):
         timeidx = len(time_data)-1
     if timeidx < 0:
         timeidx = 0     
-    clicktime=tm.strftime('(%d/%H:%M)',tm.localtime(backepoch+time_data[timeidx]*60))
+    clicktime=tm.strftime('%d/%H:%M',tm.localtime(backepoch+time_data[timeidx]*60))
     print('timeidx:%d date:%s' % (timeidx,clicktime))
     #print clicktime to canvas    
     height = canvas.winfo_height()
     width = canvas.winfo_width()
     ypos=8; xpos=(width-len(clicktime))/2-15
     canvas.delete('clicktime')    
-    canvas.create_text(xpos,height-ypos, text=clicktime, font=win_font, anchor=tk.W, tags='clicktime')
+    canvas.create_text(xpos,height-ypos, text=clicktime, fill='blue', font=win_font, anchor=tk.W, tags='clicktime')
     #draw vertical line
     canvas.delete('clickline')
-    canvas.create_line(event.x,0,event.x,height-13,fill='black',dash=(2,2),tags='clickline')
+    canvas.create_line(event.x,0,event.x,height-13,fill='red',dash=(2,2),tags='clickline')
 
 
 
@@ -425,10 +441,10 @@ def draw_form(win):
     #canvas tool Frame
     canvtoolfrm = tk.Frame(topfrm, bg=win_col, height=20)
     tk.Button(canvtoolfrm, text='<', font=but_font, width=2).pack(side=tk.LEFT, padx=0)
-    tk.Button(canvtoolfrm, text='-', font=but_font, width=2, command=lambda:backhours_change(False)).pack(side=tk.LEFT, padx=2)
+    tk.Button(canvtoolfrm, text='-', font=but_font, width=2, command=lambda:backhours_change(True)).pack(side=tk.LEFT, padx=2)
     backhours_lbl=tk.Label(canvtoolfrm, text=get_backhours_str(), bg=win_col, fg='red', font=but_font)
     backhours_lbl.pack(side=tk.LEFT)
-    tk.Button(canvtoolfrm, text='+', font=but_font, width=2, command=lambda:backhours_change(True)).pack(side=tk.LEFT, padx=2)
+    tk.Button(canvtoolfrm, text='+', font=but_font, width=2, command=lambda:backhours_change(False)).pack(side=tk.LEFT, padx=2)
     tk.Button(canvtoolfrm, text='>', font=but_font, width=2).pack(side=tk.LEFT, padx=0)
     canvtoolfrm.pack(side=tk.BOTTOM, padx=0, pady=0, fill=tk.X)
     canvtoolfrm.pack_propagate(False) #enable Frame height
