@@ -328,7 +328,50 @@ def draw_plots(canvas):
 
 def canvas_resize(event):
     # Redraw the plots when the canvas is resized    
-    draw_plots(event.widget)    
+    draw_plots(event.widget)   
+
+
+def print_info(timeidx,infowin):
+    clicktime=tm.strftime('%d  %H:%M',tm.localtime(backepoch+time_data[timeidx]*60))
+    tk.Label(infowin,text=clicktime,bg=win_col, fg="blue", font=win_font).pack(anchor=tk.W)
+    #tk.Label(infowin,text="Idx:{}".format(timeidx),bg=win_col,font=win_font).pack()
+    #print web_temp_data
+    if web_temp_var.get() :
+        value = 'w temp : {}°C'.format(web_temp_data[timeidx])
+        tk.Label(infowin,text=value,bg=win_col, fg=web_temp_col, font=win_font).pack(anchor=tk.W)
+    #print web_humid_data
+    if web_humid_var.get() :
+        value = 'w humid: {}%'.format(web_humid_data[timeidx])
+        tk.Label(infowin,text=value,bg=win_col, fg=web_humid_col, font=win_font).pack(anchor=tk.W)
+    #print sens_press_data
+    if sens_press_var.get() :
+        value = 's press: {}hPa'.format(sens_press_data[timeidx])
+        tk.Label(infowin,text=value,bg=win_col, fg=sens_press_col, font=win_font).pack(anchor=tk.W)
+    #print sens_temp_data
+    if sens_temp_var.get() :
+        value = 's temp : {}°C'.format(sens_temp_data[timeidx])
+        tk.Label(infowin,text=value,bg=win_col, fg=sens_temp_col, font=win_font).pack(anchor=tk.W)
+    #print sens_humid_data
+    if sens_humid_var.get() :
+        value = 's humid: {}%'.format(sens_humid_data[timeidx])
+        tk.Label(infowin,text=value,bg=win_col, fg=sens_humid_col, font=win_font).pack(anchor=tk.W)
+
+
+def canvas_info_win(timeidx):    
+    canvas.delete('infowin') 
+    infowin = tk.Frame(canvas,bg=win_col,relief=tk.GROOVE,borderwidth=2)
+    print_info(timeidx,infowin)
+    infowin.pack(); infowin.update()
+    win_height=infowin.winfo_height()
+    print("win h:"+str(win_height))
+    timelen = len(time_data)
+    if timeidx > (timelen/2):
+        canvas.create_window(6,win_height/2+5,window=infowin,anchor=tk.W,tags='infowin')
+    else:
+        width = canvas.winfo_width()
+        win_width=infowin.winfo_width()
+        print("win w:"+str(win_width))
+        canvas.create_window(width-win_width-5,win_height/2+5,window=infowin,anchor=tk.W,tags='infowin')
 
 
 def canvas_click(event):
@@ -364,6 +407,8 @@ def canvas_click(event):
     #draw vertical line
     canvas.delete('clickline')
     canvas.create_line(event.x,0,event.x,height-13,fill='red',dash=(2,2),tags='clickline')
+    #draw info win
+    canvas_info_win(timeidx)
 
 
 
