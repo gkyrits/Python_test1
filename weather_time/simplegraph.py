@@ -260,15 +260,17 @@ def draw_plots(canvas):
         max_temp = max_temp + (5 - max_temp % 5)
         print(min_temp,max_temp)  
     #estimate humid limits
+    min_df_humd = 30
+    max_df_humd = 60
     if web_humid_var.get() and sens_humid_var.get():
-        min_humid = min(web_humid_rng[0],sens_humid_rng[0])
-        max_humid = max(web_humid_rng[1],sens_humid_rng[1])
+        min_humid = min(min_df_humd,web_humid_rng[0],sens_humid_rng[0])
+        max_humid = max(max_df_humd,web_humid_rng[1],sens_humid_rng[1])
     elif web_humid_var.get():
-        min_humid = web_humid_rng[0]
-        max_humid = web_humid_rng[1]
+        min_humid = min(min_df_humd,web_humid_rng[0])
+        max_humid = max(max_df_humd,web_humid_rng[1])
     elif sens_humid_var.get():
-        min_humid = sens_humid_rng[0]
-        max_humid = sens_humid_rng[1]            
+        min_humid = min(min_df_humd,sens_humid_rng[0])
+        max_humid = max(max_df_humd,sens_humid_rng[1])
     #min/max humid nearly lower 1 decade
     if web_humid_var.get() or sens_humid_var.get():
         print(min_humid,max_humid)
@@ -298,8 +300,18 @@ def draw_plots(canvas):
             canvas.create_line(x1,y1,x2,y2,fill=web_temp_col)    
         #draw web_humid_data
         if web_humid_var.get() :
-            y1 = find_screen_pos(min_humid,max_humid,web_humid_data[i],height-pltpadx,pltpadx)
-            y2 = find_screen_pos(min_humid,max_humid,web_humid_data[i+1],height-pltpadx,pltpadx)
+            #draw smooth line from 4 points
+            if i>1:
+                data1=(web_humid_data[i-2]+web_humid_data[i-1]+web_humid_data[i]+web_humid_data[i+1])/4.0
+            else:
+                data1=web_humid_data[i]
+            if i<(max_time-3):
+                data2=(web_humid_data[i-1]+web_humid_data[i]+web_humid_data[i+1]+web_humid_data[i+2])/4.0
+            else:    
+                data2=web_humid_data[i+1]         
+            #print(data1,data2)                 
+            y1 = find_screen_pos(min_humid,max_humid,data1,height-pltpadx,pltpadx)
+            y2 = find_screen_pos(min_humid,max_humid,data2,height-pltpadx,pltpadx)
             canvas.create_line(x1,y1,x2,y2,fill=web_humid_col)
         #draw sens_press_data
         if sens_press_var.get() :
@@ -313,8 +325,18 @@ def draw_plots(canvas):
             canvas.create_line(x1,y1,x2,y2,fill=sens_temp_col)
         #draw sens_humid_data
         if sens_humid_var.get() :
-            y1 = find_screen_pos(min_humid,max_humid,sens_humid_data[i],height-pltpadx,pltpadx)
-            y2 = find_screen_pos(min_humid,max_humid,sens_humid_data[i+1],height-pltpadx,pltpadx)
+            #draw smooth line from 4 points
+            if i>1:
+                data1=(sens_humid_data[i-2]+sens_humid_data[i-1]+sens_humid_data[i]+sens_humid_data[i+1])/4.0
+            else:
+                data1=sens_humid_data[i]
+            if i<(max_time-3):
+                data2=(sens_humid_data[i-1]+sens_humid_data[i]+sens_humid_data[i+1]+sens_humid_data[i+2])/4.0
+            else:    
+                data2=sens_humid_data[i+1]
+            #print(data1,data2)    
+            y1 = find_screen_pos(min_humid,max_humid,data1,height-pltpadx,pltpadx)
+            y2 = find_screen_pos(min_humid,max_humid,data2,height-pltpadx,pltpadx)
             canvas.create_line(x1,y1,x2,y2,fill=sens_humid_col)
         #update canvas every some points        
         if (i % update_rec == 0) and (i > 0):
