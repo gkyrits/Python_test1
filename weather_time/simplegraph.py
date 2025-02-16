@@ -182,10 +182,13 @@ def draw_plot_time_info(canvas):
     #draw time info
     if len(time_data)==0 :
         return
-    starttime=tm.strftime('%d/%H:%M',tm.localtime(backepoch+time_data[0]*60))
-    endtime=tm.strftime('%d/%H:%M',tm.localtime(backepoch+time_data[-1]*60))
+    starttime=tm.strftime('%d/ %H:%M',tm.localtime(backepoch+time_data[0]*60))
+    endtime=tm.strftime('%d/ %H:%M',tm.localtime(backepoch+time_data[-1]*60))
+    dateplot=tm.strftime('%B %Y',tm.localtime(backepoch+time_data[1]*60))      
     canvas.create_text(xpos,height-ypos,text=starttime, font=win_font, anchor=tk.W)
     canvas.create_text(width-xpos,height-ypos,text=endtime, font=win_font, anchor=tk.E)
+    xpos=(width-len(dateplot))/2-15
+    canvas.create_text(xpos,height-ypos, text=dateplot, fill='blue', font=win_font, anchor=tk.W)    
     #draw time grid lines at 00:00 
     grid_draw=False    
     for i in range(len(time_data)):       
@@ -339,7 +342,7 @@ def draw_plots(canvas):
             y2 = find_screen_pos(min_humid,max_humid,data2,height-pltpadx,pltpadx)
             canvas.create_line(x1,y1,x2,y2,fill=sens_humid_col)
         #update canvas every some points        
-        if (i % update_rec == 0) and (i > 0):
+        if (update_rec > 0) and (i % update_rec == 0) and (i > 0):
             #print('plot %d rec' % i)
             canvas.update()    
     print('plot end')
@@ -353,30 +356,43 @@ def canvas_resize(event):
     draw_plots(event.widget)   
 
 
+def delete_info(event):
+    canvas.delete('clickline')
+    canvas.delete('infowin')
+
+
 def print_info(timeidx,infowin):    
     value = []
     value_col= []
     if web_temp_var.get() :
-        value.append('w temp : {}°C'.format(web_temp_data[timeidx]))
-        value_col.append(web_temp_col)    
+        value.append('w temp: {}°C'.format(web_temp_data[timeidx]))
+        value_col.append(web_temp_col)   
+    if sens_temp_var.get() :
+        value.append('s temp: {}°C'.format(sens_temp_data[timeidx]))
+        value_col.append(sens_temp_col)         
     if web_humid_var.get() :
         value.append('w humid: {}%'.format(web_humid_data[timeidx]))
         value_col.append(web_humid_col)
-    if sens_press_var.get() :
-        value.append('s press: {}hPa'.format(sens_press_data[timeidx]))
-        value_col.append(sens_press_col)
-    if sens_temp_var.get() :
-        value.append('s temp : {}°C'.format(sens_temp_data[timeidx]))
-        value_col.append(sens_temp_col)
     if sens_humid_var.get() :
         value.append('s humid: {}%'.format(sens_humid_data[timeidx]))
-        value_col.append(sens_humid_col)
+        value_col.append(sens_humid_col)        
+    if sens_press_var.get() :
+        value.append('press: {}hPa'.format(sens_press_data[timeidx]))
+        value_col.append(sens_press_col)
     #print values
     rows=len(value)
-    clicktime=tm.strftime('%d  %H:%M',tm.localtime(backepoch+time_data[timeidx]*60))
+    clicktime=tm.strftime('%d/%m %H:%M',tm.localtime(backepoch+time_data[timeidx]*60))
+    daytime = tm.strftime('%A',tm.localtime(backepoch+time_data[timeidx]*60))
+    tk.Label(infowin,text=daytime,bg=win_col, fg="blue", font=win_font).pack(anchor=tk.W)
     tk.Label(infowin,text=clicktime,bg=win_col, fg="blue", font=win_font).pack(anchor=tk.W)
     for i in range(rows):
-        tk.Label(infowin,text=value[i],bg=win_col, fg=value_col[i], font=win_font).pack(anchor=tk.W)
+        tk.Label(infowin,text=value[i],bg=win_col, fg=value_col[i], font=win_fontB).pack(anchor=tk.W)
+
+
+def bind_tree(widget, event, callback):
+    widget.bind(event, callback)
+    for child in widget.children.values():
+        bind_tree(child, event, callback)
 
 
 def canvas_info_win(timeidx):    
@@ -394,6 +410,9 @@ def canvas_info_win(timeidx):
         win_width=infowin.winfo_width()
         print("win w:"+str(win_width))
         canvas.create_window(width-win_width-5,win_height/2+5,window=infowin,anchor=tk.W,tags='infowin')
+    bind_tree(infowin, '<Button-1>', lambda e: delete_info(e))
+
+
 
 
 def canvas_click(event):
@@ -410,6 +429,10 @@ def canvas_click(event):
         return
     if len(time_data)==0 :
         return
+    #draw vertical line
+    height = canvas.winfo_height()
+    canvas.delete('clickline')    
+    canvas.create_line(event.x,0,event.x,height-13,fill='red',dash=(2,2),tags='clickline')
     #get time from x
     width = canvas.winfo_width()
     #height = canvas.winfo_height()-canvas_inf_space
@@ -417,20 +440,10 @@ def canvas_click(event):
     if timeidx >= len(time_data):
         timeidx = len(time_data)-1
     if timeidx < 0:
-        timeidx = 0     
-    clicktime=tm.strftime('%d/%H:%M',tm.localtime(backepoch+time_data[timeidx]*60))
-    print('timeidx:%d date:%s' % (timeidx,clicktime))
-    #print clicktime to canvas    
-    height = canvas.winfo_height()
-    width = canvas.winfo_width()
-    ypos=8; xpos=(width-len(clicktime))/2-15
-    canvas.delete('clicktime')    
-    canvas.create_text(xpos,height-ypos, text=clicktime, fill='blue', font=win_font, anchor=tk.W, tags='clicktime')
-    #draw vertical line
-    canvas.delete('clickline')
-    canvas.create_line(event.x,0,event.x,height-13,fill='red',dash=(2,2),tags='clickline')
+        timeidx = 0      
     #draw info win
     canvas_info_win(timeidx)
+
 
 
 
@@ -493,7 +506,7 @@ def draw_form(win):
     tk.Checkbutton(sensFrmTools, text='P', bg='light green', font=win_font, width=1, variable=sens_press_var, command=plotCbx_change).pack(side=tk.LEFT)
     sensFrmTools.pack(side=tk.LEFT, padx=6)     
     #exit button
-    tk.Button(toolsfrm, text='Exit', font=win_font, command=lambda:btn_exit(win)).pack(side=tk.RIGHT, padx=2)
+    tk.Button(toolsfrm, text='Back', font=but_font, command=lambda:btn_exit(win)).pack(side=tk.RIGHT, padx=2)
     toolsfrm.pack(side=tk.BOTTOM, padx=2, pady=2, fill=tk.X) 
     toolsfrm.pack_propagate(False) #enable Frame height
     #top Frame
