@@ -578,7 +578,17 @@ class Gui:
             parent.rowconfigure(row, weight=1) #resize grid height
         for col in range(9): # 9 rows
             parent.columnconfigure(col, weight=1) #resize grid height            
-        daytxt=info['List'][info_rng[0]]['Date']
+        infodate=info['List'][info_rng[0]]['Date']
+        #get epoch time
+        datepart=infodate.split('-')
+        epoch_time= repo.get_epoch(int(datepart[0]),int(datepart[1]),int(datepart[2]),0,0)
+        daytxt=tm.strftime('%A %d-%m-%Y',tm.localtime(epoch_time))
+        if day==0:
+            daytxt='(Today) '+daytxt
+        elif day==1:
+            daytxt='(Tomorrow) '+daytxt
+        else:
+            daytxt='(+'+str(day)+') '+daytxt
         tk.Label(parent, text=daytxt, bg=prnt_bg, fg=pressCol, font="Arial 8 bold").grid(row=0, columnspan=9)
         tk.Label(parent, text='Hr',     bg=prnt_bg, font="Arial 8").grid(row=1, sticky=tk.W)
         #tk.Label(parent, text='Icon',     bg=prnt_bg, font="Arial 8").grid(row=2, sticky=tk.W)
@@ -654,7 +664,12 @@ class Gui:
            self.sensePanel_visible(False)
            self.wthrFrm.pack_forget()
            self.wthrFrm_on=False
-           self.frcst_day=1
+           #get current hour
+           hour =  tm.localtime(tm.time()).tm_hour
+           if hour <= 20:
+               self.frcst_day=0
+           else:
+               self.frcst_day=1
            self.forecast_panel(self.weatherFrm,self.frcst_info)
         else:
            if self.frcst_tmout != None:
