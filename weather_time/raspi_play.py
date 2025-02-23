@@ -24,47 +24,36 @@ wthr_count = 0
 wthr_pressure = 1013  #for set MPL3115 sea pressure
 sense_need_update=False
 
+EN=0
+GR=1
+lang=EN
+
+monthLst = ['January','February','March','April','May','June','July','August','September','October','November','December']
+monthLst_gr=['Ιανουάριος','Φεβρουάριος','Μάρτιος','Απρίλιος','Μάιος','Ιούνιος','Ιούλιος','Αύγουστος','Σεπτέμβριος','Οκτώβριος','Νοέμβριος','Δεκέμβριος']
+weekLst = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+weekLst_gr = ['Δευτέρα','Τρίτη','Τετάρτη','Πέμπτη','Παρασκευή','Σάββατο','Κυριακή']
+
+today_lst = ['(Today)','(Σήμερα)']
+tomorrow_lst = ['(Tomorrow)','(Αύριο)']
+temper_lst = ['Temperature','Θερμοκρασία']
+feel_lst = ['Feels Like','Αίσθηση']
+humidity_lst = ['Humidity','Υγρασία']       
+pressure_lst = ['Pressure','Πίεση']
+altitude_lst = ['Altitude','Υψόμετρο']
+wind_lst = ['Wind','Άνεμος']
+
+
 def get_month(date):    
-     if date==1:
-        return "January"
-     elif date==2:
-         return "February"
-     elif date==3:
-         return "March"
-     elif date==4:
-         return "April"
-     elif date==5:
-         return "May"
-     elif date==6:
-         return "June"
-     elif date==7:
-         return "July"
-     elif date==8:
-         return "August"
-     elif date==9:
-         return "September"
-     elif date==10:
-         return "October"
-     elif date==11:
-         return "November"
-     elif date==12:
-         return "December"
+    if lang==EN:
+        return monthLst[date-1]
+    else:
+        return monthLst_gr[date-1]
 
 def get_weekDay(wday):
-     if wday==0:
-         return "Monday"
-     elif wday==1:
-         return "Tuesday"
-     elif wday==2:
-         return "Wednesday"
-     elif wday==3:
-         return "Thursday"
-     elif wday==4:
-         return "Friday"
-     elif wday==5:
-         return "Saturday"
-     elif wday==6:
-        return "Sunday"       
+    if lang==EN:
+        return weekLst[wday]
+    else:
+        return weekLst_gr[wday]      
 
 def get_windDir(deg):
     if deg<=22 or deg>337:
@@ -351,7 +340,7 @@ class Gui:
           #-------------------  
         self.dateYear_lbl = tk.Label(dateFrm, text="2024", fg=date_fg, bg=datetm_bg, font="Arial 30 bold")
         self.dateYear_lbl.pack(side=tk.LEFT, anchor=tk.S)          
-        dateFrm.pack(side=tk.TOP, fill=tk.X, padx=2)
+        dateFrm.pack(side=tk.TOP, fill=tk.X, padx=2, pady=2)
         dateFrm.pack_propagate(False) #enable Frame height=40
         #--close panel datetm
         datetmfrm.pack(side=tk.TOP, padx=self.pnlPad, pady=self.pnlPad, fill=tk.X)         
@@ -424,7 +413,7 @@ class Gui:
             self.SensorFrm.rowconfigure(row, weight=1) #resize grid height
         self.room_sensor = tk.Label(self.SensorFrm,text=sense_txt, bg=sense_bg, fg="blue", font="Arial 7")
         self.room_sensor.grid(row=0)
-        tk.Label(self.SensorFrm,text="temperature", bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=1, sticky=tk.W)
+        tk.Label(self.SensorFrm,text=temper_lst[lang], bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=1, sticky=tk.W)
         #-temper frame
         temperFrm=tk.Frame(self.SensorFrm,bg=sense_bg)
         tk.Label(temperFrm, text=" ", fg=temperCol,  bg=sense_bg, font="Arial 20 bold").pack(side=tk.LEFT)
@@ -434,14 +423,14 @@ class Gui:
         temperFrm.grid(row=2, sticky=tk.E)
         if (self.sense_id==1) or (self.sense_id==2):
             #-Humidity
-            tk.Label(self.SensorFrm,text="Humidity", bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=3, sticky=tk.W)
+            tk.Label(self.SensorFrm,text=humidity_lst[lang], bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=3, sticky=tk.W)
             self.room_humid=tk.Label(self.SensorFrm,text="--%", bg=sense_bg, fg=humidCol, font="Arial 14 bold")
             self.room_humid.grid(row=4, sticky=tk.E)
         elif self.sense_id==3:
-            tk.Label(self.SensorFrm,text="Pressure", bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=3, sticky=tk.W)
+            tk.Label(self.SensorFrm,text=pressure_lst[lang], bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=3, sticky=tk.W)
             self.room_press=tk.Label(self.SensorFrm,text="----.- hPa", bg=sense_bg, fg=humidCol, font="Arial 10 bold")
             self.room_press.grid(row=4, sticky=tk.E)
-            tk.Label(self.SensorFrm,text="Altitude", bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=5, sticky=tk.W)
+            tk.Label(self.SensorFrm,text=altitude_lst[lang], bg=sense_bg, fg=tempLblCol, font="Arial 8 bold").grid(row=5, sticky=tk.W)
             self.room_altit=tk.Label(self.SensorFrm,text="- m", bg=sense_bg, fg=altitCol, font="Arial 10 bold")
             self.room_altit.grid(row=6, sticky=tk.E)            
         #--close panel SensorFrm
@@ -540,10 +529,10 @@ class Gui:
         self.wthr_image=tk.Label(self.wthrFrm, image=self.img,  bg=wthr_bg, anchor=tk.W)
         self.wthr_image.grid(row=1, column=2,  columnspan=2, rowspan=3, sticky=tk.W)
 
-        tk.Label(self.wthrFrm, text="Feels Like",  bg=wthr_bg, font="Arial 8").grid(row=2, sticky=tk.W)
-        tk.Label(self.wthrFrm, text="Humidity",    bg=wthr_bg, font="Arial 8").grid(row=3, sticky=tk.W)
-        tk.Label(self.wthrFrm, text="Pressure",    bg=wthr_bg, font="Arial 8").grid(row=4, sticky=tk.W)
-        tk.Label(self.wthrFrm, text="Wind",        bg=wthr_bg, font="Arial 8").grid(row=5, sticky=tk.W)
+        tk.Label(self.wthrFrm, text=feel_lst[lang],  bg=wthr_bg, font="Arial 8").grid(row=2, sticky=tk.W)
+        tk.Label(self.wthrFrm, text=humidity_lst[lang],    bg=wthr_bg, font="Arial 8").grid(row=3, sticky=tk.W)
+        tk.Label(self.wthrFrm, text=pressure_lst[lang],    bg=wthr_bg, font="Arial 8").grid(row=4, sticky=tk.W)
+        tk.Label(self.wthrFrm, text=wind_lst[lang],        bg=wthr_bg, font="Arial 8").grid(row=5, sticky=tk.W)
 
         self.wthr_like=tk.Label(self.wthrFrm, text="23°C",  fg=infoCol, bg=wthr_bg, font="Arial 8 bold")
         self.wthr_like.grid(row=2, column=1, sticky=tk.W)
@@ -582,11 +571,13 @@ class Gui:
         #get epoch time
         datepart=infodate.split('-')
         epoch_time= repo.get_epoch(int(datepart[0]),int(datepart[1]),int(datepart[2]),0,0)
-        daytxt=tm.strftime('%A %d-%m-%Y',tm.localtime(epoch_time))
+        date=tm.localtime(epoch_time)
+        wday=date.tm_wday
+        daytxt=get_weekDay(wday)+tm.strftime(' %d-%m-%Y',date)
         if day==0:
-            daytxt='(Today) '+daytxt
+            daytxt= today_lst[lang]+' '+daytxt
         elif day==1:
-            daytxt='(Tomorrow) '+daytxt
+            daytxt= tomorrow_lst[lang]+' '+daytxt
         else:
             daytxt='(+'+str(day)+') '+daytxt
         tk.Label(parent, text=daytxt, bg=prnt_bg, fg=pressCol, font="Arial 8 bold").grid(row=0, columnspan=9)
@@ -666,7 +657,7 @@ class Gui:
            self.wthrFrm_on=False
            #get current hour
            hour =  tm.localtime(tm.time()).tm_hour
-           if hour <= 20:
+           if hour < 20:
                self.frcst_day=0
            else:
                self.frcst_day=1
