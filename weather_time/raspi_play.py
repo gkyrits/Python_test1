@@ -26,7 +26,7 @@ sense_need_update=False
 
 EN=0
 GR=1
-lang=EN
+lang=GR
 
 monthLst = ['January','February','March','April','May','June','July','August','September','October','November','December']
 monthLst_gr=['Ιανουάριος','Φεβρουάριος','Μάρτιος','Απρίλιος','Μάιος','Ιούνιος','Ιούλιος','Αύγουστος','Σεπτέμβριος','Οκτώβριος','Νοέμβριος','Δεκέμβριος']
