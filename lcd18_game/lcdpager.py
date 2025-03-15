@@ -10,7 +10,8 @@ TEMPER="25.5"
 HUMID="65"
 TIME="25-02-2025  12:00:00"
 
-font_nm="arialbd.ttf"
+#font_nm="arialbd.ttf"       #windows
+font_nm="FreeSansBold.ttf"  #linux
 
 
 def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME):

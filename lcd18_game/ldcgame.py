@@ -17,7 +17,8 @@ class SimulateGui:
         self.root = tk.Tk()
         self.root.title("LDC 1.8 (160x128)")
         self.root.config(bg=self.win_col)
-        self.root.attributes('-toolwindow', True)
+        #self.root.attributes('-toolwindow', True) #windows
+        self.root.resizable(0,0)
         self.draw_form()
 
     def draw_form(self):
@@ -30,7 +31,7 @@ class SimulateGui:
     def draw_lcd(self,img):
         global tkimg
         tkimg = ImageTk.PhotoImage(img)
-        self.canvas.create_image(2,2,anchor=tk.NW,image=tkimg)
+        self.canvas.create_image(1,1,anchor=tk.NW,image=tkimg)
         self.canvas.update()
         
     def run(self):
