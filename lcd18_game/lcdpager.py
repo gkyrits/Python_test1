@@ -1,7 +1,8 @@
-
+import time
 import PIL.Image as Image
 import PIL.ImageDraw as ImgDraw
 import PIL.ImageFont as ImgFont
+import lcd18driver as lcd
 
 LCD_SIZE=(160,128)
 
@@ -13,6 +14,8 @@ TIME="25-02-2025  12:00:00"
 #font_nm="arialbd.ttf"       #windows
 font_nm="FreeSansBold.ttf"  #linux
 
+disp = None
+
 
 def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME):
     strk1 = 1
@@ -22,7 +25,7 @@ def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME):
     font4 = ImgFont.truetype(font_nm, 20)
     posx=10
     posy=10
-    img=Image.new('RGB',LCD_SIZE,(0, 150, 255))
+    img=Image.new('RGB',LCD_SIZE,(0, 80, 255))
     draw=ImgDraw.Draw(img)    
     draw.rectangle((0,0,LCD_SIZE[0]-1,LCD_SIZE[1]-1),fill=None,outline='red',width=1)    
 
@@ -43,7 +46,27 @@ def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME):
 
     return img
 
+def lcd_init():
+    global disp
+    disp = lcd.LCD_1inch8()
+    disp.Init()
+    # Clear display.
+    disp.clear()
+    #Set the backlight to 100
+    disp.bl_DutyCycle(50)
+
+def lcd_show(img):
+    if disp != None:
+        disp.ShowImage(img)
+
+def lcd_testShow():
+    lcd_init()
+    lcd_show(draw_main())
+    while True:
+        time.sleep(1)
 
 
 if __name__ == '__main__':
-    draw_main().show()
+    #draw_main().show()
+    lcd_testShow()
+

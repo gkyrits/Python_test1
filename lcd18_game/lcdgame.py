@@ -9,6 +9,11 @@ import cpuinfo as cpu
 exit=False
 ip_addr="--.--.--.--"
 
+LCD_PLAY=1
+GUI_PLAY=2
+DUAL_PLAY=3
+play_mode=LCD_PLAY
+
 #======== Gui Class =========
 class SimulateGui:
     win_col = "pink"
@@ -47,7 +52,14 @@ def time_thread():
             break
         timestr = tm.strftime("%d-%m-%Y  %H:%M:%S")
         img=pager.draw_main(time=timestr,ip_addr=ip_addr)
-        gui.draw_lcd(img)
+        if play_mode==GUI_PLAY:
+            gui.draw_lcd(img)
+        elif play_mode==LCD_PLAY:
+            pager.lcd_show(img)
+        elif play_mode==DUAL_PLAY:
+            pager.lcd_show(img)
+            gui.draw_lcd(img)
+
 #-------- End of Time Thread ---------
 
 #======== Cpu Info Thread ========
@@ -63,9 +75,15 @@ def cpuInfo_thread():
 
 
 #======== Main Program =========
-gui = SimulateGui()
-#img=pager.draw_main()
-#gui.draw_lcd(img)
+if play_mode==GUI_PLAY:
+    gui = SimulateGui()
+    #img=pager.draw_main()
+    #gui.draw_lcd(img)
+elif play_mode==LCD_PLAY:
+    pager.lcd_init()
+elif play_mode==DUAL_PLAY:
+    gui = SimulateGui()
+    pager.lcd_init()
 
 # start time thread
 tm_thrd=thrd.Thread(target=time_thread)
@@ -74,8 +92,12 @@ tm_thrd.start()
 cpu_thrd=thrd.Thread(target=cpuInfo_thread)
 cpu_thrd.start()
 
-gui.run()
-exit=True
-tm_thrd.join()
-print("Program Exit")
+if (play_mode==GUI_PLAY) or (play_mode==DUAL_PLAY):
+    gui.run()
+    exit=True
+    tm_thrd.join()
+    print("Program Exit")
+elif play_mode==LCD_PLAY:
+    while True:
+        tm.sleep(5)       
 #-------- End of Main Program ---------
