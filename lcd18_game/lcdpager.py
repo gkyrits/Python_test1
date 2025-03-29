@@ -2,7 +2,7 @@ import time
 import PIL.Image as Image
 import PIL.ImageDraw as ImgDraw
 import PIL.ImageFont as ImgFont
-import lcd18driver as lcd
+
 
 LCD_SIZE=(160,128)
 
@@ -11,10 +11,15 @@ TEMPER="25.5"
 HUMID="65"
 TIME="25-02-2025  12:00:00"
 
-#font_nm="arialbd.ttf"       #windows
-font_nm="FreeSansBold.ttf"  #linux
+WINDOWS=1
+
+if WINDOWS:
+    font_nm="arialbd.ttf"       #windows
+else:    
+    font_nm="FreeSansBold.ttf"  #linux
 
 disp = None
+
 
 
 def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME):
@@ -46,8 +51,28 @@ def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME):
 
     return img
 
+imglist = ['01','03','04','05','06','07','08','14','16','17','18','19','20']
+imgidx=0
+
+def draw_imageSlide():
+    global imgidx
+    global imglist
+    image_file = "Python_test1/lcd18_game/pic/Sample" + imglist[imgidx] + ".jpg"
+    img = Image.open(image_file)
+    img = img.resize((LCD_SIZE[0], LCD_SIZE[1]), resample = Image.BILINEAR)
+    imgidx+=1
+    if imgidx >= len(imglist):
+        imgidx=0
+    return img    
+
+
 def lcd_init():
     global disp
+    try:
+        import lcd18driver as lcd           
+    except Exception as e:
+        print("Error importing lcd18driver: ", e.__str__())
+        return        
     disp = lcd.LCD_1inch8()
     disp.Init()
     # Clear display.

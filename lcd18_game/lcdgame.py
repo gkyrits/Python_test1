@@ -7,12 +7,13 @@ import ipaddr as ip
 import cpuinfo as cpu
 
 exit=False
+pause=False
 ip_addr="--.--.--.--"
 
 LCD_PLAY=1
 GUI_PLAY=2
 DUAL_PLAY=3
-play_mode=LCD_PLAY
+play_mode=DUAL_PLAY
 
 #======== Gui Class =========
 class SimulateGui:
@@ -22,16 +23,39 @@ class SimulateGui:
         self.root = tk.Tk()
         self.root.title("LDC 1.8 (160x128)")
         self.root.config(bg=self.win_col)
-        #self.root.attributes('-toolwindow', True) #windows
+        if pager.WINDOWS:
+            self.root.attributes('-toolwindow', True) #windows
         self.root.resizable(0,0)
         self.draw_form()
+
+    def key1_press(self):
+        global pause
+        pause = True
+        img=pager.draw_imageSlide()
+        draw_image(img)
+        
+
+    def key2_press(self):
+        pass
+
+    def key3_press(self):
+        global pause
+        pause = False        
+        pass    
 
     def draw_form(self):
         #canvas Frame
         canvfrm = tk.Frame(self.root, relief=tk.GROOVE,  borderwidth=2)
         self.canvas = tk.Canvas(canvfrm, bg="black", width=pager.LCD_SIZE[0], height=pager.LCD_SIZE[1])        
         self.canvas.pack(fill=tk.BOTH, expand=tk.YES)
-        canvfrm.pack(side=tk.TOP, padx=10, pady=10)
+        canvfrm.pack(side=tk.TOP, padx=5, pady=5)
+        #toolbar Frame
+        toolbar = tk.Frame(self.root, bg=self.win_col, height=20)
+        tk.Button(toolbar, text="<", command=self.key1_press).pack(side=tk.LEFT, expand=tk.YES)
+        tk.Button(toolbar, text=">", command=self.key2_press).pack(side=tk.LEFT, expand=tk.YES)   
+        tk.Button(toolbar, text="ok", command=self.key3_press).pack(side=tk.RIGHT, expand=tk.YES)
+        toolbar.pack(side=tk.BOTTOM, fill=tk.X, pady=4)
+        toolbar.pack_propagate(False)
 
     def draw_lcd(self,img):
         global tkimg
@@ -44,21 +68,27 @@ class SimulateGui:
 #-------- End of Gui Class ---------
 
 #======== Time Thread ========
+def draw_image(img):
+    global gui
+    if play_mode==GUI_PLAY:
+        gui.draw_lcd(img)
+    elif play_mode==LCD_PLAY:
+        pager.lcd_show(img)
+    elif play_mode==DUAL_PLAY:
+        pager.lcd_show(img)
+        gui.draw_lcd(img)
+
 def time_thread():
-     global gui,exit,ip_addr
+     global gui,exit,pause,ip_addr
      while True:
         tm.sleep(1)
         if exit:
             break
+        if pause:
+            continue
         timestr = tm.strftime("%d-%m-%Y  %H:%M:%S")
         img=pager.draw_main(time=timestr,ip_addr=ip_addr)
-        if play_mode==GUI_PLAY:
-            gui.draw_lcd(img)
-        elif play_mode==LCD_PLAY:
-            pager.lcd_show(img)
-        elif play_mode==DUAL_PLAY:
-            pager.lcd_show(img)
-            gui.draw_lcd(img)
+        draw_image(img)
 
 #-------- End of Time Thread ---------
 
