@@ -30,14 +30,18 @@ class LCD_1inch8(lcdconfig.RaspberryPi):
     LCD_Y_Adjust    = LCD_Y
     width           = LCD_WIDTH
     height          = LCD_HEIGHT 
+
+
     def command(self, cmd):
         self.digital_write(self.DC_PIN, False)
         self.spi_writebyte([cmd])
         
+
     def data(self, val):
         self.digital_write(self.DC_PIN, True)
         self.spi_writebyte([val])
         
+
     def reset(self):
         """Reset the display"""
         self.digital_write(self.RST_PIN,True)
@@ -46,10 +50,11 @@ class LCD_1inch8(lcdconfig.RaspberryPi):
         time.sleep(0.01)
         self.digital_write(self.RST_PIN,True)
         time.sleep(0.01)
+
+
     def SetGramScanWay(self, Scan_dir):
         #Get the screen scan direction
-        self.LCD_Scan_Dir = Scan_dir
-        
+        self.LCD_Scan_Dir = Scan_dir        
         #Get GRAM and LCD width and height
         if (Scan_dir == L2R_U2D) or (Scan_dir == L2R_D2U) or (Scan_dir == R2L_U2D) or (Scan_dir == R2L_D2U) :
             self.LCD_Dis_Column    = LCD_HEIGHT 
@@ -76,11 +81,12 @@ class LCD_1inch8(lcdconfig.RaspberryPi):
             elif Scan_dir == D2U_L2R:
                 MemoryAccessReg_Data = 0x80 | 0x00 | 0x20
             else:        #R2L_D2U
-                MemoryAccessReg_Data = 0x40 | 0x80 | 0x20
-        
+                MemoryAccessReg_Data = 0x40 | 0x80 | 0x20        
         # Set the read / write scan direction of the frame memory
         self.command(0x36)        #MX, MY, RGB mode 
-        self.data( MemoryAccessReg_Data & 0xf7)    #RGB color filter panel    
+        self.data( MemoryAccessReg_Data & 0xf7)    #RGB color filter panel  
+
+
     def Init_reg(self):
         """Initialize dispaly"""  
         self.command(0xB1)
@@ -176,6 +182,7 @@ class LCD_1inch8(lcdconfig.RaspberryPi):
         self.command(0x3A)
         self.data(0x05)
         
+
     def Init(self,Lcd_ScanDir=U2D_R2L):
         self.module_init()
         self.reset()
@@ -196,6 +203,7 @@ class LCD_1inch8(lcdconfig.RaspberryPi):
 
         self.clear()   
   
+
     def SetWindows(self, Xstart, Ystart, Xend, Yend):
         #set the X coordinates
         self.command ( 0x2A )
@@ -213,6 +221,7 @@ class LCD_1inch8(lcdconfig.RaspberryPi):
 
         self.command(0x2C)  
         
+
     def clear(self, color=0XFFFF):
         _buffer = [color]*(self.LCD_Dis_Column * self.LCD_Dis_Page * 2)
         if (self.LCD_Scan_Dir == L2R_U2D) or (self.LCD_Scan_Dir == L2R_D2U) or (self.LCD_Scan_Dir == R2L_U2D) or (self.LCD_Scan_Dir == R2L_D2U) :
@@ -220,8 +229,7 @@ class LCD_1inch8(lcdconfig.RaspberryPi):
             self.SetWindows( 0 , 0 , LCD_X_MAXPIXEL , LCD_Y_MAXPIXEL  )
             self.digital_write(self.DC_PIN,True)
             for i in range(0,len(_buffer),4096):
-                self.spi_writebyte(_buffer[i:i+4096])        
-            
+                self.spi_writebyte(_buffer[i:i+4096])                    
         else:
             # self.LCD_SetArealColor(0,0, LCD_Y_MAXPIXEL , LCD_X_MAXPIXEL  , Color = color)#white
             self.SetWindows( 0 , 0 , LCD_Y_MAXPIXEL , LCD_X_MAXPIXEL  )
@@ -232,8 +240,7 @@ class LCD_1inch8(lcdconfig.RaspberryPi):
     
     def ShowImage(self,Image):
         if (Image == None):
-            return
-        
+            return        
         imwidth, imheight = Image.size
         if imwidth != self.width or imheight != self.height:
             raise ValueError('Image must be same dimensions as display \
@@ -245,8 +252,9 @@ class LCD_1inch8(lcdconfig.RaspberryPi):
         pix = pix.flatten().tolist()
         self.SetWindows ( 0, 0, self.width, self.height)
         self.digital_write(self.DC_PIN,True)
-        for i in range(0,len(pix),4096):
-            self.spi_writebyte(pix[i:i+4096])	
+        steps=128 #4096
+        for i in range(0,len(pix),steps):
+            self.spi_writebyte(pix[i:i+steps])	
         '''
         self.SetWindows ( Xstart, Ystart, self.LCD_Dis_Column , self.LCD_Dis_Page  )
         self.digital_write(self.DC_PIN,self.GPIO.HIGH)
@@ -260,3 +268,38 @@ class LCD_1inch8(lcdconfig.RaspberryPi):
         for i in range(0,len(pix),4096):
             self.spi_writebyte(pix[i:i+4096])
         '''
+
+
+    ##### gkyr: Adafruit (__init__.py from st7735 lib) #####
+
+    def color565(self,r, g, b):
+        """Convert red, green, blue components to a 16-bit 565 RGB value. Components
+        should be values 0 to 255.
+        """
+        return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
+
+
+    def image_to_data(self,image, rotation=0):
+        """Generator function to convert a PIL image to 16-bit 565 RGB bytes."""
+        # NumPy is much faster at doing this. NumPy code provided by:
+        # Keith (https://www.blogger.com/profile/02555547344016007163)
+        pb = self.np.rot90(self.np.array(image.convert('RGB')), rotation // 90).astype('uint16')
+        color = ((pb[:, :, 0] & 0xF8) << 8) | ((pb[:, :, 1] & 0xFC) << 3) | (pb[:, :, 2] >> 3)
+        return self.np.dstack(((color >> 8) & 0xFF, color & 0xFF)).flatten().tolist()
+
+
+    def ShowImage2(self,Image): 
+        if (Image == None):
+            return 
+        print('ShowImage2..')    
+        self.SetWindows ( 0, 0, self.width, self.height)
+        self.digital_write(self.DC_PIN,True)  
+        # Convert image to array of 16bit 565 RGB data bytes.
+        # Unfortunate that this copy has to occur, but the SPI byte writing
+        # function needs to take an array of bytes and PIL doesn't natively
+        # store images in 16-bit 565 RGB format.        
+        pix = list(self.image_to_data(Image)) 
+        steps=128 #4096
+        for i in range(0,len(pix),steps):
+            self.spi_writebyte(pix[i:i+steps])        
+

@@ -57,7 +57,7 @@ imgidx=0
 def draw_imageSlide():
     global imgidx
     global imglist
-    image_file = "Python_test1/lcd18_game/pic/Sample" + imglist[imgidx] + ".jpg"
+    image_file = "pic/Sample" + imglist[imgidx] + ".jpg"
     img = Image.open(image_file)
     img = img.resize((LCD_SIZE[0], LCD_SIZE[1]), resample = Image.BILINEAR)
     imgidx+=1
@@ -83,6 +83,10 @@ def lcd_init():
 def lcd_show(img):
     if disp != None:
         disp.ShowImage(img)
+
+def lcd_show2(img):
+    if disp != None:
+        disp.ShowImage2(img)        
 
 def lcd_testShow():
     lcd_init()

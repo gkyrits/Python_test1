@@ -16,7 +16,7 @@ humid="--"
 LCD_PLAY=1
 GUI_PLAY=2
 DUAL_PLAY=3
-play_mode=DUAL_PLAY
+play_mode=LCD_PLAY
 
 #======== Gui Class =========
 class SimulateGui:
@@ -77,8 +77,8 @@ def draw_image(img):
         gui.draw_lcd(img)
     elif play_mode==LCD_PLAY:
         pager.lcd_show(img)
-    elif play_mode==DUAL_PLAY:
-        pager.lcd_show(img)
+    elif play_mode==DUAL_PLAY:        
+        pager.lcd_show(img)            
         gui.draw_lcd(img)
 
 def time_thread():
@@ -109,7 +109,7 @@ def weather_thread(tmout):
     global exit,tm_cnt,temper,humid
     tm_cnt=0
     info = wthr.get_weather_info()
-    temper='{}'.format(info['Temper'])
+    temper='{:.1f}'.format(info['Temper'])
     humid='{}'.format(info['Humidity'])
     while True:          
         if exit:
@@ -119,7 +119,7 @@ def weather_thread(tmout):
             info = wthr.get_weather_info()
             if exit:
                break            
-            temper='{}'.format(info['Temper'])
+            temper='{:.1f}'.format(info['Temper'])
             humid='{}'.format(info['Humidity'])
             tm_cnt=0
         tm.sleep(1)
