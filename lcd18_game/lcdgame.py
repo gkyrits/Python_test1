@@ -5,10 +5,13 @@ import lcdpager as pager
 import PIL.ImageTk as ImageTk
 import ipaddr as ip
 import cpuinfo as cpu
+import weather as wthr
 
 exit=False
 pause=False
 ip_addr="--.--.--.--"
+temper="--"
+humid="--"
 
 LCD_PLAY=1
 GUI_PLAY=2
@@ -79,7 +82,7 @@ def draw_image(img):
         gui.draw_lcd(img)
 
 def time_thread():
-     global gui,exit,pause,ip_addr
+     global exit,pause,ip_addr
      while True:
         tm.sleep(1)
         if exit:
@@ -87,14 +90,13 @@ def time_thread():
         if pause:
             continue
         timestr = tm.strftime("%d-%m-%Y  %H:%M:%S")
-        img=pager.draw_main(time=timestr,ip_addr=ip_addr)
+        img=pager.draw_main(time=timestr,ip_addr=ip_addr,temperture=temper,humidity=humid)
         draw_image(img)
-
 #-------- End of Time Thread ---------
 
 #======== Cpu Info Thread ========
 def cpuInfo_thread():
-    global gui,exit,ip_addr
+    global exit,ip_addr
     while True:
         tm.sleep(5)
         if exit:
@@ -102,7 +104,26 @@ def cpuInfo_thread():
         ip_addr=ip.get_ip_address("wlan0")
 #-------- End of Cpu Info Thread ---------
 
-
+#======== Weather Thread ======
+def weather_thread(tmout):
+    global exit,tm_cnt,temper,humid
+    tm_cnt=0
+    info = wthr.get_weather_info()
+    temper='{}'.format(info['Temper'])
+    humid='{}'.format(info['Humidity'])
+    while True:          
+        if exit:
+            break
+        tm_cnt += 1
+        if tm_cnt>tmout:        
+            info = wthr.get_weather_info()
+            if exit:
+               break            
+            temper='{}'.format(info['Temper'])
+            humid='{}'.format(info['Humidity'])
+            tm_cnt=0
+        tm.sleep(1)
+#-------- End of Weather Thread ---------   
 
 #======== Main Program =========
 if play_mode==GUI_PLAY:
@@ -121,6 +142,9 @@ tm_thrd.start()
 # start lanIp thread
 cpu_thrd=thrd.Thread(target=cpuInfo_thread)
 cpu_thrd.start()
+# start wheather thread
+wether_thrd=thrd.Thread(target=weather_thread, args=(60,)) # sec update
+wether_thrd.start()
 
 if (play_mode==GUI_PLAY) or (play_mode==DUAL_PLAY):
     gui.run()

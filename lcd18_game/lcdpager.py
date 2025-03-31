@@ -11,7 +11,7 @@ TEMPER="25.5"
 HUMID="65"
 TIME="25-02-2025  12:00:00"
 
-WINDOWS=1
+WINDOWS=0
 
 if WINDOWS:
     font_nm="arialbd.ttf"       #windows
