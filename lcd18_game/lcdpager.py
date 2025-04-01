@@ -8,7 +8,7 @@ LCD_SIZE=(160,128)
 
 WINDOWS=0
 if WINDOWS:
-    WORK_PATH="C:\MyFiles\WORK\python\Python_test1\lcd18_game"
+    WORK_PATH="C:/MyFiles/WORK/python/Python_test1/lcd18_game/"
 else:    
     WORK_PATH="/home/gkyr/Work/Python_test1/lcd18_game/"
 
