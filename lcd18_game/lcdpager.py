@@ -6,58 +6,74 @@ import PIL.ImageFont as ImgFont
 
 LCD_SIZE=(160,128)
 
+WINDOWS=0
+if WINDOWS:
+    WORK_PATH="C:\MyFiles\WORK\python\Python_test1\lcd18_game"
+else:    
+    WORK_PATH="/home/gkyr/Work/Python_test1/lcd18_game/"
+
 IPADDR="192.168.1.17"
 TEMPER="25.5"
 HUMID="65"
 TIME="25-02-2025  12:00:00"
 
-WINDOWS=0
-
-if WINDOWS:
-    font_nm="arialbd.ttf"       #windows
-else:    
-    font_nm="FreeSansBold.ttf"  #linux
+font_nm=WORK_PATH+"Font/arialbd.ttf"
 
 disp = None
+main_img_cnt=0
+imglist = ['01','03','04','05','06','07','08','14','16','17','18','19','20']
+imgidx=0
+seconds_cnt=0
 
-
+def get_main_img():
+    global imgidx,imglist,seconds_cnt
+    seconds_cnt+=1
+    if seconds_cnt==60:
+        seconds_cnt=0
+        imgidx+=1
+        if imgidx >= len(imglist):
+            imgidx=0
+    image_file = WORK_PATH+"pic/Sample" + imglist[imgidx] + ".jpg"
+    img = Image.open(image_file)
+    img = img.resize((LCD_SIZE[0], LCD_SIZE[1]), resample = Image.BILINEAR)
+    return img
+  
 
 def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME):
-    strk1 = 1
+    strk1 = 1    
     font1 = ImgFont.truetype(font_nm, 12)
     font2 = ImgFont.truetype(font_nm, 14)
     font3 = ImgFont.truetype(font_nm, 16)
-    font4 = ImgFont.truetype(font_nm, 20)
+    font4 = ImgFont.truetype(font_nm, 24)
     posx=10
     posy=10
-    img=Image.new('RGB',LCD_SIZE,(0, 80, 255))
+    #img=Image.new('RGB',LCD_SIZE,(0, 80, 255))
+    img=get_main_img()
     draw=ImgDraw.Draw(img)    
     draw.rectangle((0,0,LCD_SIZE[0]-1,LCD_SIZE[1]-1),fill=None,outline='red',width=1)    
 
     draw.text((posx,posy),'IP',fill='white',font=font3,stroke_width=strk1,stroke_fill='black')
     draw.text((posx+40,posy),ip_addr,fill='yellow',font=font3,stroke_width=strk1,stroke_fill='black')
 
-    posy+=20+10
+    posy+=30
     draw.text((posx,posy),'Temperture',fill='white',font=font1,stroke_width=strk1,stroke_fill='black')
     draw.text((posx+80,posy-5),temperture,fill='red',font=font4,stroke_width=strk1,stroke_fill='white')
 
-    posy+=25
+    posy+=30
     draw.text((posx,posy),'Humidity',fill='white',font=font1,stroke_width=strk1,stroke_fill='black')
     draw.text((posx+80,posy-5),humidity,fill='green',font=font4,stroke_width=strk1,stroke_fill='white')
 
-    posy+=20+20
+    posy+=35
     #draw.text((posx,posy),'Time:',fill='white',font=font1,stroke_width=strk1,stroke_fill='black')
     draw.text((posx,posy),time,fill='white',font=font2,stroke_width=strk1,stroke_fill='black')
 
     return img
 
-imglist = ['01','03','04','05','06','07','08','14','16','17','18','19','20']
-imgidx=0
+
 
 def draw_imageSlide():
-    global imgidx
-    global imglist
-    image_file = "pic/Sample" + imglist[imgidx] + ".jpg"
+    global imgidx,imglist    
+    image_file = WORK_PATH+"pic/Sample" + imglist[imgidx] + ".jpg"
     img = Image.open(image_file)
     img = img.resize((LCD_SIZE[0], LCD_SIZE[1]), resample = Image.BILINEAR)
     imgidx+=1
