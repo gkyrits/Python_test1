@@ -96,13 +96,20 @@ def lcd_init():
     #Set the backlight to 100
     disp.bl_DutyCycle(50)
 
+def ldc_backlight(value):
+    print("set backlight:{}".format(value))
+    if disp != None:
+        disp.bl_DutyCycle(value)
+
 def lcd_show(img):
     if disp != None:
         disp.ShowImage(img)
 
+
 def lcd_show2(img):
     if disp != None:
         disp.ShowImage2(img)        
+
 
 def lcd_testShow():
     lcd_init()

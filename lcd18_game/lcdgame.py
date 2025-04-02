@@ -44,7 +44,11 @@ class SimulateGui:
     def key3_press(self):
         global pause
         pause = False        
-        pass    
+        
+
+    def set_backlight(self,val):
+        pager.ldc_backlight(val)
+        
 
     def draw_form(self):
         #canvas Frame
@@ -57,8 +61,15 @@ class SimulateGui:
         tk.Button(toolbar, text="<", command=self.key1_press).pack(side=tk.LEFT, expand=tk.YES)
         tk.Button(toolbar, text=">", command=self.key2_press).pack(side=tk.LEFT, expand=tk.YES)   
         tk.Button(toolbar, text="ok", command=self.key3_press).pack(side=tk.RIGHT, expand=tk.YES)
-        toolbar.pack(side=tk.BOTTOM, fill=tk.X, pady=4)
+        toolbar.pack(side=tk.TOP, fill=tk.X, pady=0)
         toolbar.pack_propagate(False)
+        #Scale Frame
+        scaleFrm = tk.Frame(self.root, bg=self.win_col, height=20)
+        blScale=tk.Scale(scaleFrm, to=100, orient=tk.HORIZONTAL,showvalue=0,command=lambda x :self.set_backlight(x))
+        blScale.set(50)
+        blScale.pack(side=tk.TOP, fill=tk.X, padx=2, pady=4)
+        scaleFrm.pack(side=tk.BOTTOM, fill=tk.X)
+        #scaleFrm.pack_propagate(False)
 
     def draw_lcd(self,img):
         global tkimg
