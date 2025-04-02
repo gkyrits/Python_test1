@@ -97,9 +97,9 @@ def lcd_init():
     disp.bl_DutyCycle(50)
 
 def ldc_backlight(value):
-    print("set backlight:{}".format(value))
+    #print("set backlight:{}".format(value))
     if disp != None:
-        disp.bl_DutyCycle(value)
+        disp.bl_DutyCycle(int(value))
 
 def lcd_show(img):
     if disp != None:
