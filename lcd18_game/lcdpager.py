@@ -3,8 +3,16 @@ import PIL.Image as Image
 import PIL.ImageDraw as ImgDraw
 import PIL.ImageFont as ImgFont
 
+######################
+#  SPI/PIN config
+######################
+SPI_DEV=1    #spi0,spi1
+SPI_CS=0     #cs0,cs1,cs2
+DC_GPIO=6    #lcd command/data  //6        //24
+RST_GPIO=5  #lcd reset          //5 26     //25
+BL_GPIO=13   #lcd backlight     //13(PWM1) //22
+#---------------------
 
-LCD_SIZE=(160,128)
 
 WINDOWS=0
 if WINDOWS:
@@ -12,6 +20,7 @@ if WINDOWS:
 else:    
     WORK_PATH="/home/gkyr/Work/Python_test1/lcd18_game/"
 
+LCD_SIZE=(160,128)
 IPADDR="192.168.1.17"
 TEMPER="25.5"
 HUMID="65"
@@ -89,7 +98,7 @@ def lcd_init():
     except Exception as e:
         print("Error importing lcd18driver: ", e.__str__())
         return        
-    disp = lcd.LCD_1inch8()
+    disp = lcd.LCD_1inch8(spi_dev=SPI_DEV,spi_cs=SPI_CS,dc=DC_GPIO,rst=RST_GPIO,bl=BL_GPIO)
     disp.Init()
     # Clear display.
     disp.clear()

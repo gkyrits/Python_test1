@@ -31,12 +31,12 @@ import os
 import sys
 import time
 import spidev
-import logging
+#import logging
 import numpy as np
 from gpiozero import *
 
 class RaspberryPi:
-    def __init__(self,spi=spidev.SpiDev(0,0),spi_freq=40000000,rst = 25,dc = 24,bl = 22,bl_freq=1000,i2c=None,i2c_freq=100000):
+    def __init__(self, spi_dev=0, spi_cs=0, spi_freq=32000000, rst=25, dc=24, bl=22, bl_freq=1000):
         self.np=np
         self.INPUT = False
         self.OUTPUT = True
@@ -49,8 +49,8 @@ class RaspberryPi:
         self.BL_PIN = self.gpio_pwm(bl)
         self.bl_DutyCycle(0)
         
-        #Initialize SPI
-        self.SPI = spi
+        #Initialize SPI    
+        self.SPI = spidev.SpiDev(spi_dev,spi_cs)
         if self.SPI!=None :
             self.SPI.max_speed_hz = spi_freq
             self.SPI.mode = 0b00
@@ -93,11 +93,11 @@ class RaspberryPi:
         return 0
 
     def module_exit(self):
-        logging.debug("spi end")
+        #logging.debug("spi end")
         if self.SPI!=None :
             self.SPI.close()
         
-        logging.debug("gpio cleanup...")
+        #logging.debug("gpio cleanup...")
         self.digital_write(self.RST_PIN, 1)
         self.digital_write(self.DC_PIN, 0)   
         self.BL_PIN.close()

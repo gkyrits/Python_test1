@@ -19,8 +19,9 @@ D2U_L2R = 7
 D2U_R2L = 8
 SCAN_DIR_DFT = U2D_R2L
 
-LCD_WIDTH  = 160
 LCD_HEIGHT = 128
+LCD_WIDTH  = 160
+
 
 class LCD_1inch8(lcdconfig.RaspberryPi):
     LCD_Dis_Column  = LCD_WIDTH
@@ -30,6 +31,7 @@ class LCD_1inch8(lcdconfig.RaspberryPi):
     LCD_Y_Adjust    = LCD_Y
     width           = LCD_WIDTH
     height          = LCD_HEIGHT 
+    WR_DATA_STEP    = 256  #4096
 
 
     def command(self, cmd):
@@ -252,9 +254,8 @@ class LCD_1inch8(lcdconfig.RaspberryPi):
         pix = pix.flatten().tolist()
         self.SetWindows ( 0, 0, self.width, self.height)
         self.digital_write(self.DC_PIN,True)
-        steps=128 #4096
-        for i in range(0,len(pix),steps):
-            self.spi_writebyte(pix[i:i+steps])	
+        for i in range(0,len(pix),self.WR_DATA_STEP):
+            self.spi_writebyte(pix[i:i+self.WR_DATA_STEP])	
         '''
         self.SetWindows ( Xstart, Ystart, self.LCD_Dis_Column , self.LCD_Dis_Page  )
         self.digital_write(self.DC_PIN,self.GPIO.HIGH)
@@ -298,8 +299,7 @@ class LCD_1inch8(lcdconfig.RaspberryPi):
         # Unfortunate that this copy has to occur, but the SPI byte writing
         # function needs to take an array of bytes and PIL doesn't natively
         # store images in 16-bit 565 RGB format.        
-        pix = list(self.image_to_data(Image)) 
-        steps=128 #4096
-        for i in range(0,len(pix),steps):
-            self.spi_writebyte(pix[i:i+steps])        
+        pix = list(self.image_to_data(Image))         
+        for i in range(0,len(pix),self.WR_DATA_STEP):
+            self.spi_writebyte(pix[i:i+self.WR_DATA_STEP])        
 
