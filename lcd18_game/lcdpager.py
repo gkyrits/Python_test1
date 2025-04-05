@@ -9,7 +9,7 @@ import PIL.ImageFont as ImgFont
 SPI_DEV=1    #spi0,spi1
 SPI_CS=0     #cs0,cs1,cs2
 DC_GPIO=6    #lcd command/data  //6        //24
-RST_GPIO=5  #lcd reset          //5 26     //25
+RST_GPIO=26  #lcd reset          //5 26     //25
 BL_GPIO=13   #lcd backlight     //13(PWM1) //22
 #---------------------
 
