@@ -6,6 +6,7 @@ import PIL.ImageTk as ImageTk
 import ipaddr as ip
 import cpuinfo as cpu
 import weather as wthr
+import board as brd
 
 exit=False
 pause=False
@@ -32,18 +33,20 @@ class SimulateGui:
         self.draw_form()
 
     def key1_press(self):
-        global pause
-        pause = True
-        img=pager.draw_imageSlide()
-        draw_image(img)
+        #global pause
+        #pause = True
+        #img=pager.draw_imageSlide()
+        #draw_image(img)
+        key1_hw_press()
         
 
     def key2_press(self):
-        pass
+        key2_hw_press()
 
     def key3_press(self):
-        global pause
-        pause = False        
+        #global pause
+        #pause = False  
+        key3_hw_press()
         
 
     def set_backlight(self,val):
@@ -136,7 +139,33 @@ def weather_thread(tmout):
         tm.sleep(1)
 #-------- End of Weather Thread ---------   
 
+#======== keys =================
+
+def key1_hw_press():
+    print("key1 press")
+    brd.beep()
+    global pause
+    pause = True
+    img=pager.draw_imageSlide()
+    draw_image(img)    
+
+def key2_hw_press():
+    print("key2 press")
+    brd.beep() 
+
+def key3_hw_press():
+    print("key3 press")
+    brd.beep()   
+    global pause
+    pause = False
+
 #======== Main Program =========
+brd.init()
+brd.key1_func = key1_hw_press
+brd.key2_func = key2_hw_press
+brd.key3_func = key3_hw_press
+brd.init_buttons()
+
 if play_mode==GUI_PLAY:
     gui = SimulateGui()
     #img=pager.draw_main()
@@ -164,5 +193,7 @@ if (play_mode==GUI_PLAY) or (play_mode==DUAL_PLAY):
     print("Program Exit")
 elif play_mode==LCD_PLAY:
     while True:
-        tm.sleep(5)       
+        tm.sleep(5)
+
+brd.close()
 #-------- End of Main Program ---------
