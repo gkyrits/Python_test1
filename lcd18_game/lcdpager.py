@@ -102,8 +102,12 @@ def lcd_init():
     disp.Init()
     # Clear display.
     disp.clear()
-    #Set the backlight to 100
+    #Set the backlight
     disp.bl_DutyCycle(50)
+
+def lcd_close():
+    if disp != None:
+        disp.Close()
 
 def ldc_backlight(value):
     #print("set backlight:{}".format(value))

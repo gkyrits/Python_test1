@@ -7,6 +7,7 @@ import ipaddr as ip
 import cpuinfo as cpu
 import weather as wthr
 import board as brd
+import sensehat as hat
 
 exit=False
 pause=False
@@ -142,7 +143,7 @@ def weather_thread(tmout):
 #======== keys =================
 
 def key1_hw_press():
-    print("key1 press")
+    #print("key1 press")
     brd.beep()
     global pause
     pause = True
@@ -150,11 +151,11 @@ def key1_hw_press():
     draw_image(img)    
 
 def key2_hw_press():
-    print("key2 press")
+    #print("key2 press")
     brd.beep() 
 
 def key3_hw_press():
-    print("key3 press")
+    #print("key3 press")
     brd.beep()   
     global pause
     pause = False
@@ -165,6 +166,8 @@ brd.key1_func = key1_hw_press
 brd.key2_func = key2_hw_press
 brd.key3_func = key3_hw_press
 brd.init_buttons()
+
+hat.init()
 
 if play_mode==GUI_PLAY:
     gui = SimulateGui()
@@ -196,4 +199,5 @@ elif play_mode==LCD_PLAY:
         tm.sleep(5)
 
 brd.close()
+pager.lcd_close()
 #-------- End of Main Program ---------

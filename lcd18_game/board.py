@@ -5,6 +5,9 @@ KEY1_GPIO = 18
 KEY2_GPIO = 17
 KEY3_GPIO = 5
 
+FILTER_STEADY=50000
+FILTER_ACTIVE=1
+
 pi=None
 key1=None
 key2=None
@@ -58,13 +61,13 @@ def init_buttons():
     import pigpio
     pi.set_mode(KEY1_GPIO, pigpio.INPUT)
     pi.set_pull_up_down(KEY1_GPIO, pigpio.PUD_UP)
-    pi.set_noise_filter(KEY1_GPIO, 10000, 0)
+    pi.set_noise_filter(KEY1_GPIO, FILTER_STEADY, FILTER_ACTIVE)
     pi.set_mode(KEY2_GPIO, pigpio.INPUT)
     pi.set_pull_up_down(KEY2_GPIO, pigpio.PUD_UP)
-    pi.set_noise_filter(KEY2_GPIO, 10000, 0)
+    pi.set_noise_filter(KEY2_GPIO, FILTER_STEADY, FILTER_ACTIVE)
     pi.set_mode(KEY3_GPIO, pigpio.INPUT)
     pi.set_pull_up_down(KEY3_GPIO, pigpio.PUD_UP)
-    pi.set_noise_filter(KEY3_GPIO, 10000, 0)
+    pi.set_noise_filter(KEY3_GPIO, FILTER_STEADY, FILTER_ACTIVE)
     key1=pi.callback(KEY1_GPIO, pigpio.RISING_EDGE , key1_pressed)
     key2=pi.callback(KEY2_GPIO, pigpio.RISING_EDGE , key2_pressed)
     key3=pi.callback(KEY3_GPIO, pigpio.RISING_EDGE , key3_pressed)        

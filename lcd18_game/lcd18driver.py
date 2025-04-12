@@ -203,7 +203,10 @@ class LCD_1inch8(lcdconfig.RaspberryPi):
         #Turn on the LCD display
         self.command(0x29)
 
-        self.clear()   
+        self.clear()  
+
+    def Close(self):
+        self.module_exit()         
   
 
     def SetWindows(self, Xstart, Ystart, Xend, Yend):

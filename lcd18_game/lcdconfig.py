@@ -35,6 +35,8 @@ import spidev
 import numpy as np
 from gpiozero import *
 
+USE_PIGPIO=True
+
 class RaspberryPi:
     def __init__(self, spi_dev=0, spi_cs=0, spi_freq=32000000, rst=25, dc=24, bl=22, bl_freq=1000):
         self.np=np
@@ -43,11 +45,13 @@ class RaspberryPi:
 
         self.SPEED  =spi_freq
         self.BL_freq=bl_freq
+        self.BL_duty=10
+        self.pi=None #for pigpio lib
 
         self.RST_PIN= self.gpio_mode(rst,self.OUTPUT)
         self.DC_PIN = self.gpio_mode(dc,self.OUTPUT)
         self.BL_PIN = self.gpio_pwm(bl)
-        self.bl_DutyCycle(0)
+        self.bl_DutyCycle(self.BL_duty)
         
         #Initialize SPI    
         self.SPI = spidev.SpiDev(spi_dev,spi_cs)
@@ -74,17 +78,34 @@ class RaspberryPi:
         time.sleep(delaytime / 1000.0)
 
     def gpio_pwm(self,Pin):
-        return PWMOutputDevice(Pin,frequency = self.BL_freq)
+        if USE_PIGPIO:
+            import pigpio
+            self.pi=pigpio.pi()
+            dcycle=self.BL_duty*10000
+            self.pi.hardware_PWM(Pin, self.BL_freq, dcycle)
+            return Pin
+        else:    
+            return PWMOutputDevice(Pin,frequency = self.BL_freq)
 
     def spi_writebyte(self, data):
         if self.SPI!=None :
             self.SPI.writebytes(data)
 
     def bl_DutyCycle(self, duty):
-        self.BL_PIN.value = duty / 100
+        self.BL_duty=duty
+        if USE_PIGPIO:
+            dcycle=duty*10000
+            self.pi.hardware_PWM(self.BL_PIN, self.BL_freq, dcycle)
+        else:    
+            self.BL_PIN.value = duty / 100
         
     def bl_Frequency(self,freq):# Hz
-        self.BL_PIN.frequency = freq
+        self.BL_freq=freq
+        if USE_PIGPIO:
+            dcycle=self.BL_duty*10000
+            self.pi.hardware_PWM(self.BL_PIN, freq, dcycle)            
+        else:    
+            self.BL_PIN.frequency = freq
            
     def module_init(self):
         if self.SPI!=None :
@@ -94,13 +115,18 @@ class RaspberryPi:
 
     def module_exit(self):
         #logging.debug("spi end")
+        print("lcd module_exit")
         if self.SPI!=None :
             self.SPI.close()
         
         #logging.debug("gpio cleanup...")
         self.digital_write(self.RST_PIN, 1)
         self.digital_write(self.DC_PIN, 0)   
-        self.BL_PIN.close()
+        if USE_PIGPIO:
+            self.pi.hardware_PWM(self.BL_PIN, self.BL_freq, 0)
+            self.pi.stop()
+        else:    
+            self.BL_PIN.close()
         time.sleep(0.001)
 
 

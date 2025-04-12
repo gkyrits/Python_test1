@@ -16,7 +16,7 @@ import sys
 import os
 
 LCD_SIZE = "320x240"
-FULL_SCREEN = 1
+FULL_SCREEN = 0
 
 exit = False
 infoWin = False
@@ -882,7 +882,7 @@ def screensaver_disable(disable):
 screensaver_disable(True)
 gui = Gui()
 # register Keys
-register_keys()
+#register_keys()
 # start time thread
 tm_thrd=thrd.Thread(target=time_thread)
 tm_thrd.start()
