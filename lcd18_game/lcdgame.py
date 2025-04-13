@@ -9,6 +9,8 @@ import weather as wthr
 import board as brd
 import sensehat as hat
 
+WINDOWS=0
+
 exit=False
 pause=False
 ip_addr="--.--.--.--"
@@ -18,7 +20,10 @@ humid="--"
 LCD_PLAY=1
 GUI_PLAY=2
 DUAL_PLAY=3
-play_mode=LCD_PLAY
+play_mode=DUAL_PLAY
+
+if WINDOWS:
+    play_mode=GUI_PLAY
 
 #======== Gui Class =========
 class SimulateGui:
@@ -28,7 +33,7 @@ class SimulateGui:
         self.root = tk.Tk()
         self.root.title("LDC 1.8 (160x128)")
         self.root.config(bg=self.win_col)
-        if pager.WINDOWS:
+        if WINDOWS:
             self.root.attributes('-toolwindow', True) #windows
         self.root.resizable(0,0)
         self.draw_form()
@@ -200,4 +205,5 @@ elif play_mode==LCD_PLAY:
 
 brd.close()
 pager.lcd_close()
+print("End!")
 #-------- End of Main Program ---------

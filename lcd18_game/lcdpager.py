@@ -1,4 +1,5 @@
 import time
+import os
 import PIL.Image as Image
 import PIL.ImageDraw as ImgDraw
 import PIL.ImageFont as ImgFont
@@ -14,25 +15,22 @@ BL_GPIO=13   #lcd backlight     //13(PWM1) //22
 #---------------------
 
 
-WINDOWS=0
-if WINDOWS:
-    WORK_PATH="C:/MyFiles/WORK/python/Python_test1/lcd18_game/"
-else:    
-    WORK_PATH="/home/gkyr/Work/Python_test1/lcd18_game/"
-
 LCD_SIZE=(160,128)
 IPADDR="192.168.1.17"
 TEMPER="25.5"
 HUMID="65"
 TIME="25-02-2025  12:00:00"
 
-font_nm=WORK_PATH+"Font/arialbd.ttf"
+font_nm="arialbd.ttf"
 
 disp = None
 main_img_cnt=0
 imglist = ['01','03','04','05','06','07','08','14','16','17','18','19','20']
 imgidx=0
 seconds_cnt=0
+
+picdir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'pic')
+fontdir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'Font')
 
 def get_main_img():
     global imgidx,imglist,seconds_cnt
@@ -42,18 +40,18 @@ def get_main_img():
         imgidx+=1
         if imgidx >= len(imglist):
             imgidx=0
-    image_file = WORK_PATH+"pic/Sample" + imglist[imgidx] + ".jpg"
-    img = Image.open(image_file)
+    image_name =  os.path.join(picdir, "Sample" + imglist[imgidx] + ".jpg")
+    img = Image.open(image_name)
     img = img.resize((LCD_SIZE[0], LCD_SIZE[1]), resample = Image.BILINEAR)
     return img
   
 
 def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME):
     strk1 = 1    
-    font1 = ImgFont.truetype(font_nm, 12)
-    font2 = ImgFont.truetype(font_nm, 14)
-    font3 = ImgFont.truetype(font_nm, 16)
-    font4 = ImgFont.truetype(font_nm, 24)
+    font1 = ImgFont.truetype(os.path.join(fontdir, font_nm), 12)
+    font2 = ImgFont.truetype(os.path.join(fontdir, font_nm), 14)
+    font3 = ImgFont.truetype(os.path.join(fontdir, font_nm), 16)
+    font4 = ImgFont.truetype(os.path.join(fontdir, font_nm), 24)
     posx=10
     posy=10
     #img=Image.new('RGB',LCD_SIZE,(0, 80, 255))
@@ -82,8 +80,8 @@ def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME):
 
 def draw_imageSlide():
     global imgidx,imglist    
-    image_file = WORK_PATH+"pic/Sample" + imglist[imgidx] + ".jpg"
-    img = Image.open(image_file)
+    image_name =  os.path.join(picdir, "Sample" + imglist[imgidx] + ".jpg")
+    img = Image.open(image_name)
     img = img.resize((LCD_SIZE[0], LCD_SIZE[1]), resample = Image.BILINEAR)
     imgidx+=1
     if imgidx >= len(imglist):
