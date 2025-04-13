@@ -46,31 +46,34 @@ def get_main_img():
     return img
   
 
-def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME):
+def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME,desc='IN'):
     strk1 = 1    
     font1 = ImgFont.truetype(os.path.join(fontdir, font_nm), 12)
     font2 = ImgFont.truetype(os.path.join(fontdir, font_nm), 14)
     font3 = ImgFont.truetype(os.path.join(fontdir, font_nm), 16)
-    font4 = ImgFont.truetype(os.path.join(fontdir, font_nm), 24)
+    font4 = ImgFont.truetype(os.path.join(fontdir, font_nm), 28)
     posx=10
-    posy=10
+    posy=5
     #img=Image.new('RGB',LCD_SIZE,(0, 80, 255))
     img=get_main_img()
     draw=ImgDraw.Draw(img)    
     draw.rectangle((0,0,LCD_SIZE[0]-1,LCD_SIZE[1]-1),fill=None,outline='red',width=1)    
 
     draw.text((posx,posy),'IP',fill='white',font=font3,stroke_width=strk1,stroke_fill='black')
-    draw.text((posx+40,posy),ip_addr,fill='yellow',font=font3,stroke_width=strk1,stroke_fill='black')
+    draw.text((posx+35,posy),ip_addr,fill='yellow',font=font3,stroke_width=strk1,stroke_fill='black')
 
     posy+=30
     draw.text((posx,posy),'Temperture',fill='white',font=font1,stroke_width=strk1,stroke_fill='black')
     draw.text((posx+80,posy-5),temperture,fill='red',font=font4,stroke_width=strk1,stroke_fill='white')
 
-    posy+=30
-    draw.text((posx,posy),'Humidity',fill='white',font=font1,stroke_width=strk1,stroke_fill='black')
-    draw.text((posx+80,posy-5),humidity,fill='green',font=font4,stroke_width=strk1,stroke_fill='white')
+    posy+=20
+    draw.text((posx,posy),desc,fill='cyan',font=font3,stroke_width=strk1,stroke_fill='blue')
 
-    posy+=35
+    posy+=25
+    draw.text((posx,posy),'Humidity',fill='white',font=font1,stroke_width=strk1,stroke_fill='black')
+    draw.text((posx+80,posy-10),humidity,fill='green',font=font4,stroke_width=strk1,stroke_fill='white')
+
+    posy+=25
     #draw.text((posx,posy),'Time:',fill='white',font=font1,stroke_width=strk1,stroke_fill='black')
     draw.text((posx,posy),time,fill='white',font=font2,stroke_width=strk1,stroke_fill='black')
 

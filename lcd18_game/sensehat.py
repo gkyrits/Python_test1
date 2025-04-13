@@ -29,7 +29,7 @@ def init():
         print("Error importing SenseHat: ", e.__str__())
         return    
 
-def sense_exist():
+def exist():
     if sense != None:
         return True
     else:
