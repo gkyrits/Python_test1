@@ -26,7 +26,7 @@ humid="--"
 LCD_PLAY=1
 GUI_PLAY=2
 DUAL_PLAY=3
-play_mode=DUAL_PLAY
+play_mode=LCD_PLAY
 
 SENS_IN =1
 SENS_WEB=2
@@ -108,13 +108,15 @@ def draw_image(img):
         gui.draw_lcd(img)
 
 def time_thread():
-     global exit,pause,ip_addr,sens_dscr
+     global exit,pause,humid
      while True:
         tm.sleep(1)
         if exit:
             break
         if pause:
             continue
+        if (sensor_id==SENS_HAT) and (humid=='0'):
+            weather_update()
         timestr = tm.strftime("%d-%m-%Y  %H:%M:%S")
         img=pager.draw_main(time=timestr,ip_addr=ip_addr,temperture=temper,humidity=humid,desc=sens_dscr)
         draw_image(img)
@@ -137,8 +139,11 @@ def weather_update():
        sens_dscr='IN'
        info = sens_in.get_sensor_info()
     elif sensor_id==SENS_WEB:
-        sens_dscr='OUT'
-        info = wthr.get_weather_info()
+       sens_dscr='OUT'
+       info = wthr.get_weather_info()
+    elif sensor_id==SENS_HAT:
+       sens_dscr='HAT'
+       info = hat.get_sensor_info()
     temper='{:.1f}'.format(info['Temper'])
     humid='{}'.format(info['Humidity'])
 

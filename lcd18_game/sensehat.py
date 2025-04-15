@@ -2,8 +2,9 @@ import board as brd
 import time as tm
 import threading as thrd
 
-LED_LUM	= 100
+info = {'Temper':0.0, 'Humidity':0, 'Pressure':0}
 
+LED_LUM	= 100
 sense=None
 
 def hello():
@@ -35,7 +36,22 @@ def exist():
     else:
         return False
 
-def loy_any_pressed(event):
+def get_sensor_info():
+    if sense == None:
+        return info
+    temp = sense.get_temperature()
+    print("temp="+str(temp))
+    info["Temper"]=temp
+    humid = sense.get_humidity()
+    print("humid="+str(humid))
+    info["Humidity"]=int(humid)
+    press=sense.get_pressure()
+    info["Pressure"]=int(press)
+    return info
+
+
+
+def joy_any_pressed(event):
     from sense_hat import ACTION_RELEASED
     if event.action != ACTION_RELEASED:
         brd.beep(2000)
@@ -50,7 +66,7 @@ def init_buttons():
     sense.stick.direction_left = None
     sense.stick.direction_right = None
     sense.stick.direction_middle = None
-    sense.stick.direction_any = loy_any_pressed
+    sense.stick.direction_any = joy_any_pressed
 
 if __name__ == '__main__':
     print("Start Tests")
