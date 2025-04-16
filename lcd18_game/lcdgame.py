@@ -22,6 +22,7 @@ pause=False
 ip_addr="--.--.--.--"
 temper="--"
 humid="--"
+press="--"
 
 LCD_PLAY=1
 GUI_PLAY=2
@@ -118,7 +119,7 @@ def time_thread():
         if (sensor_id==SENS_HAT) and (humid=='0'):
             weather_update()
         timestr = tm.strftime("%d-%m-%Y  %H:%M:%S")
-        img=pager.draw_main(time=timestr,ip_addr=ip_addr,temperture=temper,humidity=humid,desc=sens_dscr)
+        img=pager.draw_main(time=timestr,ip_addr=ip_addr,temperture=temper,humidity=humid,pressure=press, desc=sens_dscr)
         draw_image(img)
 #-------- End of Time Thread ---------
 
@@ -134,7 +135,7 @@ def cpuInfo_thread():
 
 #======== Weather Thread ======
 def weather_update():
-    global temper,humid,sens_dscr
+    global temper,humid,press,sens_dscr
     if sensor_id==SENS_IN:
        sens_dscr='IN'
        info = sens_in.get_sensor_info()
@@ -146,6 +147,10 @@ def weather_update():
        info = hat.get_sensor_info()
     temper='{:.1f}'.format(info['Temper'])
     humid='{}'.format(info['Humidity'])
+    if sensor_id==SENS_IN:
+        press='0'
+    else:    
+        press='{}'.format(info['Pressure'])
 
 
 def weather_thread(tmout):
@@ -203,8 +208,6 @@ hat.init()
 
 if play_mode==GUI_PLAY:
     gui = SimulateGui()
-    #img=pager.draw_main()
-    #gui.draw_lcd(img)
 elif play_mode==LCD_PLAY:
     pager.lcd_init()
 elif play_mode==DUAL_PLAY:

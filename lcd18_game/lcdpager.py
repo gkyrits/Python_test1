@@ -19,6 +19,7 @@ LCD_SIZE=(160,128)
 IPADDR="192.168.1.17"
 TEMPER="25.5"
 HUMID="65"
+PRESSUSE="1024"
 TIME="25-02-2025  12:00:00"
 
 font_nm="arialbd.ttf"
@@ -46,14 +47,14 @@ def get_main_img():
     return img
   
 
-def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME,desc='IN'):
+def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME, pressure=PRESSUSE, desc='IN'):
     strk1 = 1    
     font1 = ImgFont.truetype(os.path.join(fontdir, font_nm), 12)
     font2 = ImgFont.truetype(os.path.join(fontdir, font_nm), 14)
     font3 = ImgFont.truetype(os.path.join(fontdir, font_nm), 16)
     font4 = ImgFont.truetype(os.path.join(fontdir, font_nm), 28)
     posx=10
-    posy=5
+    posy=3
     #img=Image.new('RGB',LCD_SIZE,(0, 80, 255))
     img=get_main_img()
     draw=ImgDraw.Draw(img)    
@@ -62,19 +63,23 @@ def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME,desc='IN
     draw.text((posx,posy),'IP',fill='white',font=font3,stroke_width=strk1,stroke_fill='black')
     draw.text((posx+35,posy),ip_addr,fill='yellow',font=font3,stroke_width=strk1,stroke_fill='black')
 
-    posy+=30
-    draw.text((posx,posy),'Temperture',fill='white',font=font1,stroke_width=strk1,stroke_fill='black')
-    draw.text((posx+80,posy-5),temperture,fill='red',font=font4,stroke_width=strk1,stroke_fill='white')
+    posy+=20
+    draw.text((posx,posy),desc,fill='magenta',font=font2,stroke_width=strk1,stroke_fill='white')    
 
     posy+=20
-    draw.text((posx,posy),desc,fill='cyan',font=font3,stroke_width=strk1,stroke_fill='blue')
+    draw.text((posx,posy),'Temperture',fill='white',font=font1,stroke_width=strk1,stroke_fill='black')
+    draw.text((posx+80,posy-15),temperture,fill='red',font=font4,stroke_width=strk1,stroke_fill='white')    
 
-    posy+=25
+    posy+=22
     draw.text((posx,posy),'Humidity',fill='white',font=font1,stroke_width=strk1,stroke_fill='black')
-    draw.text((posx+80,posy-10),humidity,fill='green',font=font4,stroke_width=strk1,stroke_fill='white')
+    draw.text((posx+80,posy-8),humidity,fill='green',font=font4,stroke_width=strk1,stroke_fill='white')
+    
+    posy+=22
+    if(pressure!='0'):
+        draw.text((posx,posy),'Pressure',fill='white',font=font1,stroke_width=strk1,stroke_fill='black')
+        draw.text((posx+80,posy),pressure,fill='cyan',font=font3,stroke_width=strk1,stroke_fill='blue')
 
-    posy+=25
-    #draw.text((posx,posy),'Time:',fill='white',font=font1,stroke_width=strk1,stroke_fill='black')
+    posy+=20
     draw.text((posx,posy),time,fill='white',font=font2,stroke_width=strk1,stroke_fill='black')
 
     return img
