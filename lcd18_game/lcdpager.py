@@ -64,7 +64,7 @@ def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME, pressur
     draw.text((posx+35,posy),ip_addr,fill='yellow',font=font3,stroke_width=strk1,stroke_fill='black')
 
     posy+=20
-    draw.text((posx,posy),desc,fill='magenta',font=font2,stroke_width=strk1,stroke_fill='white')    
+    draw.text((posx,posy),desc,fill='magenta',font=font2,stroke_width=strk1,stroke_fill='black')    
 
     posy+=20
     draw.text((posx,posy),'Temperture',fill='white',font=font1,stroke_width=strk1,stroke_fill='black')

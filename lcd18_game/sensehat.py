@@ -46,6 +46,7 @@ def get_sensor_info():
     print("humid="+str(humid))
     info["Humidity"]=int(humid)
     press=sense.get_pressure()
+    print("humid="+str(press))
     info["Pressure"]=int(press)
     return info
 
