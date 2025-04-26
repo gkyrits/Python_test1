@@ -35,6 +35,9 @@ SENS_HAT=3
 sensor_id=SENS_IN
 sens_dscr="IN"
 
+gui=None
+backlight_val=50
+
 if WINDOWS:
     play_mode=GUI_PLAY
 
@@ -63,7 +66,10 @@ class SimulateGui:
         
 
     def set_backlight(self,val):
-        pager.ldc_backlight(val)
+        global backlight_val
+        print("set backlight :"+val)
+        backlight_val=int(val)
+        pager.ldc_backlight(backlight_val)
         
 
     def draw_form(self):
@@ -74,16 +80,16 @@ class SimulateGui:
         canvfrm.pack(side=tk.TOP, padx=5, pady=5)
         #toolbar Frame
         toolbar = tk.Frame(self.root, bg=self.win_col, height=20)
-        tk.Button(toolbar, text="<", command=self.key1_press).pack(side=tk.LEFT, expand=tk.YES)
-        tk.Button(toolbar, text=">", command=self.key2_press).pack(side=tk.LEFT, expand=tk.YES)   
-        tk.Button(toolbar, text="ok", command=self.key3_press).pack(side=tk.RIGHT, expand=tk.YES)
+        tk.Button(toolbar, text="1", command=self.key1_press).pack(side=tk.LEFT, expand=tk.YES)
+        tk.Button(toolbar, text="2", command=self.key2_press).pack(side=tk.LEFT, expand=tk.YES)   
+        tk.Button(toolbar, text="3", command=self.key3_press).pack(side=tk.RIGHT, expand=tk.YES)
         toolbar.pack(side=tk.TOP, fill=tk.X, pady=0)
         toolbar.pack_propagate(False)
         #Scale Frame
         scaleFrm = tk.Frame(self.root, bg=self.win_col, height=20)
-        blScale=tk.Scale(scaleFrm, to=100, orient=tk.HORIZONTAL,showvalue=0,command=lambda x :self.set_backlight(x))
-        blScale.set(50)
-        blScale.pack(side=tk.TOP, fill=tk.X, padx=2, pady=4)
+        self.blScale=tk.Scale(scaleFrm, to=100, orient=tk.HORIZONTAL,showvalue=0,command=lambda x :self.set_backlight(x))
+        self.blScale.set(backlight_val)
+        self.blScale.pack(side=tk.TOP, fill=tk.X, padx=2, pady=4)
         scaleFrm.pack(side=tk.BOTTOM, fill=tk.X)
         #scaleFrm.pack_propagate(False)
 
@@ -140,7 +146,7 @@ def weather_update():
        sens_dscr='IN'
        info = sens_in.get_sensor_info()
     elif sensor_id==SENS_WEB:
-       sens_dscr='OUT'
+       sens_dscr='WEB'
        info = wthr.get_weather_info()
     elif sensor_id==SENS_HAT:
        sens_dscr='HAT'
@@ -177,9 +183,9 @@ def key1_hw_press():
     global sensor_id
     sensor_id +=1 
     if sensor_id==SENS_HAT and not hat.exist():
-       sensor_id=SENS_IN
+        sensor_id=SENS_IN
     if sensor_id>SENS_HAT:
-       sensor_id=SENS_IN
+        sensor_id=SENS_IN
     weather_update()   
 
 
@@ -194,8 +200,23 @@ def key2_hw_press():
 def key3_hw_press():
     #print("key3 press")
     brd.beep()   
-    global pause
-    pause = False
+    global pause,backlight_val,gui
+    if pause:
+        pause = False
+    else:
+        if backlight_val < 40:
+            backlight_val += 10
+        else:    
+            backlight_val += 20
+        backlight_val = (backlight_val//10)*10
+        if backlight_val>100:
+            backlight_val=3
+        pager.ldc_backlight(backlight_val)
+        if gui != None:
+            gui.blScale.set(backlight_val)
+
+
+       
 
 #======== Main Program =========
 brd.init()

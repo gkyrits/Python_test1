@@ -44,10 +44,10 @@ def get_sensor_info():
     info["Temper"]=temp
     humid = sense.get_humidity()
     print("humid="+str(humid))
-    info["Humidity"]=int(humid)
+    info["Humidity"]=round(humid)
     press=sense.get_pressure()
     print("humid="+str(press))
-    info["Pressure"]=int(press)
+    info["Pressure"]=round(press)
     return info
 
 
