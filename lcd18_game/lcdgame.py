@@ -21,6 +21,8 @@ WINDOWS=True
 exit=False
 pause=False
 on_menu=False
+on_bklgt=False
+
 ip_addr="--.--.--.--"
 temper="--"
 humid="--"
@@ -178,34 +180,67 @@ def weather_thread(tmout):
 #-------- End of Weather Thread ---------   
 
 #======== keys =================
-def backlight_play():
-    global backlight_val,gui
-    if backlight_val < 40:
-        backlight_val += 10
-    else:    
-        backlight_val += 20
-    backlight_val = (backlight_val//10)*10
-    if backlight_val>100:
-        backlight_val=3
-    pager.ldc_backlight(backlight_val)
-    if gui != None:
-        gui.blScale.set(backlight_val)
+def backlight_show():
+    img=pager.get_curr_img()
+    img=menu.draw_slider(img, value=backlight_val, title='BackLight', color=(180, 0, 180))
+    draw_image(img)
 
-def menu_play():
+def backlight_play(dir=-1):
+    global backlight_val,gui,pause,on_bklgt
+    pause = True
+    on_bklgt = True
+    if dir == -1: #start menu
+        backlight_show()
+        return
+    elif dir == 1: #increase
+        if backlight_val < 40:
+            backlight_val += 10
+        else:    
+            backlight_val += 20
+        backlight_val = (backlight_val//10)*10
+        if backlight_val>100:
+            backlight_val=100
+    elif dir == 2: #decrease
+        if backlight_val <= 40:
+            backlight_val -= 10
+        else:    
+            backlight_val -= 20
+        if backlight_val<3:
+            backlight_val=3
+    backlight_show()         
+    pager.ldc_backlight(backlight_val)    
+    if gui != None:
+        gui.blScale.set(backlight_val)    
+
+
+def menu_play1():
     global pause,on_menu
     pause = True
     on_menu = True
     menu.reset_select()
     img=pager.get_curr_img()
     img=menu.draw_menu(img)
-    draw_image(img)      
+    draw_image(img)
+
+
+main_menu=['Select Action','BackLigit','Music','Exit']
+def menu_play():
+    global pause,on_menu
+    pause = True
+    on_menu = True
+    menu.reset_select()
+    img=pager.get_curr_img()
+    img=menu.draw_menu(img, items=main_menu)
+    draw_image(img)
 
 
 def key1_hw_press():
     #print("key1 press")    
     brd.beep()
-    global on_menu
-    if on_menu:
+    global on_menu,on_bklgt,on_bklgt
+    if on_bklgt:
+        backlight_play(2)
+    elif on_menu:
         img=menu.select_up()
         draw_image(img)
     else:    
@@ -221,8 +256,10 @@ def key1_hw_press():
 def key2_hw_press():
     #print("key2 press")
     brd.beep()
-    global on_menu
-    if on_menu:
+    global on_menu,on_bklgt
+    if on_bklgt:
+        backlight_play(1)    
+    elif on_menu:
         img=menu.select_down()
         draw_image(img)
     else:    
@@ -235,17 +272,22 @@ def key2_hw_press():
 def key3_hw_press():
     #print("key3 press")
     brd.beep()   
-    global pause,on_menu
-    if on_menu:
+    global pause,on_menu,on_bklgt
+    if on_bklgt:
+        on_bklgt = False
+        pause = False
+    elif on_menu:
          on_menu = False
          pause = False
-         print('menu sel:'+str(menu.get_select()))
+         mnu_sel=(menu.get_select())
+         print('menu sel:'+str(mnu_sel))
+         if mnu_sel == 1:
+             backlight_play(-1)
     elif pause:
         pause = False         
     else:
         #backlight_play()
         menu_play()
-
 
        
 
