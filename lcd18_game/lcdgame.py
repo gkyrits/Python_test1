@@ -2,6 +2,7 @@ import tkinter as tk
 import time as tm
 import threading as thrd
 import lcdpager as pager
+import lcdmenu as menu
 import PIL.ImageTk as ImageTk
 import board as brd
 import sensehat as hat
@@ -15,10 +16,11 @@ import ipaddr as ip
 import weather as wthr
 import si7021sense as sens_in
 
-WINDOWS=0
+WINDOWS=True
 
 exit=False
 pause=False
+on_menu=False
 ip_addr="--.--.--.--"
 temper="--"
 humid="--"
@@ -176,44 +178,73 @@ def weather_thread(tmout):
 #-------- End of Weather Thread ---------   
 
 #======== keys =================
+def backlight_play():
+    global backlight_val,gui
+    if backlight_val < 40:
+        backlight_val += 10
+    else:    
+        backlight_val += 20
+    backlight_val = (backlight_val//10)*10
+    if backlight_val>100:
+        backlight_val=3
+    pager.ldc_backlight(backlight_val)
+    if gui != None:
+        gui.blScale.set(backlight_val)
+
+def menu_play():
+    global pause,on_menu
+    pause = True
+    on_menu = True
+    menu.reset_select()
+    img=pager.get_curr_img()
+    img=menu.draw_menu(img)
+    draw_image(img)      
+
 
 def key1_hw_press():
-    #print("key1 press")
+    #print("key1 press")    
     brd.beep()
-    global sensor_id
-    sensor_id +=1 
-    if sensor_id==SENS_HAT and not hat.exist():
-        sensor_id=SENS_IN
-    if sensor_id>SENS_HAT:
-        sensor_id=SENS_IN
-    weather_update()   
+    global on_menu
+    if on_menu:
+        img=menu.select_up()
+        draw_image(img)
+    else:    
+        global sensor_id
+        sensor_id +=1 
+        if sensor_id==SENS_HAT and not hat.exist():
+            sensor_id=SENS_IN
+        if sensor_id>SENS_HAT:
+            sensor_id=SENS_IN
+        weather_update()   
 
 
 def key2_hw_press():
     #print("key2 press")
     brd.beep()
-    global pause
-    pause = True
-    img=pager.draw_imageSlide()
-    draw_image(img)    
+    global on_menu
+    if on_menu:
+        img=menu.select_down()
+        draw_image(img)
+    else:    
+        global pause
+        pause = True
+        img=pager.draw_imageSlide()
+        draw_image(img)    
+
 
 def key3_hw_press():
     #print("key3 press")
     brd.beep()   
-    global pause,backlight_val,gui
-    if pause:
-        pause = False
+    global pause,on_menu
+    if on_menu:
+         on_menu = False
+         pause = False
+         print('menu sel:'+str(menu.get_select()))
+    elif pause:
+        pause = False         
     else:
-        if backlight_val < 40:
-            backlight_val += 10
-        else:    
-            backlight_val += 20
-        backlight_val = (backlight_val//10)*10
-        if backlight_val>100:
-            backlight_val=3
-        pager.ldc_backlight(backlight_val)
-        if gui != None:
-            gui.blScale.set(backlight_val)
+        #backlight_play()
+        menu_play()
 
 
        

@@ -45,6 +45,14 @@ def get_main_img():
     img = Image.open(image_name)
     img = img.resize((LCD_SIZE[0], LCD_SIZE[1]), resample = Image.BILINEAR)
     return img
+
+
+def get_curr_img():
+    global imgidx,imglist
+    image_name =  os.path.join(picdir, "Sample" + imglist[imgidx] + ".jpg")
+    img = Image.open(image_name)
+    img = img.resize((LCD_SIZE[0], LCD_SIZE[1]), resample = Image.BILINEAR)
+    return img
   
 
 def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME, pressure=PRESSUSE, desc='IN'):
