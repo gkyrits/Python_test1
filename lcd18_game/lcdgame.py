@@ -332,6 +332,7 @@ brd.key2_func = key2_hw_press
 brd.key3_func = key3_hw_press
 brd.init_buttons()
 
+melo.init()
 hat.init()
 
 if play_mode==GUI_PLAY:
@@ -362,6 +363,7 @@ elif play_mode==LCD_PLAY:
     while True:
         tm.sleep(5)
 
+melo.close()
 brd.close()
 pager.lcd_close()
 brd.active_led(brd.ACTLD_MMC)
