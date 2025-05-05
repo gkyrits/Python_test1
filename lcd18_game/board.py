@@ -1,4 +1,5 @@
 import time as tm
+import os
 
 BUZZ_GPIO = 12
 KEY1_GPIO = 18
@@ -70,7 +71,28 @@ def init_buttons():
     pi.set_noise_filter(KEY3_GPIO, FILTER_STEADY, FILTER_ACTIVE)
     key1=pi.callback(KEY1_GPIO, pigpio.RISING_EDGE , key1_pressed)
     key2=pi.callback(KEY2_GPIO, pigpio.RISING_EDGE , key2_pressed)
-    key3=pi.callback(KEY3_GPIO, pigpio.RISING_EDGE , key3_pressed)        
+    key3=pi.callback(KEY3_GPIO, pigpio.RISING_EDGE , key3_pressed)
+
+
+ACTLD_DISABLE   = 0
+ACTLD_MMC       = 1
+ACTLD_FLASH     = 2
+ACTLD_HEARTBEAT = 3
+ACTLD_ON        = 4
+ACTLD_OFF       = 5
+def active_led(action):
+    if action == ACTLD_DISABLE:
+        os.system("echo none | sudo tee /sys/class/leds/ACT/trigger > null")
+    elif action == ACTLD_MMC:
+        os.system("echo mmc0 | sudo tee /sys/class/leds/ACT/trigger > null")
+    elif action == ACTLD_FLASH:
+        os.system("echo timer | sudo tee /sys/class/leds/ACT/trigger > null")
+    elif action == ACTLD_HEARTBEAT:
+        os.system("echo heartbeat | sudo tee /sys/class/leds/ACT/trigger > null")        
+    elif action == ACTLD_ON:
+        os.system("echo 1 | sudo tee /sys/class/leds/ACT/brightness > null")
+    elif action == ACTLD_OFF:
+        os.system("echo 0 | sudo tee /sys/class/leds/ACT/brightness > null")
 
 
 if __name__ == '__main__':

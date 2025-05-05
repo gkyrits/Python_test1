@@ -16,7 +16,7 @@ import ipaddr as ip
 import weather as wthr
 import si7021sense as sens_in
 
-WINDOWS=True
+WINDOWS=False
 
 exit=False
 pause=False
@@ -110,6 +110,8 @@ class SimulateGui:
 #======== Time Thread ========
 def draw_image(img):
     global gui
+    if backlight_val>=20:
+        brd.active_led(brd.ACTLD_ON)
     if play_mode==GUI_PLAY:
         gui.draw_lcd(img)
     elif play_mode==LCD_PLAY:
@@ -117,6 +119,8 @@ def draw_image(img):
     elif play_mode==DUAL_PLAY:        
         pager.lcd_show(img)            
         gui.draw_lcd(img)
+    if backlight_val>=20:    
+        brd.active_led(brd.ACTLD_OFF)    
 
 def time_thread():
      global exit,pause,humid
@@ -292,6 +296,7 @@ def key3_hw_press():
        
 
 #======== Main Program =========
+brd.active_led(brd.ACTLD_FLASH)
 brd.init()
 brd.key1_func = key1_hw_press
 brd.key2_func = key2_hw_press
@@ -317,6 +322,7 @@ cpu_thrd.start()
 # start wheather thread
 wether_thrd=thrd.Thread(target=weather_thread, args=(60,)) # sec update
 wether_thrd.start()
+brd.active_led(brd.ACTLD_OFF)
 
 if (play_mode==GUI_PLAY) or (play_mode==DUAL_PLAY):
     gui.run()
@@ -329,5 +335,6 @@ elif play_mode==LCD_PLAY:
 
 brd.close()
 pager.lcd_close()
+brd.active_led(brd.ACTLD_MMC)
 print("End!")
 #-------- End of Main Program ---------
