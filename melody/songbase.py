@@ -83,7 +83,7 @@ __durations_2 = (
   2, 1, 4,
   2, 1, 4,
 )
-melody_2 = ( __melody_2, __durations_2, "Richard Marx - Right Here Waiting" )
+melody_2 = ( __melody_2, __durations_2, "Right Here Waiting" )
 
 #----------------------------------------------------------------------------------------
 __melody_3 = (
@@ -140,7 +140,7 @@ __durations_3 = (
 
   2, 6, 2, 6, 2, 1
 )
-melody_3 = ( __melody_3, __durations_3, "Rick Astley - Never Gonna Give You Up" )
+melody_3 = ( __melody_3, __durations_3, "Never Gonna Give You Up" )
 
 #----------------------------------------------------------------------------------------
 __melody_4 = (
@@ -183,7 +183,7 @@ __durations_4 = (
 
   4, 4, 4, 2, 2, 1,
 )
-melody_4 = ( __melody_4, __durations_4, "Coldplay - Hymn for the weekend" )
+melody_4 = ( __melody_4, __durations_4, "Hymn for the weekend" )
 
 
 ###############################################################################

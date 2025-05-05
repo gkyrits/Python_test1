@@ -37,14 +37,17 @@ __durations = ( 4, 8, 8, 4, 4, 4, 4, 4 )
 demo_melody = ( __melody, __durations, "demo melody" )
 
 def play_melody(melody):
+    if pi == None:
+        return    
     for idx in range(len(melody[0])):
         beep(melody[TONES][idx],1000/melody[DURACTIONS][idx])
 
+
+############## main ###############
 def __next_action():
     print("1.next 2.play 3.exit")
     x = input()
     return x
-
 
 if __name__ == '__main__':
     print("Start Tests")

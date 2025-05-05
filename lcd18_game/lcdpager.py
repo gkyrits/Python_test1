@@ -72,7 +72,7 @@ def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME, pressur
     draw.text((posx+35,posy),ip_addr,fill='yellow',font=font3,stroke_width=strk1,stroke_fill='black')
 
     posy+=20
-    draw.text((posx,posy),desc,fill='magenta',font=font2,stroke_width=strk1,stroke_fill='black')    
+    draw.text((posx,posy),desc,fill='cyan',font=font2,stroke_width=strk1,stroke_fill='blue')    
 
     posy+=20
     draw.text((posx,posy),'Temperture',fill='white',font=font1,stroke_width=strk1,stroke_fill='black')
@@ -85,7 +85,7 @@ def draw_main(ip_addr=IPADDR,temperture=TEMPER,humidity=HUMID,time=TIME, pressur
     posy+=22
     if(pressure!='0'):
         draw.text((posx,posy),'Pressure',fill='white',font=font1,stroke_width=strk1,stroke_fill='black')
-        draw.text((posx+80,posy),pressure,fill='cyan',font=font3,stroke_width=strk1,stroke_fill='blue')
+        draw.text((posx+80,posy),pressure,fill='magenta',font=font3,stroke_width=strk1,stroke_fill='white') 
 
     posy+=20
     draw.text((posx,posy),time,fill='white',font=font2,stroke_width=strk1,stroke_fill='black')

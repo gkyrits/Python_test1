@@ -9,6 +9,8 @@ import sensehat as hat
 #include libdir
 import sys
 import os
+
+#import lib
 libdir = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), 'lib')
 if os.path.exists(libdir):
     sys.path.append(libdir)
@@ -16,12 +18,20 @@ import ipaddr as ip
 import weather as wthr
 import si7021sense as sens_in
 
+#import lib
+libdir = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), 'melody')
+if os.path.exists(libdir):
+    sys.path.append(libdir)
+import melody as melo
+import songbase as melobase
+
 WINDOWS=False
 
 exit=False
 pause=False
 on_menu=False
 on_bklgt=False
+on_music=False
 
 ip_addr="--.--.--.--"
 temper="--"
@@ -183,7 +193,7 @@ def weather_thread(tmout):
         tm.sleep(1)
 #-------- End of Weather Thread ---------   
 
-#======== keys =================
+#======== backlight menu =================
 def backlight_show():
     img=pager.get_curr_img()
     img=menu.draw_slider(img, value=backlight_val, title='BackLight', color=(180, 0, 180))
@@ -216,17 +226,30 @@ def backlight_play(dir=-1):
     if gui != None:
         gui.blScale.set(backlight_val)    
 
+#======== music menu =================
+def music_select(idx):
+    songlist = list(melobase.songs.keys())
+    if idx > len(songlist):
+        return
+    song=songlist[idx-1]
+    print("play song "+song)
+    melo.play_melody(melobase.songs[song])
 
-def menu_play1():
-    global pause,on_menu
+def music_play():
+    global pause,on_menu,on_music
     pause = True
     on_menu = True
+    on_music = True
+    song_menu = ['Songs']
+    for itm in melobase.songs.keys():        
+        song_menu.append(itm)
+    song_menu.append('Exit')      
     menu.reset_select()
     img=pager.get_curr_img()
-    img=menu.draw_menu(img)
-    draw_image(img)
+    img=menu.draw_menu(img, items=song_menu)
+    draw_image(img)  
 
-
+#======== main menu =================
 main_menu=['Select Action','BackLigit','Music','Exit']
 def menu_play():
     global pause,on_menu
@@ -237,7 +260,7 @@ def menu_play():
     img=menu.draw_menu(img, items=main_menu)
     draw_image(img)
 
-
+#======== keys =================
 def key1_hw_press():
     #print("key1 press")    
     brd.beep()
@@ -276,17 +299,23 @@ def key2_hw_press():
 def key3_hw_press():
     #print("key3 press")
     brd.beep()   
-    global pause,on_menu,on_bklgt
+    global pause,on_menu,on_bklgt,on_music
     if on_bklgt:
         on_bklgt = False
         pause = False
     elif on_menu:
-         on_menu = False
-         pause = False
-         mnu_sel=(menu.get_select())
-         print('menu sel:'+str(mnu_sel))
-         if mnu_sel == 1:
-             backlight_play(-1)
+        on_menu = False
+        pause = False
+        mnu_sel=(menu.get_select())
+        print('menu sel:'+str(mnu_sel))
+        if on_music:
+            on_music=False
+            music_select(mnu_sel)            
+        else:
+            if mnu_sel == 1:
+                backlight_play(-1)
+            elif mnu_sel == 2:
+                music_play()
     elif pause:
         pause = False         
     else:

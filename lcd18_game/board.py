@@ -81,6 +81,8 @@ ACTLD_HEARTBEAT = 3
 ACTLD_ON        = 4
 ACTLD_OFF       = 5
 def active_led(action):
+    if pi == None:
+        return     
     if action == ACTLD_DISABLE:
         os.system("echo none | sudo tee /sys/class/leds/ACT/trigger > null")
     elif action == ACTLD_MMC:
