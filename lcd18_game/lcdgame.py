@@ -31,7 +31,9 @@ exit=False
 pause=False
 on_menu=False
 on_bklgt=False
+on_music_mnu=False
 on_song_mnu=False
+on_song_vol_mnu=False
 
 ip_addr="--.--.--.--"
 temper="--"
@@ -226,7 +228,7 @@ def backlight_play(dir=-1):
     if gui != None:
         gui.blScale.set(backlight_val)    
 
-#======== music menu =================
+#======== song menu =================
 def song_select(idx):
     songlist = list(melobase.songs.keys())
     if idx > len(songlist):
@@ -236,45 +238,88 @@ def song_select(idx):
     melo.play_melody(melobase.songs[song])
 
 def song_play():
-    global pause,on_menu,on_song_mnu
-    pause = True
-    on_menu = True
+    global on_song_mnu
     on_song_mnu = True
     song_menu = ['Songs']
     for itm in melobase.songs.keys():        
         song_menu.append(itm)
     song_menu.append('Exit')      
-    menu.reset_select()
-    img=pager.get_curr_img()
+    img=menu_reset()
     img=menu.draw_menu(img, items=song_menu)
     draw_image(img)  
 
+#======== song volume menu ==============
+song_vol_menu=['Volume','Normal','Midium','Low','Exit']
+def song_volume_play():
+    global on_song_vol_mnu    
+    on_song_vol_mnu = True    
+    img=menu_reset()
+    img=menu.draw_menu(img, items=song_vol_menu)
+    draw_image(img)    
+
+def song_volume_select(idx):
+    if idx>3:
+        return
+    print("play volume "+str(idx))
+
+#-------- music menu -------------
+music_menu=['Music','Songs','Volume','Exit']
+def music_play():
+    global on_music_mnu    
+    on_music_mnu = True    
+    img=menu_reset()
+    img=menu.draw_menu(img, items=music_menu)
+    draw_image(img)
+
+def music_select(idx):
+    if idx == 1:
+        song_play()
+    elif idx == 2:
+        song_volume_play()        
+
+
 #======== main menu =================
-main_menu=['Select Action','BackLigit','Music','Exit']
-def menu_play():
+def menu_reset():
     global pause,on_menu
     pause = True
     on_menu = True
     menu.reset_select()
     img=pager.get_curr_img()
+    return img
+
+
+main_menu=['Select Action','BackLigit','Music','Exit']
+def menu_play():
+    img=menu_reset()
     img=menu.draw_menu(img, items=main_menu)
     draw_image(img)
 
 
+def menu_select(idx):
+    if idx == 1:
+        backlight_play(-1)
+    elif idx == 2:
+        music_play()  
+
+
 def menu_select_key():
-    global pause,on_menu,on_song_mnu
+    global pause,on_menu
+    global on_song_vol_mnu,on_song_mnu,on_music_mnu
     on_menu = False
     pause = False
     mnu_sel=(menu.get_select())
     print('menu sel:'+str(mnu_sel))
-    if on_song_mnu:
+    if on_music_mnu:
+        on_music_mnu=False
+        music_select(mnu_sel)     
+    elif on_song_mnu:
         on_song_mnu=False
-        song_select(mnu_sel)            
+        song_select(mnu_sel)
+    elif on_song_vol_mnu:
+        on_song_vol_mnu=False
+        song_volume_select(mnu_sel)        
     else:
-        if mnu_sel == 1:
-            backlight_play(-1)
-        elif mnu_sel == 2:
-            song_play()    
+        menu_select(mnu_sel)
 
 #======== keys =================
 def key1_hw_press():
