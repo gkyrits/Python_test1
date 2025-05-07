@@ -249,7 +249,7 @@ def song_play():
     draw_image(img)  
 
 #======== song volume menu ==============
-song_vol_menu=['Volume','Normal','Midium','Low','Exit']
+song_vol_menu=['Volume','Normal','Medium','Low','Exit']
 def song_volume_play():
     global on_song_vol_mnu    
     on_song_vol_mnu = True    
@@ -257,10 +257,13 @@ def song_volume_play():
     img=menu.draw_menu(img, items=song_vol_menu)
     draw_image(img)    
 
+
 def song_volume_select(idx):
     if idx>3:
         return
-    print("play volume "+str(idx))
+    vol_value=['normal','medium','low']
+    melo.melody_volume(vol_value[idx-1])
+    print("play volume "+vol_value[idx-1])
 
 #-------- music menu -------------
 music_menu=['Music','Songs','Volume','Exit']

@@ -5,8 +5,10 @@ import songbase as base
 BUZZ_GPIO = 12
 pi=None
 
-VOL_MAX = 500000
-VOL_LOW = 2000
+VOL_NORMAL = 500000
+VOL_MEDIUM = 10000
+VOL_LOW    = 2000
+song_volume = VOL_NORMAL
 
 def init():
     global pi
@@ -26,7 +28,7 @@ def beep(freq=600, time=100):
     if pi == None:
         return
     delay=time/1000
-    pi.hardware_PWM(BUZZ_GPIO, freq, VOL_LOW)
+    pi.hardware_PWM(BUZZ_GPIO, freq, song_volume)
     tm.sleep(delay)
     pi.hardware_PWM(BUZZ_GPIO, 0, 0)
 
@@ -41,6 +43,19 @@ def play_melody(melody):
         return    
     for idx in range(len(melody[0])):
         beep(melody[TONES][idx],1000/melody[DURACTIONS][idx])
+
+
+def melody_volume(volume):
+    global song_volume
+    if volume == 'low':
+        song_volume = VOL_LOW
+    elif volume == 'medium':
+        song_volume = VOL_MEDIUM
+    elif volume == 'normal':
+        song_volume = VOL_NORMAL
+    else:
+        print("Volume not set, using normal volume")
+        song_volume = VOL_NORMAL       
 
 
 ############## main ###############
