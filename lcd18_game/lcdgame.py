@@ -31,7 +31,7 @@ exit=False
 pause=False
 on_menu=False
 on_bklgt=False
-on_music=False
+on_song_mnu=False
 
 ip_addr="--.--.--.--"
 temper="--"
@@ -41,7 +41,7 @@ press="--"
 LCD_PLAY=1
 GUI_PLAY=2
 DUAL_PLAY=3
-play_mode=LCD_PLAY
+play_mode=GUI_PLAY
 
 SENS_IN =1
 SENS_WEB=2
@@ -227,7 +227,7 @@ def backlight_play(dir=-1):
         gui.blScale.set(backlight_val)    
 
 #======== music menu =================
-def music_select(idx):
+def song_select(idx):
     songlist = list(melobase.songs.keys())
     if idx > len(songlist):
         return
@@ -235,11 +235,11 @@ def music_select(idx):
     print("play song "+song)
     melo.play_melody(melobase.songs[song])
 
-def music_play():
-    global pause,on_menu,on_music
+def song_play():
+    global pause,on_menu,on_song_mnu
     pause = True
     on_menu = True
-    on_music = True
+    on_song_mnu = True
     song_menu = ['Songs']
     for itm in melobase.songs.keys():        
         song_menu.append(itm)
@@ -260,11 +260,27 @@ def menu_play():
     img=menu.draw_menu(img, items=main_menu)
     draw_image(img)
 
+
+def menu_select_key():
+    global pause,on_menu,on_song_mnu
+    on_menu = False
+    pause = False
+    mnu_sel=(menu.get_select())
+    print('menu sel:'+str(mnu_sel))
+    if on_song_mnu:
+        on_song_mnu=False
+        song_select(mnu_sel)            
+    else:
+        if mnu_sel == 1:
+            backlight_play(-1)
+        elif mnu_sel == 2:
+            song_play()    
+
 #======== keys =================
 def key1_hw_press():
     #print("key1 press")    
     brd.beep()
-    global on_menu,on_bklgt,on_bklgt
+    global on_menu,on_bklgt
     if on_bklgt:
         backlight_play(2)
     elif on_menu:
@@ -299,27 +315,15 @@ def key2_hw_press():
 def key3_hw_press():
     #print("key3 press")
     brd.beep()   
-    global pause,on_menu,on_bklgt,on_music
+    global pause,on_menu,on_bklgt
     if on_bklgt:
         on_bklgt = False
         pause = False
     elif on_menu:
-        on_menu = False
-        pause = False
-        mnu_sel=(menu.get_select())
-        print('menu sel:'+str(mnu_sel))
-        if on_music:
-            on_music=False
-            music_select(mnu_sel)            
-        else:
-            if mnu_sel == 1:
-                backlight_play(-1)
-            elif mnu_sel == 2:
-                music_play()
+        menu_select_key()
     elif pause:
         pause = False         
     else:
-        #backlight_play()
         menu_play()
 
        
