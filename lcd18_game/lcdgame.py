@@ -43,7 +43,7 @@ press="--"
 LCD_PLAY=1
 GUI_PLAY=2
 DUAL_PLAY=3
-play_mode=GUI_PLAY
+play_mode=LCD_PLAY
 
 SENS_IN =1
 SENS_WEB=2
@@ -235,7 +235,8 @@ def song_select(idx):
         return
     song=songlist[idx-1]
     print("play song "+song)
-    melo.play_melody(melobase.songs[song])
+    #melo.play_melody(melobase.songs[song])
+    thrd.Thread(target=lambda sng=melobase.songs[song] :melo.play_melody(sng,1) ).start()
 
 def song_play():
     global on_song_mnu

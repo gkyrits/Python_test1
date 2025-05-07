@@ -38,12 +38,14 @@ __melody = ( NOTE_C4, NOTE_G3, NOTE_G3, NOTE_A3, NOTE_G3, 0, NOTE_B3, NOTE_C4 )
 __durations = ( 4, 8, 8, 4, 4, 4, 4, 4 )
 demo_melody = ( __melody, __durations, "demo melody" )
 
-def play_melody(melody):
+def play_melody(melody,loop=1):
     if pi == None:
-        return    
-    for idx in range(len(melody[0])):
-        beep(melody[TONES][idx],1000/melody[DURACTIONS][idx])
-
+        return
+    for x in range(loop):
+        print("loop:"+str(x+1))
+        for idx in range(len(melody[0])):
+            beep(melody[TONES][idx],1000/melody[DURACTIONS][idx])            
+    print("melody end")
 
 def melody_volume(volume):
     global song_volume
