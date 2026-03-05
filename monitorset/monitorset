@@ -1,0 +1,4 @@
+#!/bin/bash
+
+cd /home/gkyr/Work/Python_test1/monitorset
+python monitorset.py
