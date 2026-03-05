@@ -4,7 +4,8 @@ import PIL.ImageDraw as ImgDraw
 import PIL.ImageFont as ImgFont
 
 img_size=(160,128)
-font_nm="arialbd.ttf"
+#font_nm="arialbd.ttf"
+font_nm="FreeSerif.ttf"
 
 ip_addr="192.168.1.17"
 temperture="25.5"
@@ -65,5 +66,6 @@ def test2():
 
 
 if __name__ == '__main__':
-    print_fonts()
-    #test2()
+    #print_fonts()
+    #test1()
+    test2()
