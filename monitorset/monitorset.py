@@ -53,7 +53,7 @@ class MonitorSet:
         val = self.val_to_255(int(val))
         print("Brightness:",val)
         try:
-            proc.run(["brightnessctl","set","{}%".format(val)])
+            proc.run(["brightnessctl","set","{}".format(val)])
         except:
             print("Error occurred while setting brightness")
 
