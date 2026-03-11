@@ -1,8 +1,34 @@
 import tkinter as tk
 import time as tm
 import threading as thrd
+import sys
+import io
 
 APP_TITLE = "Cam Play"
+
+demo_obj  = [{'name':'alfa','number':3},{'name':'bhta','number':10,'id':1}]
+demo2_obj = ({'name':'alfa','number':3},{'name':'bhta','number':10,'id':1})
+
+#print a dictionary list
+def pprint(obj, indent=0, out=sys.stdout):
+    """Pretty-print a dictionary, list, or nested structure to the console."""
+    space = ' ' * indent
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            print(f"{space}{key}:", end=' ', file=out)
+            if isinstance(value, (dict, list, tuple)):
+                print("", file=out)
+                pprint(value, indent + 2, out)
+            else:
+                print(value, file=out)
+    elif isinstance(obj, (list, tuple)):
+        for i, item in enumerate(obj, start=1):
+            print(f"{space}[{i}]", file=out)
+            pprint(item, indent + 2, out)
+    else:
+        print(space + str(obj), file=out)
+
+
 
 class main_win:
     def __init__(self,title):
@@ -30,8 +56,11 @@ class main_win:
         text.configure(yscrollcommand=scroll.set)
         #...
         text.insert(tk.END, "some text ...\n")
-        for x in range(30) :
-            text.insert(tk.END, "line "+str(x)+" !\n")
+        #for x in range(30) :
+        #    text.insert(tk.END, "line "+str(x)+" !\n")
+        txt = io.StringIO('')
+        pprint(demo_obj, out=txt)
+        text.insert(tk.END, txt.getvalue())
         text.config(state=tk.DISABLED)
         #...
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
@@ -47,6 +76,9 @@ class main_win:
 #main function
 if __name__ == '__main__':
     print(APP_TITLE+" start...")
+    txt = io.StringIO('')
+    pprint(demo2_obj, out=txt)
+    print(txt.getvalue(), end='')
     win=main_win(APP_TITLE+" V0.1")
     #...
     win.run()
