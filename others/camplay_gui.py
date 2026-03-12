@@ -1,4 +1,5 @@
 import tkinter as tk
+import Pmw as tk2
 import time as tm
 import threading as thrd
 import sys
@@ -33,36 +34,31 @@ def pprint(obj, indent=0, out=sys.stdout):
 class main_win:
     def __init__(self,title):
         self.root = tk.Tk()
+        tk2.initialise(self.root)
         self.root.title(title)
         self.root.geometry("400x200+20+50")
-        #add buttons_frm
+        #add buttons_frm ======
         frm2=tk.Frame(self.root)
         tk.Button(frm2, text="Update").pack(side=tk.LEFT, padx=5)
-        tk.Button(frm2, text="Open Cam").pack(side=tk.LEFT, padx=5)
-        #add cam ListBox
-        cbx = tk.Listbox(frm2, height=1, width=3)
-        cbx_scrl = tk.Scrollbar(frm2, command=cbx.yview)
-        cbx.configure(yscrollcommand=cbx_scrl.set)
+        tk.Button(frm2, text="Open").pack(side=tk.LEFT, padx=5)
+        #add cam ListBox ------
+        cbx_entries = ('cam 1','cam 2','cam 3')
+        cbx = tk2.ComboBox(frm2, label_text='Cam:', labelpos='w', listheight=60, dropdown=1, scrolledlist_items=cbx_entries)
+        cbx.selectitem(cbx_entries[0])
         cbx.pack(side=tk.LEFT)
-        cbx_scrl.pack(side=tk.RIGHT, fill=tk.Y)
-        for item in range(3):
-            cbx.insert(tk.END, item)
         frm2.pack(side=tk.BOTTOM, anchor=tk.W, pady=5)
-        #add text_frm
+        #add text_frm ======
         tk.Label(self.root, text="Available Cameras").pack(side=tk.TOP)
         frm1=tk.Frame(self.root, relief=tk.GROOVE,  borderwidth=2)                
         text=tk.Text(frm1, height=30)
         scroll = tk.Scrollbar(frm1, command=text.yview)
         text.configure(yscrollcommand=scroll.set)
-        #...
-        text.insert(tk.END, "some text ...\n")
-        #for x in range(30) :
-        #    text.insert(tk.END, "line "+str(x)+" !\n")
-        txt = io.StringIO('')
-        pprint(demo_obj, out=txt)
-        text.insert(tk.END, txt.getvalue())
+        #fill text info
+        txtio = io.StringIO('')
+        pprint(demo_obj, out=txtio)
+        text.insert(tk.END, txtio.getvalue())
         text.config(state=tk.DISABLED)
-        #...
+        #pack frm1
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
         text.pack(side=tk.LEFT,fill=tk.BOTH)        
         frm1.pack(side=tk.TOP,fill=tk.X)
@@ -75,10 +71,10 @@ class main_win:
 
 #main function
 if __name__ == '__main__':
-    print(APP_TITLE+" start...")
-    txt = io.StringIO('')
-    pprint(demo2_obj, out=txt)
-    print(txt.getvalue(), end='')
+    print(APP_TITLE+" start...")    
+    txtio = io.StringIO('')
+    pprint(demo2_obj, out=txtio)
+    print(txtio.getvalue(), end='')
     win=main_win(APP_TITLE+" V0.1")
     #...
     win.run()
