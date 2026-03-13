@@ -2,22 +2,14 @@ import tkinter as tk
 import Pmw as tk2
 import time as tm
 import threading as thrd
-import sys
-import io
+import sys, io
+
+from picamera2_sim import Picamera2
+
 
 APP_TITLE = "Cam Play"
 
-cameras_obj  = [{'Model': 'ov5647', 'Location': 2, 'Rotation': 0, 'Id': '/base/soc/i2c0mux/i2c@1/ov5647@36', 'Num': 0}, {'Model': 'UVC Camera (046d:0825)', 'Location': 0, 'Id': '/base/soc/usb@7e980000/usb1@1-1.5:1.0-046d:0825', 'Num': 2}, {'Model': 'USB2.0 PC CAMERA', 'Location': 0, 'Id': '/base/soc/usb@7e980000/usb1@1-1.4:1.0-18ec:3299', 'Num': 1}]
-
-cam1_prop_obj = {'Model': 'ov5647', 'UnitCellSize': (1400, 1400), 'Location': 2, 'Rotation': 0, 'PixelArraySize': (2592, 1944), 'ColorFilterArrangement': 2, 'PixelArrayActiveAreas': [(16, 6, 2592, 1944)], 'ScalerCropMaximum': (0, 0, 0, 0), 'SystemDevices': (20749, 20737, 20738, 20739)}
-cam1_sens_obj = [{'format': 'SGBRG10_CSI2P', 'unpacked': 'SGBRG10', 'bit_depth': 10, 'size': (640, 480), 'fps': 58.92, 'crop_limits': (16, 0, 2560, 1920), 'exposure_limits': (134, 4879289, 20000)}, {'format': 'SGBRG10_CSI2P', 'unpacked': 'SGBRG10', 'bit_depth': 10, 'size': (1296, 972), 'fps': 46.34, 'crop_limits': (0, 0, 2592, 1944), 'exposure_limits': (86, 3066985, 20000)}, {'format': 'SGBRG10_CSI2P', 'unpacked': 'SGBRG10', 'bit_depth': 10, 'size': (1920, 1080), 'fps': 32.81, 'crop_limits': (348, 434, 1928, 1080), 'exposure_limits': (110, 3066979, 20000)}, {'format': 'SGBRG10_CSI2P', 'unpacked': 'SGBRG10', 'bit_depth': 10, 'size': (2592, 1944), 'fps': 15.63, 'crop_limits': (0, 0, 2592, 1944), 'exposure_limits': (130, 3066985, 20000)}]
-
-cam2_prop_obj = {'Model': 'UVC Camera (046d:0825)', 'Location': 0, 'PixelArraySize': (1280, 960), 'PixelArrayActiveAreas': [(0, 0, 1280, 960)], 'SystemDevices': (20753,)}
-com2_sens_obj = [{'format': 'MJPEG'}, {'format': 'YUYV'}] 
-
-cam3_prop_obj = {'Model': 'USB2.0 PC CAMERA', 'Location': 0, 'PixelArraySize': (640, 480), 'PixelArrayActiveAreas': [(0, 0, 640, 480)], 'SystemDevices': (20751,)}
-cam3_sens_obs = [{'format': 'YUYV'}]
-
+##############################################################################################
 #print a dictionary list
 def pprint(obj, indent=0, out=sys.stdout):
     """Pretty-print a dictionary, list, or nested structure to the console."""
@@ -25,12 +17,12 @@ def pprint(obj, indent=0, out=sys.stdout):
     if isinstance(obj, dict):
         for key, value in obj.items():
             print(f"{space}{key}:", end=' ', file=out)
-            if isinstance(value, (dict, list, tuple)):
+            if isinstance(value, (dict, list)):
                 print("", file=out)
                 pprint(value, indent + 2, out)
             else:
                 print(value, file=out)
-    elif isinstance(obj, (list, tuple)):
+    elif isinstance(obj, (list)):
         for i, item in enumerate(obj, start=1):
             print(f"{space}[{i}]", file=out)
             pprint(item, indent + 2, out)
@@ -38,52 +30,97 @@ def pprint(obj, indent=0, out=sys.stdout):
         print(space + str(obj), file=out)
 
 
-
+##############################################################################################
 class main_win:
-    def __init__(self,title):
+
+    def __init__(self,caminfo_obj):
         self.root = tk.Tk()
         tk2.initialise(self.root)
-        self.root.title(title)
+        self.root.title(APP_TITLE)
         self.root.geometry("400x200+20+50")
         #add buttons_frm ======
         frm2=tk.Frame(self.root)
-        tk.Button(frm2, text="Update").pack(side=tk.LEFT, padx=5)
-        tk.Button(frm2, text="Open").pack(side=tk.LEFT, padx=5)
+        tk.Button(frm2, text="Update", command=self.__update_btn).pack(side=tk.LEFT, padx=5)
+        tk.Button(frm2, text="Open", command=self.__open_btn).pack(side=tk.LEFT, padx=5)
         #add cam ListBox ------
         cbx_entries = ('cam 1','cam 2','cam 3')
         cbx = tk2.ComboBox(frm2, label_text='Cam:', labelpos='w', listheight=60, dropdown=1, scrolledlist_items=cbx_entries)
         cbx.selectitem(cbx_entries[0])
         cbx.pack(side=tk.LEFT)
         frm2.pack(side=tk.BOTTOM, anchor=tk.W, pady=5)
-        #add text_frm ======
-        tk.Label(self.root, text="Available Cameras").pack(side=tk.TOP)
+        #add test frm ======
+        self._TEXT_LABEL = "Available Cameras"
+        self.__add_ScrolledText_frame(caminfo_obj)
+
+
+    #draw text frame using tk.Text
+    def __add_text_frame(self,view_obj):
+        tk.Label(self.root, text=self._TEXT_LABEL).pack(side=tk.TOP)
         frm1=tk.Frame(self.root, relief=tk.GROOVE,  borderwidth=2)                
-        text=tk.Text(frm1, height=30)
-        scroll = tk.Scrollbar(frm1, command=text.yview)
-        text.configure(yscrollcommand=scroll.set)
+        self.text=tk.Text(frm1, height=30)
+        scroll = tk.Scrollbar(frm1, command=self.text.yview)
+        self.text.configure(yscrollcommand=scroll.set)
         #fill text info
         txtio = io.StringIO('')
-        pprint(cameras_obj, out=txtio)
-        text.insert(tk.END, txtio.getvalue())
-        text.config(state=tk.DISABLED)
+        pprint(view_obj, out=txtio)
+        self.text.insert(tk.END, txtio.getvalue())
+        self.text.config(state=tk.DISABLED)
         #pack frm1
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        text.pack(side=tk.LEFT,fill=tk.BOTH)        
-        frm1.pack(side=tk.TOP,fill=tk.X)
+        self.text.pack(side=tk.LEFT,fill=tk.BOTH)        
+        frm1.pack(side=tk.TOP,fill=tk.BOTH, expand=1)
 
+
+    #draw text frame using Pmw.ScrolledText
+    def __add_ScrolledText_frame(self,view_obj):
+        frm1=tk.Frame(self.root, relief=tk.GROOVE,  borderwidth=2)
+        self.text = tk2.ScrolledText(frm1, borderframe=0, labelpos=tk.N, label_text=self._TEXT_LABEL, usehullsize=0,
+            text_padx=5, text_pady=5, text_wrap='none')
+        #fill text info
+        txtio = io.StringIO('')
+        pprint(view_obj, out=txtio)
+        self.text.settext(txtio.getvalue())
+        self.text.configure(text_state = 'disabled')
+        #pack frm1                
+        self.text.pack(fill=tk.BOTH, expand=1, padx=5, pady=5)
+        frm1.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
+
+    def __update_btn(self):
+        print('update button')        
+        txtio = io.StringIO('')
+        info = Picamera2._cam1_sens_obj
+        pprint(info, out=txtio)
+        if isinstance(self.text, tk2.ScrolledText):
+            self.text.clear()
+            self.text.settext(txtio.getvalue())
+            self.text.configure(text_state = 'disabled')
+        elif isinstance(self.text, tk.Text):
+            self.text.config(state=tk.NORMAL)
+            self.text.delete('1.0', tk.END)
+            self.text.insert(tk.END, txtio.getvalue())
+            self.text.config(state=tk.DISABLED)
+
+
+
+    def __open_btn(self):
+        print('open button')        
 
 
     def run(self):
         self.root.mainloop() 
 
-
+##############################################################################################
 #main function
 if __name__ == '__main__':
-    print(APP_TITLE+" start...")    
+    print(APP_TITLE+" start...")
+    camera_info = Picamera2.global_camera_info()
+    #test pprint camera_info
     txtio = io.StringIO('')
-    pprint(cam1_sens_obj, out=txtio)
+    pprint(camera_info, out=txtio)
     print(txtio.getvalue(), end='')
-    win=main_win(APP_TITLE+" V0.1")
+    #open Gui
+    win=main_win(camera_info)
     #...
     win.run()
     print("End")
