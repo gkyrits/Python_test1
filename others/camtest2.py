@@ -28,7 +28,7 @@ pprint(Picamera2.global_camera_info())
 print("\n=====================\n")
 print("\n")
 
-picam = Picamera2(2)
+picam = Picamera2(0)
 
 print("===== Camera Properties: ====\n")
 pprint(picam.camera_properties)
