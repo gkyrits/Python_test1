@@ -11,10 +11,18 @@ _com2_sens_obj = [{'format': 'MJPEG'}, {'format': 'YUYV'}]
 _cam3_prop_obj = {'Model': 'USB2.0 PC CAMERA', 'Location': 0, 'PixelArraySize': (640, 480), 'PixelArrayActiveAreas': [(0, 0, 640, 480)], 'SystemDevices': (20751,)}
 _cam3_sens_obs = [{'format': 'YUYV'}]
 
+_call_cnt=0
 
 def global_camera_info():
-    return _cameras_obj
-
-
-
+    global _call_cnt
+    _call_cnt += 1
+    if _call_cnt == 1:
+        return _cameras_obj
+    elif _call_cnt == 2:
+        return [_cameras_obj[0]]
+    elif _call_cnt == 3:
+        return _cameras_obj[0:2]
+    elif _call_cnt == 4:
+        _call_cnt=0
+        return [_cameras_obj[0]] + [_cameras_obj[2]]
 
