@@ -33,10 +33,11 @@ def pprint(obj, indent=0, pre='', out=sys.stdout):
 
 ##############################################################################################
 class main_win:
+    _TEXT_LABEL = "Available Cameras"
+    _CAM_INF_PRE = "cam "    
+    _cam_insts = [None,None,None,None]
 
     def __init__(self,cam_info):
-        self._TEXT_LABEL = "Available Cameras"
-        self._CAM_INF_PRE = "cam "
         self.curr_caminfo = cam_info
         ####
         self.root = tk.Tk()
@@ -119,18 +120,69 @@ class main_win:
 
 
 
-    def __open_btn(self):
+    def __open_btn(self):        
         print('\nopen button:')
         cbxIdx = self.cbx.component('scrolledlist').curselection()[0]
+        if cbxIdx > len(self._cam_insts) :
+            print('Too many comeras')
+            return
         print('Select idx:'+str(cbxIdx))
         cam_model =  self.curr_caminfo[cbxIdx]['Model']
         print('Select Model:'+cam_model)
         cam_num = self.curr_caminfo[cbxIdx]['Num']
         print('Select Cam Num:'+str(cam_num))
+        if self._cam_insts[cbxIdx] != None:
+            print(f'cam_insts {cbxIdx} aleary Open!')
+            self._cam_insts[cbxIdx].on_top()
+            return
+        self._cam_insts[cbxIdx] = camera_win(cbxIdx, cam_model, cam_num)
 
 
     def run(self):
-        self.root.mainloop() 
+        self.root.mainloop()
+
+##############################################################################################        
+class camera_win:
+    def __init__(self, idx, cam_model, cam_num):
+        self.idx = idx
+        self.cam_num = cam_num
+        print(f'Open cam_insts {self.idx}')
+        self.win = tk.Toplevel()
+        self.win.title(cam_model)
+        self.win.geometry("400x290+150+100")
+        self.win.resizable(0,0)
+        self.win.bind('<Destroy>',self.__close_win)
+        #left butt form
+        leftfrm = tk.Frame(self.win)
+        tk.Button(leftfrm, text="Info", command=self.__info_btn, width=5).pack(side=tk.TOP, padx=2)
+        tk.Button(leftfrm, text="Modes",  command=self.__modes_btn, width=5).pack(side=tk.TOP, padx=2)
+        leftfrm.pack(side=tk.LEFT, fill=tk.Y, pady=4)
+        #image form
+        canvfrm = tk.Frame(self.win, relief=tk.GROOVE,  borderwidth=2)
+        self.canvas = tk.Canvas(canvfrm, bg="lightgray", width=320, height=240)
+        self.canvas.pack(fill=tk.BOTH, expand=tk.YES)
+        canvfrm.pack(side=tk.TOP, padx=4, pady=4)
+        #bottom butt form
+        botfrm = tk.Frame(self.win)
+        tk.Button(botfrm, text="Foto").pack(side=tk.LEFT, padx=2)
+        tk.Button(botfrm, text="Start Rec").pack(side=tk.LEFT, padx=2)
+        botfrm.pack(side=tk.BOTTOM, fill=tk.X, pady=4)
+
+
+    def __close_win(self,e):
+        global mainWin
+        print(f'Close cam_insts {self.idx}')
+        mainWin._cam_insts[self.idx] = None
+
+    def __info_btn(self):
+        print(f"info butt [{self.cam_num}]")
+
+    def __modes_btn(self):
+        print(f"modes butt [{self.cam_num}]")
+
+    def on_top(self):
+        self.win.lift()
+
 
 ##############################################################################################
 #test print cam infos
@@ -141,12 +193,13 @@ def test_print(camera_info):
 
 #main function
 if __name__ == '__main__':
+    global mainWin
     print(APP_TITLE+" start...")   
     #get cameras info 
     camera_info = Picamera2.global_camera_info()
     #test_print(camera_info)
     #open Gui
-    win=main_win(camera_info)            
+    mainWin=main_win(camera_info)            
     #...
-    win.run()
+    mainWin.run()
     print("End")
