@@ -61,7 +61,7 @@ class main_win:
     #draw text frame using tk.Text
     def __add_text_frame(self,view_obj):
         tk.Label(self.root, text=self._TEXT_LABEL).pack(side=tk.TOP)
-        frm1=tk.Frame(self.root, relief=tk.GROOVE,  borderwidth=2)                
+        frm1=tk.Frame(self.root, relief=tk.GROOVE,  borderwidth=2)
         self.text=tk.Text(frm1, height=30)
         scroll = tk.Scrollbar(frm1, command=self.text.yview)
         self.text.configure(yscrollcommand=scroll.set)
@@ -89,6 +89,7 @@ class main_win:
         #pack frm1                
         self.text.pack(fill=tk.BOTH, expand=1, padx=1, pady=1)
         frm1.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
 
     def __get_list_items(self,view_obj,pre):
         items = ()
@@ -143,10 +144,18 @@ class main_win:
 
 ##############################################################################################        
 class camera_win:
+    INFO_PROP_ID = 0
+    INFO_SENSOR_ID = 1
+
     def __init__(self, idx, cam_model, cam_num):
         self.idx = idx
         self.cam_num = cam_num
+        self.cam_model = cam_model
+        self.propInf_win = None
+        self.sensorInf_win = None
         print(f'Open cam_insts {self.idx}')
+        self.picam = Picamera2(cam_num)
+        #build window
         self.win = tk.Toplevel()
         self.win.title(cam_model)
         self.win.geometry("400x290+150+100")
@@ -176,19 +185,76 @@ class camera_win:
 
     def __info_btn(self):
         print(f"info butt [{self.cam_num}]")
+        if self.propInf_win == None:
+            self.propInf_win = info_win(self,self.cam_model,self.picam.camera_properties,self.INFO_PROP_ID)
+        else:
+            print(f"info [{self.cam_model}] already Open!")
+            self.propInf_win.on_top()
+                
 
     def __modes_btn(self):
-        print(f"modes butt [{self.cam_num}]")
+        print(f"Modes butt [{self.cam_num}]")
+        if self.sensorInf_win == None:
+            self.sensorInf_win = info_win(self,self.cam_model,self.picam.sensor_modes,self.INFO_SENSOR_ID)
+        else:
+            print(f"Modes [{self.cam_model}] already Open!")
+            self.sensorInf_win.on_top()        
 
     def on_top(self):
         self.win.lift()
+
+    def close(self):
+        self.win.destroy()
+
+##############################################################################################
+class info_win:
+
+    def __init__(self, parent, model, info, id):
+        self.parent = parent
+        self.model = model
+        if id == camera_win.INFO_PROP_ID:
+            self.label = 'Properties'
+        elif id == camera_win.INFO_SENSOR_ID:
+            self.label = 'Sensor Modes'
+        self.win = tk.Toplevel()
+        self.win.title(model+" "+self.label)
+        self.win.geometry("400x200+200+150")
+        self.win.bind('<Destroy>',self.__close_win)
+        self.__add_ScrolledText_frame(info)
+
+
+    def __add_ScrolledText_frame(self,view_obj):
+        frm1=tk.Frame(self.win, relief=tk.GROOVE,  borderwidth=2)
+        self.text = tk2.ScrolledText(frm1, borderframe=0, labelpos=tk.N, label_text=self.label, usehullsize=0,
+            text_padx=5, text_pady=5, text_wrap='none')
+        #fill text info
+        txtio = io.StringIO('')
+        pprint(view_obj, out=txtio)
+        self.text.settext(txtio.getvalue())
+        self.text.configure(text_state = 'disabled')
+        #pack frm1                
+        self.text.pack(fill=tk.BOTH, expand=1, padx=1, pady=1)
+        frm1.pack(side=tk.TOP, fill=tk.BOTH, expand=1)        
+
+
+    def __close_win(self,e):        
+        print(f'Close Info [{self.model}]')
+        if id == camera_win.INFO_PROP_ID:
+            self.parent.propInf_win = None
+        elif id == camera_win.INFO_SENSOR_ID:
+            self.parent.sensorInf_win = None            
+
+
+    def on_top(self):
+        self.win.lift()
+
 
 
 ##############################################################################################
 #test print cam infos
 def test_print(camera_info):
     txtio = io.StringIO('')
-    pprint(camera_info, pre=win._CAM_INF_PRE, out=txtio)
+    pprint(camera_info, pre=main_win._CAM_INF_PRE, out=txtio)
     print(txtio.getvalue(), end='')
 
 #main function

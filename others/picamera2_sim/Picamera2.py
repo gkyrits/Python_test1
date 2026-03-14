@@ -6,12 +6,13 @@ _cam1_prop_obj = {'Model': 'ov5647', 'UnitCellSize': (1400, 1400), 'Location': 2
 _cam1_sens_obj = [{'format': 'SGBRG10_CSI2P', 'unpacked': 'SGBRG10', 'bit_depth': 10, 'size': (640, 480), 'fps': 58.92, 'crop_limits': (16, 0, 2560, 1920), 'exposure_limits': (134, 4879289, 20000)}, {'format': 'SGBRG10_CSI2P', 'unpacked': 'SGBRG10', 'bit_depth': 10, 'size': (1296, 972), 'fps': 46.34, 'crop_limits': (0, 0, 2592, 1944), 'exposure_limits': (86, 3066985, 20000)}, {'format': 'SGBRG10_CSI2P', 'unpacked': 'SGBRG10', 'bit_depth': 10, 'size': (1920, 1080), 'fps': 32.81, 'crop_limits': (348, 434, 1928, 1080), 'exposure_limits': (110, 3066979, 20000)}, {'format': 'SGBRG10_CSI2P', 'unpacked': 'SGBRG10', 'bit_depth': 10, 'size': (2592, 1944), 'fps': 15.63, 'crop_limits': (0, 0, 2592, 1944), 'exposure_limits': (130, 3066985, 20000)}]
 
 _cam2_prop_obj = {'Model': 'UVC Camera (046d:0825)', 'Location': 0, 'PixelArraySize': (1280, 960), 'PixelArrayActiveAreas': [(0, 0, 1280, 960)], 'SystemDevices': (20753,)}
-_com2_sens_obj = [{'format': 'MJPEG'}, {'format': 'YUYV'}] 
+_cam2_sens_obj = [{'format': 'MJPEG'}, {'format': 'YUYV'}] 
 
 _cam3_prop_obj = {'Model': 'USB2.0 PC CAMERA', 'Location': 0, 'PixelArraySize': (640, 480), 'PixelArrayActiveAreas': [(0, 0, 640, 480)], 'SystemDevices': (20751,)}
-_cam3_sens_obs = [{'format': 'YUYV'}]
+_cam3_sens_obj = [{'format': 'YUYV'}]
 
 _call_cnt=0
+
 
 def global_camera_info():
     global _call_cnt
@@ -26,3 +27,44 @@ def global_camera_info():
         _call_cnt=0
         return [_cameras_obj[0]] + [_cameras_obj[2]]
 
+
+def Picamera2(num=0):
+    return __Picamera(num)
+
+
+class __Picamera:
+    camera_properties = None
+    sensor_modes = None
+
+    def __init__(self, num=0):
+        self.cam_num = num
+        if num==0 :
+            self.camera_properties = _cam1_prop_obj
+            self.sensor_modes = _cam1_sens_obj
+        elif num==1:
+            self.camera_properties = _cam2_prop_obj
+            self.sensor_modes = _cam2_sens_obj
+        elif num==2:
+            self.camera_properties = _cam3_prop_obj
+            self.sensor_modes = _cam3_sens_obj            
+
+
+#######################################################
+# Make Module Callable
+#######################################################
+import sys
+class CallableModule():
+    def __init__(self, wrapped):
+        self._wrapped = wrapped
+
+    def __call__(self, *args, **kwargs):
+        return self._wrapped.main(*args, **kwargs)
+
+    def __getattr__(self, attr):
+        return object.__getattribute__(self._wrapped, attr)
+
+sys.modules[__name__] = CallableModule(sys.modules[__name__])
+
+def main(num=0):
+    print(f"call Picamera2({num})")
+    return __Picamera(num)
