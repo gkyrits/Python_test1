@@ -8,6 +8,7 @@ from picamera2_sim import Picamera2
 
 
 APP_TITLE = "Cam Play"
+INFO_FONT = "Arial 8"
 
 
 ##############################################################################################
@@ -43,7 +44,7 @@ class main_win:
         self.root = tk.Tk()
         tk2.initialise(self.root)
         self.root.title(APP_TITLE)
-        self.root.geometry("400x200+20+50")
+        self.root.geometry("350x200+20+50")
         #add buttons_frm ======
         frm2=tk.Frame(self.root)
         tk.Button(frm2, text="Update", command=self.__update_btn).pack(side=tk.LEFT, padx=5)
@@ -80,7 +81,7 @@ class main_win:
     def __add_ScrolledText_frame(self,view_obj):
         frm1=tk.Frame(self.root, relief=tk.GROOVE,  borderwidth=2)
         self.text = tk2.ScrolledText(frm1, borderframe=0, labelpos=tk.N, label_text=self._TEXT_LABEL, usehullsize=0,
-            text_padx=5, text_pady=5, text_wrap='none')
+            text_padx=2, text_pady=2, text_wrap='none',text_font =INFO_FONT)
         #fill text info
         txtio = io.StringIO('')
         pprint(view_obj, pre=self._CAM_INF_PRE, out=txtio)
@@ -158,7 +159,7 @@ class camera_win:
         #build window
         self.win = tk.Toplevel()
         self.win.title(cam_model)
-        self.win.geometry("400x290+150+100")
+        self.win.geometry("350x290+150+100")
         self.win.resizable(0,0)
         self.win.bind('<Destroy>',self.__close_win)
         #left butt form
@@ -180,6 +181,10 @@ class camera_win:
 
     def __close_win(self,e):
         global mainWin
+        if self.propInf_win != None:
+            self.propInf_win.destroy()
+        if self.sensorInf_win != None:
+            self.sensorInf_win.destroy()            
         print(f'Close cam_insts {self.idx}')
         mainWin._cam_insts[self.idx] = None
 
@@ -218,7 +223,7 @@ class info_win:
             self.label = 'Sensor Modes'
         self.win = tk.Toplevel()
         self.win.title(model+" "+self.label)
-        self.win.geometry("400x200+200+150")
+        self.win.geometry("350x200+200+150")
         self.win.bind('<Destroy>',self.__close_win)
         self.__add_ScrolledText_frame(info)
 
@@ -226,7 +231,7 @@ class info_win:
     def __add_ScrolledText_frame(self,view_obj):
         frm1=tk.Frame(self.win, relief=tk.GROOVE,  borderwidth=2)
         self.text = tk2.ScrolledText(frm1, borderframe=0, labelpos=tk.N, label_text=self.label, usehullsize=0,
-            text_padx=5, text_pady=5, text_wrap='none')
+            text_padx=2, text_pady=2, text_wrap='none', text_font =INFO_FONT)
         #fill text info
         txtio = io.StringIO('')
         pprint(view_obj, out=txtio)
@@ -242,7 +247,10 @@ class info_win:
         if id == camera_win.INFO_PROP_ID:
             self.parent.propInf_win = None
         elif id == camera_win.INFO_SENSOR_ID:
-            self.parent.sensorInf_win = None            
+            self.parent.sensorInf_win = None   
+
+    def destroy(self):
+        self.win.destroy()                     
 
 
     def on_top(self):
