@@ -159,13 +159,24 @@ class camera_win:
         #build window
         self.win = tk.Toplevel()
         self.win.title(cam_model)
-        self.win.geometry("350x290+150+100")
+        self.win.geometry("400x310+150+100")
         self.win.resizable(0,0)
         self.win.bind('<Destroy>',self.__close_win)
+        #menu
+        mnBar = tk.Frame(self.win, relief=tk.SUNKEN, borderwidth=1, height=20)        
+        mnBar.pack(fill=tk.X)
+        mnBar.pack_propagate(False)
+        mnBtn1 = tk.Menubutton(mnBar, text='Info', underline=0)
+        mnBtn1.pack(side=tk.LEFT, padx="2m")
+        mnBtn1.menu = tk.Menu(mnBtn1)
+        mnBtn1.menu.add_command(label='Properties', underline=0, command=self.__info_btn)
+        mnBtn1.menu.add_command(label='Sensor Modes', underline=0, command=self.__modes_btn)
+        mnBtn1['menu'] = mnBtn1.menu        
         #left butt form
         leftfrm = tk.Frame(self.win)
-        tk.Button(leftfrm, text="Info", command=self.__info_btn, width=5).pack(side=tk.TOP, padx=2)
-        tk.Button(leftfrm, text="Modes",  command=self.__modes_btn, width=5).pack(side=tk.TOP, padx=2)
+        tk.Button(leftfrm, text="Snap", command=self.__info_btn, width=7).pack(side=tk.TOP, padx=2)
+        tk.Button(leftfrm, text="View",  command=self.__modes_btn, width=7).pack(side=tk.TOP, padx=2)
+        tk.Button(leftfrm, text="PreView",  command=self.__modes_btn, width=7).pack(side=tk.TOP, padx=2)
         leftfrm.pack(side=tk.LEFT, fill=tk.Y, pady=4)
         #image form
         canvfrm = tk.Frame(self.win, relief=tk.GROOVE,  borderwidth=2)
@@ -217,6 +228,7 @@ class info_win:
     def __init__(self, parent, model, info, id):
         self.parent = parent
         self.model = model
+        self.id = id
         if id == camera_win.INFO_PROP_ID:
             self.label = 'Properties'
         elif id == camera_win.INFO_SENSOR_ID:
@@ -244,9 +256,9 @@ class info_win:
 
     def __close_win(self,e):        
         print(f'Close Info [{self.model}]')
-        if id == camera_win.INFO_PROP_ID:
+        if self.id == camera_win.INFO_PROP_ID:
             self.parent.propInf_win = None
-        elif id == camera_win.INFO_SENSOR_ID:
+        elif self.id == camera_win.INFO_SENSOR_ID:
             self.parent.sensorInf_win = None   
 
     def destroy(self):
