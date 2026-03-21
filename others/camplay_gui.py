@@ -4,7 +4,8 @@ import time as tm
 import threading as thrd
 import sys, io
 
-from picamera2_sim import Picamera2
+from picamera2 import Picamera2, Preview
+from libcamera import Transform
 
 
 APP_TITLE = "Cam Play"
@@ -35,7 +36,7 @@ def pprint(obj, indent=0, pre='', out=sys.stdout):
 ##############################################################################################
 class main_win:
     _TEXT_LABEL = "Available Cameras"
-    _CAM_INF_PRE = "cam "    
+    _CAM_INF_PRE = "cam "
     _cam_insts = [None,None,None,None]
 
     def __init__(self,cam_info):
@@ -50,12 +51,12 @@ class main_win:
         tk.Button(frm2, text="Update", command=self.__update_btn).pack(side=tk.LEFT, padx=5)
         tk.Button(frm2, text="Open", command=self.__open_btn).pack(side=tk.LEFT, padx=5)
         #add cam ListBox ------
-        cbx_entries = self.__get_list_items(cam_info,self._CAM_INF_PRE)        
+        cbx_entries = self.__get_list_items(cam_info,self._CAM_INF_PRE)
         self.cbx = tk2.ComboBox(frm2, label_text='Camera:', labelpos='w', listheight=60, dropdown=1, scrolledlist_items=cbx_entries)
         self.cbx.selectitem(cbx_entries[0])
         self.cbx.pack(side=tk.LEFT)
         frm2.pack(side=tk.BOTTOM, anchor=tk.W, pady=5)
-        #add test frm ======        
+        #add test frm ======
         self.__add_ScrolledText_frame(cam_info)
 
 
@@ -73,7 +74,7 @@ class main_win:
         self.text.config(state=tk.DISABLED)
         #pack frm1
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.text.pack(side=tk.LEFT,fill=tk.BOTH)        
+        self.text.pack(side=tk.LEFT,fill=tk.BOTH)
         frm1.pack(side=tk.TOP,fill=tk.BOTH, expand=1)
 
 
@@ -87,7 +88,7 @@ class main_win:
         pprint(view_obj, pre=self._CAM_INF_PRE, out=txtio)
         self.text.settext(txtio.getvalue())
         self.text.configure(text_state = 'disabled')
-        #pack frm1                
+        #pack frm1
         self.text.pack(fill=tk.BOTH, expand=1, padx=1, pady=1)
         frm1.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
@@ -100,7 +101,7 @@ class main_win:
         return items
 
 
-    def __update_btn(self):        
+    def __update_btn(self):
         txtio = io.StringIO('')
         cam_info = Picamera2.global_camera_info()
         self.curr_caminfo = cam_info
@@ -122,7 +123,7 @@ class main_win:
 
 
 
-    def __open_btn(self):        
+    def __open_btn(self):
         print('\nopen button:')
         cbxIdx = self.cbx.component('scrolledlist').curselection()[0]
         if cbxIdx > len(self._cam_insts) :
@@ -143,7 +144,7 @@ class main_win:
     def run(self):
         self.root.mainloop()
 
-##############################################################################################        
+##############################################################################################
 class camera_win:
     INFO_PROP_ID = 0
     INFO_SENSOR_ID = 1
@@ -154,16 +155,18 @@ class camera_win:
         self.cam_model = cam_model
         self.propInf_win = None
         self.sensorInf_win = None
+        self.preview_on = False
+        self.hflip = tk.IntVar()
+        self.vflip = tk.IntVar()
         print(f'Open cam_insts {self.idx}')
-        self.picam = Picamera2(cam_num)
         #build window
         self.win = tk.Toplevel()
         self.win.title(cam_model)
-        self.win.geometry("400x310+150+100")
+        self.win.geometry("420x310+150+100")
         self.win.resizable(0,0)
         self.win.bind('<Destroy>',self.__close_win)
         #menu
-        mnBar = tk.Frame(self.win, relief=tk.SUNKEN, borderwidth=1, height=20)        
+        mnBar = tk.Frame(self.win, relief=tk.SUNKEN, borderwidth=1, height=20)
         mnBar.pack(fill=tk.X)
         mnBar.pack_propagate(False)
         mnBtn1 = tk.Menubutton(mnBar, text='Info', underline=0)
@@ -171,12 +174,17 @@ class camera_win:
         mnBtn1.menu = tk.Menu(mnBtn1)
         mnBtn1.menu.add_command(label='Properties', underline=0, command=self.__info_btn)
         mnBtn1.menu.add_command(label='Sensor Modes', underline=0, command=self.__modes_btn)
-        mnBtn1['menu'] = mnBtn1.menu        
+        mnBtn1['menu'] = mnBtn1.menu
         #left butt form
         leftfrm = tk.Frame(self.win)
-        tk.Button(leftfrm, text="Snap", command=self.__info_btn, width=7).pack(side=tk.TOP, padx=2)
-        tk.Button(leftfrm, text="View",  command=self.__modes_btn, width=7).pack(side=tk.TOP, padx=2)
-        tk.Button(leftfrm, text="PreView",  command=self.__modes_btn, width=7).pack(side=tk.TOP, padx=2)
+        tk.Button(leftfrm, text="Snap", width=7).pack(side=tk.TOP, padx=2)
+        tk.Button(leftfrm, text="View", width=7).pack(side=tk.TOP, padx=2)
+        tk.Button(leftfrm, text="PreView",  command=self.__preview_btn, width=7).pack(side=tk.TOP, padx=2)
+        #--frame checkbuttons
+        ckbtnFrm = tk.Frame(leftfrm)
+        tk.Checkbutton(ckbtnFrm, text="H rot", variable=self.hflip, onvalue=1, offvalue=0, command=self.__rotate_ckbox).pack(anchor=tk.W, side=tk.TOP)
+        tk.Checkbutton(ckbtnFrm, text="V rot", variable=self.vflip, onvalue=1, offvalue=0, command=self.__rotate_ckbox).pack(anchor=tk.W, side=tk.TOP)
+        ckbtnFrm.pack(side=tk.BOTTOM)
         leftfrm.pack(side=tk.LEFT, fill=tk.Y, pady=4)
         #image form
         canvfrm = tk.Frame(self.win, relief=tk.GROOVE,  borderwidth=2)
@@ -188,6 +196,21 @@ class camera_win:
         tk.Button(botfrm, text="Foto").pack(side=tk.LEFT, padx=2)
         tk.Button(botfrm, text="Start Rec").pack(side=tk.LEFT, padx=2)
         botfrm.pack(side=tk.BOTTOM, fill=tk.X, pady=4)
+        #initialize Camera
+        self.__initialize_Camera()
+
+
+    def __initialize_Camera(self):
+        self.picam = Picamera2(self.cam_num)
+        self.cam_modes = self.picam.sensor_modes
+        #cam_prv_cfg = self.picam.create_preview_configuration(lores={"size": (320, 240)}, display="lores", encode="lores")
+        self.cam_prv_cfg = self.picam.create_preview_configuration(main={"size": (320, 240)})
+        print("--------")
+        pprint(self.cam_prv_cfg)
+        print("--------")
+        self.picam.configure(self.cam_prv_cfg)
+        self.picam.start()
+        self.picam.stop_preview()
 
 
     def __close_win(self,e):
@@ -195,9 +218,10 @@ class camera_win:
         if self.propInf_win != None:
             self.propInf_win.destroy()
         if self.sensorInf_win != None:
-            self.sensorInf_win.destroy()            
+            self.sensorInf_win.destroy()
         print(f'Close cam_insts {self.idx}')
         mainWin._cam_insts[self.idx] = None
+
 
     def __info_btn(self):
         print(f"info butt [{self.cam_num}]")
@@ -206,15 +230,39 @@ class camera_win:
         else:
             print(f"info [{self.cam_model}] already Open!")
             self.propInf_win.on_top()
-                
+
 
     def __modes_btn(self):
         print(f"Modes butt [{self.cam_num}]")
         if self.sensorInf_win == None:
-            self.sensorInf_win = info_win(self,self.cam_model,self.picam.sensor_modes,self.INFO_SENSOR_ID)
+            self.sensorInf_win = info_win(self,self.cam_model,self.cam_modes,self.INFO_SENSOR_ID)
         else:
             print(f"Modes [{self.cam_model}] already Open!")
-            self.sensorInf_win.on_top()        
+            self.sensorInf_win.on_top()
+
+
+    def __rotate_ckbox(self):
+        hflp = self.hflip.get()
+        vflp = self.vflip.get()
+        print('hflip='+str(hflp)+'  vflip='+str(vflp))
+        self.picam.stop()
+        self.cam_prv_cfg["transform"] = Transform(hflip=hflp, vflip=vflp)
+        self.picam.configure(self.cam_prv_cfg)
+        self.picam.start()
+        self.picam.stop_preview()
+        if self.preview_on:
+            self.picam.start_preview(Preview.QT, width=320, height=240)
+
+
+
+    def __preview_btn(self):
+        if not self.preview_on:
+            self.preview_on = True
+            self.picam.start_preview(Preview.QT, width=320, height=240)
+        else:
+            self.preview_on = False
+            self.picam.stop_preview()
+
 
     def on_top(self):
         self.win.lift()
@@ -249,20 +297,20 @@ class info_win:
         pprint(view_obj, out=txtio)
         self.text.settext(txtio.getvalue())
         self.text.configure(text_state = 'disabled')
-        #pack frm1                
+        #pack frm1
         self.text.pack(fill=tk.BOTH, expand=1, padx=1, pady=1)
-        frm1.pack(side=tk.TOP, fill=tk.BOTH, expand=1)        
+        frm1.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
 
-    def __close_win(self,e):        
+    def __close_win(self,e):
         print(f'Close Info [{self.model}]')
         if self.id == camera_win.INFO_PROP_ID:
             self.parent.propInf_win = None
         elif self.id == camera_win.INFO_SENSOR_ID:
-            self.parent.sensorInf_win = None   
+            self.parent.sensorInf_win = None
 
     def destroy(self):
-        self.win.destroy()                     
+        self.win.destroy()
 
 
     def on_top(self):
@@ -280,12 +328,12 @@ def test_print(camera_info):
 #main function
 if __name__ == '__main__':
     global mainWin
-    print(APP_TITLE+" start...")   
-    #get cameras info 
+    print(APP_TITLE+" start...")
+    #get cameras info
     camera_info = Picamera2.global_camera_info()
     #test_print(camera_info)
     #open Gui
-    mainWin=main_win(camera_info)            
+    mainWin=main_win(camera_info)
     #...
     mainWin.run()
     print("End")
