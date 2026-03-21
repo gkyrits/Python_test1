@@ -1,6 +1,8 @@
 import tkinter as tk
 import Pmw as tk2
 import time as tm
+import PIL.Image as Image
+import PIL.ImageTk as ImageTk
 import threading as thrd
 import sys, io
 
@@ -153,12 +155,13 @@ class camera_win:
         self.idx = idx
         self.cam_num = cam_num
         self.cam_model = cam_model
+        self.picam = None
         self.propInf_win = None
         self.sensorInf_win = None
         self.preview_on = False
         self.hflip = tk.IntVar()
         self.vflip = tk.IntVar()
-        print(f'Open cam_insts {self.idx}')
+        print(f'Start camera win {self.idx}')
         #build window
         self.win = tk.Toplevel()
         self.win.title(cam_model)
@@ -177,14 +180,14 @@ class camera_win:
         mnBtn1['menu'] = mnBtn1.menu
         #left butt form
         leftfrm = tk.Frame(self.win)
-        tk.Button(leftfrm, text="Snap", width=7).pack(side=tk.TOP, padx=2)
+        tk.Button(leftfrm, text="Snap", command=self.__snap_pil_image, width=7).pack(side=tk.TOP, padx=2)
         tk.Button(leftfrm, text="View", width=7).pack(side=tk.TOP, padx=2)
-        tk.Button(leftfrm, text="PreView",  command=self.__preview_btn, width=7).pack(side=tk.TOP, padx=2)
+        tk.Button(leftfrm, text="PreView", command=self.__preview_btn, width=7).pack(side=tk.TOP, padx=2)
         #--frame checkbuttons
         ckbtnFrm = tk.Frame(leftfrm)
-        tk.Checkbutton(ckbtnFrm, text="H rot", variable=self.hflip, onvalue=1, offvalue=0, command=self.__rotate_ckbox).pack(anchor=tk.W, side=tk.TOP)
-        tk.Checkbutton(ckbtnFrm, text="V rot", variable=self.vflip, onvalue=1, offvalue=0, command=self.__rotate_ckbox).pack(anchor=tk.W, side=tk.TOP)
-        ckbtnFrm.pack(side=tk.BOTTOM)
+        tk.Checkbutton(ckbtnFrm, text="H rot", variable=self.hflip, onvalue=1, offvalue=0, command=self.__rotate_ckbox).pack(side=tk.TOP)
+        tk.Checkbutton(ckbtnFrm, text="V rot", variable=self.vflip, onvalue=1, offvalue=0, command=self.__rotate_ckbox).pack(side=tk.TOP)
+        ckbtnFrm.pack(side=tk.BOTTOM, anchor=tk.W)
         leftfrm.pack(side=tk.LEFT, fill=tk.Y, pady=4)
         #image form
         canvfrm = tk.Frame(self.win, relief=tk.GROOVE,  borderwidth=2)
@@ -201,6 +204,7 @@ class camera_win:
 
 
     def __initialize_Camera(self):
+        print(f'Open cam_insts {self.cam_num}')
         self.picam = Picamera2(self.cam_num)
         self.cam_modes = self.picam.sensor_modes
         #cam_prv_cfg = self.picam.create_preview_configuration(lores={"size": (320, 240)}, display="lores", encode="lores")
@@ -210,7 +214,6 @@ class camera_win:
         print("--------")
         self.picam.configure(self.cam_prv_cfg)
         self.picam.start()
-        self.picam.stop_preview()
 
 
     def __close_win(self,e):
@@ -219,7 +222,10 @@ class camera_win:
             self.propInf_win.destroy()
         if self.sensorInf_win != None:
             self.sensorInf_win.destroy()
-        print(f'Close cam_insts {self.idx}')
+        if self.picam != None:
+            self.picam.stop()
+            self.picam = None
+        print(f'Close cam_insts {self.cam_num}')
         mainWin._cam_insts[self.idx] = None
 
 
@@ -249,8 +255,8 @@ class camera_win:
         self.cam_prv_cfg["transform"] = Transform(hflip=hflp, vflip=vflp)
         self.picam.configure(self.cam_prv_cfg)
         self.picam.start()
-        self.picam.stop_preview()
         if self.preview_on:
+            self.picam.stop_preview()
             self.picam.start_preview(Preview.QT, width=320, height=240)
 
 
@@ -258,14 +264,26 @@ class camera_win:
     def __preview_btn(self):
         if not self.preview_on:
             self.preview_on = True
+            self.picam.stop_preview()
             self.picam.start_preview(Preview.QT, width=320, height=240)
         else:
             self.preview_on = False
             self.picam.stop_preview()
+            self.picam.start_preview(Preview.NULL)
+
+
+    def __snap_pil_image(self):
+        print('snap image ...')
+        pilimg = self.picam.capture_image('main')
+        self.tkimg = ImageTk.PhotoImage(pilimg)
+        self.canvas.create_image(1,1,anchor=tk.NW,image=self.tkimg)
+        self.canvas.update()
+        pass
 
 
     def on_top(self):
         self.win.lift()
+
 
     def close(self):
         self.win.destroy()
@@ -308,6 +326,7 @@ class info_win:
             self.parent.propInf_win = None
         elif self.id == camera_win.INFO_SENSOR_ID:
             self.parent.sensorInf_win = None
+
 
     def destroy(self):
         self.win.destroy()
