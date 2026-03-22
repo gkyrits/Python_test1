@@ -162,6 +162,7 @@ class camera_win:
         self.sensorInf_win = None
         self.preview_on = False
         self.view_pil_on = False
+        self.pvimg = None
         self.hflip = tk.IntVar()
         self.vflip = tk.IntVar()
         print(f'Start camera win {self.idx}')
@@ -282,24 +283,26 @@ class camera_win:
         self.canvas.create_image(1,1,anchor=tk.NW,image=self.tkimg)
         self.canvas.update()
 
+
     def __preview_pil_image(self):
         if not self.view_pil_on:
             # start PIL thread
             print('preview PIL start ...')
-            self.pil_thrd=thrd.Thread(target=cam_pil_view_thread, args=(self.picam,self.idx))
-            self.pil_thrd.start()
             self.view_pil_on = True
+            self.win.after(100,self.__pil_image_loop)
         else:
-            global _pil_view_exit
-            _pil_view_exit[self.idx] = True
             self.view_pil_on = False
-            #self.pil_thrd.join()
 
 
-    def update_pil_image(self,img):
-        self.cpimg = img
-        self.canvas.create_image(1,1,anchor=tk.NW,image=self.cpimg)
-        #self.canvas.update()
+    def __pil_image_loop(self):
+        pilimg = self.picam.capture_image('main')
+        self.tkimg = ImageTk.PhotoImage(pilimg)
+        if self.pvimg == None:
+            self.pvimg = self.canvas.create_image(1,1,anchor=tk.NW,image=self.tkimg)
+        else:
+            self.canvas.itemconfig(self.pvimg, image=self.tkimg)
+        if self.view_pil_on:
+            self.win.after(100,self.__pil_image_loop)
 
 
     def on_top(self):
@@ -308,20 +311,6 @@ class camera_win:
 
     def close(self):
         self.win.destroy()
-
-##############################################################################################
-
-def cam_pil_view_thread(picam,idx):
-    global _pil_view_exit,mainWin
-    _pil_view_exit[idx] = False
-    while True:
-        if _pil_view_exit[idx]:
-            break
-        pilimg = picam.capture_image('main')
-        img = ImageTk.PhotoImage(pilimg)
-        mainWin.cam_insts[idx].update_pil_image(img)
-        tm.sleep(0.2)
-    print('exit  cam_pil_view_thread')
 
 
 ##############################################################################################
