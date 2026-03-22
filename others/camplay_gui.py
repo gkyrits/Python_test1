@@ -13,6 +13,8 @@ from libcamera import Transform
 APP_TITLE = "Cam Play"
 INFO_FONT = "Arial 8"
 
+_pil_view_exit = [False,False,False,False]
+
 
 ##############################################################################################
 #print a dictionary list
@@ -39,7 +41,7 @@ def pprint(obj, indent=0, pre='', out=sys.stdout):
 class main_win:
     _TEXT_LABEL = "Available Cameras"
     _CAM_INF_PRE = "cam "
-    _cam_insts = [None,None,None,None]
+    cam_insts = [None,None,None,None]
 
     def __init__(self,cam_info):
         self.curr_caminfo = cam_info
@@ -128,7 +130,7 @@ class main_win:
     def __open_btn(self):
         print('\nopen button:')
         cbxIdx = self.cbx.component('scrolledlist').curselection()[0]
-        if cbxIdx > len(self._cam_insts) :
+        if cbxIdx > len(self.cam_insts) :
             print('Too many comeras')
             return
         print('Select idx:'+str(cbxIdx))
@@ -136,11 +138,11 @@ class main_win:
         print('Select Model:'+cam_model)
         cam_num = self.curr_caminfo[cbxIdx]['Num']
         print('Select Cam Num:'+str(cam_num))
-        if self._cam_insts[cbxIdx] != None:
+        if self.cam_insts[cbxIdx] != None:
             print(f'cam_insts {cbxIdx} aleary Open!')
-            self._cam_insts[cbxIdx].on_top()
+            self.cam_insts[cbxIdx].on_top()
             return
-        self._cam_insts[cbxIdx] = camera_win(cbxIdx, cam_model, cam_num)
+        self.cam_insts[cbxIdx] = camera_win(cbxIdx, cam_model, cam_num)
 
 
     def run(self):
@@ -159,6 +161,7 @@ class camera_win:
         self.propInf_win = None
         self.sensorInf_win = None
         self.preview_on = False
+        self.view_pil_on = False
         self.hflip = tk.IntVar()
         self.vflip = tk.IntVar()
         print(f'Start camera win {self.idx}')
@@ -181,7 +184,7 @@ class camera_win:
         #left butt form
         leftfrm = tk.Frame(self.win)
         tk.Button(leftfrm, text="Snap", command=self.__snap_pil_image, width=7).pack(side=tk.TOP, padx=2)
-        tk.Button(leftfrm, text="View", width=7).pack(side=tk.TOP, padx=2)
+        tk.Button(leftfrm, text="View", command=self.__preview_pil_image, width=7).pack(side=tk.TOP, padx=2)
         tk.Button(leftfrm, text="PreView", command=self.__preview_btn, width=7).pack(side=tk.TOP, padx=2)
         #--frame checkbuttons
         ckbtnFrm = tk.Frame(leftfrm)
@@ -226,7 +229,7 @@ class camera_win:
             self.picam.stop()
             self.picam = None
         print(f'Close cam_insts {self.cam_num}')
-        mainWin._cam_insts[self.idx] = None
+        mainWin.cam_insts[self.idx] = None
 
 
     def __info_btn(self):
@@ -273,12 +276,30 @@ class camera_win:
 
 
     def __snap_pil_image(self):
-        print('snap image ...')
+        print('snap PIL image ...')
         pilimg = self.picam.capture_image('main')
         self.tkimg = ImageTk.PhotoImage(pilimg)
         self.canvas.create_image(1,1,anchor=tk.NW,image=self.tkimg)
         self.canvas.update()
-        pass
+
+    def __preview_pil_image(self):
+        if not self.view_pil_on:
+            # start PIL thread
+            print('preview PIL start ...')
+            self.pil_thrd=thrd.Thread(target=cam_pil_view_thread, args=(self.picam,self.idx))
+            self.pil_thrd.start()
+            self.view_pil_on = True
+        else:
+            global _pil_view_exit
+            _pil_view_exit[self.idx] = True
+            self.view_pil_on = False
+            #self.pil_thrd.join()
+
+
+    def update_pil_image(self,img):
+        self.cpimg = img
+        self.canvas.create_image(1,1,anchor=tk.NW,image=self.cpimg)
+        #self.canvas.update()
 
 
     def on_top(self):
@@ -287,6 +308,21 @@ class camera_win:
 
     def close(self):
         self.win.destroy()
+
+##############################################################################################
+
+def cam_pil_view_thread(picam,idx):
+    global _pil_view_exit,mainWin
+    _pil_view_exit[idx] = False
+    while True:
+        if _pil_view_exit[idx]:
+            break
+        pilimg = picam.capture_image('main')
+        img = ImageTk.PhotoImage(pilimg)
+        mainWin.cam_insts[idx].update_pil_image(img)
+        tm.sleep(0.2)
+    print('exit  cam_pil_view_thread')
+
 
 ##############################################################################################
 class info_win:
