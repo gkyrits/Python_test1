@@ -1,0 +1,4 @@
+#!/bin/bash
+
+cd /home/gkyr/Work/Python_test1/camera
+python camplay_gui.py
