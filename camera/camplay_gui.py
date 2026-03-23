@@ -6,8 +6,18 @@ import PIL.ImageTk as ImageTk
 import threading as thrd
 import sys, io
 
-from picamera2 import Picamera2, Preview
-from libcamera import Transform
+global Picamera2, Preview, Transform
+
+def import_special_libs():
+    global Picamera2, Preview, Transform
+    try:
+        from picamera2 import Picamera2, Preview
+        from libcamera import Transform
+    except Exception as e:
+        print("Error importing : ", e.__str__())
+        from picamera2_sim import Picamera2, Preview, Transform
+        print('import simulation libs')    
+
 
 
 APP_TITLE = "Cam Play"
@@ -18,7 +28,7 @@ _pil_view_exit = [False,False,False,False]
 
 ##############################################################################################
 #print a dictionary list
-def pprint(obj, indent=0, pre='', out=sys.stdout):
+def d_print(obj, indent=0, pre='', out=sys.stdout):
     """Pretty-print a dictionary, list, or nested structure to the console."""
     space = ' ' * indent
     if isinstance(obj, dict):
@@ -26,13 +36,13 @@ def pprint(obj, indent=0, pre='', out=sys.stdout):
             print(f"{space}{key}:", end=' ', file=out)
             if isinstance(value, (dict, list)):
                 print("", file=out)
-                pprint(value, indent + 2, pre, out)
+                d_print(value, indent + 2, pre, out)
             else:
                 print(value, file=out)
     elif isinstance(obj, (list)):
         for i, item in enumerate(obj, start=1):
             print(f"{space}[{pre}{i}]", file=out)
-            pprint(item, indent + 2, pre, out)
+            d_print(item, indent + 2, pre, out)
     else:
         print(space + str(obj), file=out)
 
@@ -73,7 +83,7 @@ class main_win:
         self.text.configure(yscrollcommand=scroll.set)
         #fill text info
         txtio = io.StringIO('')
-        pprint(view_obj, pre=self._CAM_INF_PRE, out=txtio)
+        d_print(view_obj, pre=self._CAM_INF_PRE, out=txtio)
         self.text.insert(tk.END, txtio.getvalue())
         self.text.config(state=tk.DISABLED)
         #pack frm1
@@ -89,7 +99,7 @@ class main_win:
             text_padx=2, text_pady=2, text_wrap='none',text_font =INFO_FONT)
         #fill text info
         txtio = io.StringIO('')
-        pprint(view_obj, pre=self._CAM_INF_PRE, out=txtio)
+        d_print(view_obj, pre=self._CAM_INF_PRE, out=txtio)
         self.text.settext(txtio.getvalue())
         self.text.configure(text_state = 'disabled')
         #pack frm1
@@ -109,7 +119,7 @@ class main_win:
         txtio = io.StringIO('')
         cam_info = Picamera2.global_camera_info()
         self.curr_caminfo = cam_info
-        pprint(cam_info, pre=self._CAM_INF_PRE, out=txtio)
+        d_print(cam_info, pre=self._CAM_INF_PRE, out=txtio)
         #update Text
         if isinstance(self.text, tk2.ScrolledText):
             self.text.clear()
@@ -196,6 +206,7 @@ class camera_win:
         #image form
         canvfrm = tk.Frame(self.win, relief=tk.GROOVE,  borderwidth=2)
         self.canvas = tk.Canvas(canvfrm, bg="lightgray", width=320, height=240)
+        self.canvas.bind('<Double-Button-1>',self.__bouble_click_view)
         self.canvas.pack(fill=tk.BOTH, expand=tk.YES)
         canvfrm.pack(side=tk.TOP, padx=4, pady=4)
         #bottom butt form
@@ -214,7 +225,7 @@ class camera_win:
         #cam_prv_cfg = self.picam.create_preview_configuration(lores={"size": (320, 240)}, display="lores", encode="lores")
         self.cam_prv_cfg = self.picam.create_preview_configuration(main={"size": (320, 240)})
         print("--------")
-        pprint(self.cam_prv_cfg)
+        d_print(self.cam_prv_cfg)
         print("--------")
         self.picam.configure(self.cam_prv_cfg)
         self.picam.start()
@@ -305,6 +316,10 @@ class camera_win:
             self.win.after(100,self.__pil_image_loop)
 
 
+    def __bouble_click_view(self,e):
+        print(f'bouble_click_view of [{self.cam_model}]')
+
+
     def on_top(self):
         self.win.lift()
 
@@ -337,7 +352,7 @@ class info_win:
             text_padx=2, text_pady=2, text_wrap='none', text_font =INFO_FONT)
         #fill text info
         txtio = io.StringIO('')
-        pprint(view_obj, out=txtio)
+        d_print(view_obj, out=txtio)
         self.text.settext(txtio.getvalue())
         self.text.configure(text_state = 'disabled')
         #pack frm1
@@ -366,11 +381,12 @@ class info_win:
 #test print cam infos
 def test_print(camera_info):
     txtio = io.StringIO('')
-    pprint(camera_info, pre=main_win._CAM_INF_PRE, out=txtio)
+    d_print(camera_info, pre=main_win._CAM_INF_PRE, out=txtio)
     print(txtio.getvalue(), end='')
 
 #main function
 if __name__ == '__main__':
+    import_special_libs()
     global mainWin
     print(APP_TITLE+" start...")
     #get cameras info

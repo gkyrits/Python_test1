@@ -46,7 +46,25 @@ class __Picamera:
             self.sensor_modes = _cam2_sens_obj
         elif num==2:
             self.camera_properties = _cam3_prop_obj
-            self.sensor_modes = _cam3_sens_obj            
+            self.sensor_modes = _cam3_sens_obj
+
+    def create_preview_configuration(self, main={}):
+        return {'use_case': 'preview', 'main': main}
+
+    def configure(self, obj):
+        pass
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass    
+
+    def start_preview(self, *args, **kwargs):
+        pass
+
+    def stop_preview(self):
+        pass    
 
 
 #######################################################
