@@ -16,14 +16,14 @@ def import_special_libs():
     except Exception as e:
         print("Error importing : ", e.__str__())
         from picamera2_sim import Picamera2, Preview, Transform
-        print('import simulation libs')    
+        print('import simulation libs')
 
 
 
 APP_TITLE = "Cam Play"
 INFO_FONT = "Arial 8"
 
-_pil_view_exit = [False,False,False,False]
+picamera2_inst = [None,None,None,None]
 
 
 ##############################################################################################
@@ -51,7 +51,7 @@ def d_print(obj, indent=0, pre='', out=sys.stdout):
 class main_win:
     _TEXT_LABEL = "Available Cameras"
     _CAM_INF_PRE = "cam "
-    cam_insts = [None,None,None,None]
+    cam_inst = [None,None,None,None]
 
     def __init__(self,cam_info):
         self.curr_caminfo = cam_info
@@ -140,7 +140,7 @@ class main_win:
     def __open_btn(self):
         print('\nopen button:')
         cbxIdx = self.cbx.component('scrolledlist').curselection()[0]
-        if cbxIdx > len(self.cam_insts) :
+        if cbxIdx > len(self.cam_inst) :
             print('Too many comeras')
             return
         print('Select idx:'+str(cbxIdx))
@@ -148,11 +148,11 @@ class main_win:
         print('Select Model:'+cam_model)
         cam_num = self.curr_caminfo[cbxIdx]['Num']
         print('Select Cam Num:'+str(cam_num))
-        if self.cam_insts[cbxIdx] != None:
-            print(f'cam_insts {cbxIdx} aleary Open!')
-            self.cam_insts[cbxIdx].on_top()
+        if self.cam_inst[cbxIdx] != None:
+            print(f'cam_inst {cbxIdx} aleary Open!')
+            self.cam_inst[cbxIdx].on_top()
             return
-        self.cam_insts[cbxIdx] = camera_win(cbxIdx, cam_model, cam_num)
+        self.cam_inst[cbxIdx] = camera_win(cbxIdx, cam_model, cam_num)
 
 
     def run(self):
@@ -171,7 +171,8 @@ class camera_win:
         self.propInf_win = None
         self.sensorInf_win = None
         self.preview_on = False
-        self.view_pil_on = False
+        self.pilview_on = False        
+        self.fullview_on = False
         self.pvimg = None
         self.hflip = tk.IntVar()
         self.vflip = tk.IntVar()
@@ -219,8 +220,11 @@ class camera_win:
 
 
     def __initialize_Camera(self):
-        print(f'Open cam_insts {self.cam_num}')
-        self.picam = Picamera2(self.cam_num)
+        global picamera2_inst
+        print(f'Open camera {self.cam_num}')
+        if picamera2_inst[self.idx] == None:
+            picamera2_inst[self.idx] = Picamera2(self.cam_num)
+        self.picam = picamera2_inst[self.idx]
         self.cam_modes = self.picam.sensor_modes
         #cam_prv_cfg = self.picam.create_preview_configuration(lores={"size": (320, 240)}, display="lores", encode="lores")
         self.cam_prv_cfg = self.picam.create_preview_configuration(main={"size": (320, 240)})
@@ -240,21 +244,21 @@ class camera_win:
         if self.picam != None:
             self.picam.stop()
             self.picam = None
-        print(f'Close cam_insts {self.cam_num}')
-        mainWin.cam_insts[self.idx] = None
+        print(f'Close camera {self.cam_num}')
+        mainWin.cam_inst[self.idx] = None
 
 
     def __info_btn(self):
-        print(f"info butt [{self.cam_num}]")
+        print(f"Info Cam [{self.cam_num}]")
         if self.propInf_win == None:
             self.propInf_win = info_win(self,self.cam_model,self.picam.camera_properties,self.INFO_PROP_ID)
         else:
-            print(f"info [{self.cam_model}] already Open!")
+            print(f"Info [{self.cam_model}] already Open!")
             self.propInf_win.on_top()
 
 
     def __modes_btn(self):
-        print(f"Modes butt [{self.cam_num}]")
+        print(f"Modes Cam [{self.cam_num}]")
         if self.sensorInf_win == None:
             self.sensorInf_win = info_win(self,self.cam_model,self.cam_modes,self.INFO_SENSOR_ID)
         else:
@@ -296,28 +300,32 @@ class camera_win:
 
 
     def __preview_pil_image(self):
-        if not self.view_pil_on:
+        if not self.pilview_on:
             # start PIL thread
             print('preview PIL start ...')
-            self.view_pil_on = True
+            self.pilview_on = True
             self.win.after(100,self.__pil_image_loop)
         else:
-            self.view_pil_on = False
+            self.pilview_on = False
 
 
     def __pil_image_loop(self):
+        if self.fullview_on:
+            return
         pilimg = self.picam.capture_image('main')
         self.tkimg = ImageTk.PhotoImage(pilimg)
         if self.pvimg == None:
             self.pvimg = self.canvas.create_image(1,1,anchor=tk.NW,image=self.tkimg)
         else:
             self.canvas.itemconfig(self.pvimg, image=self.tkimg)
-        if self.view_pil_on:
+        if self.pilview_on:
             self.win.after(100,self.__pil_image_loop)
 
 
     def __bouble_click_view(self,e):
         print(f'bouble_click_view of [{self.cam_model}]')
+        if self.pilview_on:
+            self.fullview_on=True        
 
 
     def on_top(self):
@@ -326,6 +334,21 @@ class camera_win:
 
     def close(self):
         self.win.destroy()
+
+##############################################################################################        
+class full_screen_view:
+
+    def __init__(self, cam_idx):
+        self.win = tk.Toplevel()
+        self.win.attributes('-fullscreen', True)
+        self.canvas = tk.Canvas(self.win, bg="lightgray")
+        self.canvas.bind('<Double-Button-1>',self.__bouble_click_view)
+        self.canvas.pack(fill=tk.BOTH, expand=tk.YES)
+
+
+    def __bouble_click_view(self):
+        self.win.destroy()
+
 
 
 ##############################################################################################
