@@ -47,6 +47,20 @@ def d_print(obj, indent=0, pre='', out=sys.stdout):
         print(space + str(obj), file=out)
 
 
+def set_config_size(cfg,width,height):
+        main = cfg['main']
+        main['size'] = (width,height)
+        cfg['main'] = main
+        raw = cfg['raw']
+        raw['size'] = (width,height)
+        cfg['raw'] = raw
+
+
+def set_modal(win):
+    win.grab_set()
+    win.wait_window()
+    win.grab_release()
+
 ##############################################################################################
 class main_win:
     _TEXT_LABEL = "Available Cameras"
@@ -325,7 +339,21 @@ class camera_win:
     def __bouble_click_view(self,e):
         print(f'bouble_click_view of [{self.cam_model}]')
         if self.pilview_on:
-            self.fullview_on=True        
+            self.fullview_on=True
+            view = full_screen_view(self.idx, self.cam_prv_cfg)
+            set_modal(view.win)
+            print('fullscreen exit')
+            self.fullview_on=False
+            self.picam.stop()
+            set_config_size(self.cam_prv_cfg, 320, 240)
+            self.picam.align_configuration(self.cam_prv_cfg) 
+            print("--------")
+            d_print(self.cam_prv_cfg)
+            print("--------")             
+            self.picam.configure(self.cam_prv_cfg)
+            self.picam.start()
+            self.win.after(100,self.__pil_image_loop)
+
 
 
     def on_top(self):
@@ -338,15 +366,52 @@ class camera_win:
 ##############################################################################################        
 class full_screen_view:
 
-    def __init__(self, cam_idx):
+    def __init__(self, cam_idx, cam_cfg):
+        self.quit=False        
+        self.pvimg=None
         self.win = tk.Toplevel()
         self.win.attributes('-fullscreen', True)
         self.canvas = tk.Canvas(self.win, bg="lightgray")
         self.canvas.bind('<Double-Button-1>',self.__bouble_click_view)
         self.canvas.pack(fill=tk.BOTH, expand=tk.YES)
+        self.canvas.update()
+        width = self.canvas.winfo_width()
+        height = self.canvas.winfo_height()
+        print(f'canvas width={width} height={height}')
+        if width > 800:
+            self.time=1000
+        else:
+            self.time=100
+        self.__initialize_Camera(cam_idx,cam_cfg,width,height)
+
+    
+    def __initialize_Camera(self, idx, cfg, width,height):
+        self.picam = picamera2_inst[idx]
+        self.picam.stop()
+        set_config_size(cfg,width,height)
+        self.picam.align_configuration(cfg)        
+        print("--------")
+        d_print(cfg)
+        print("--------")        
+        self.picam.configure(cfg)
+        self.picam.start()
+        self.win.after(100,self.__pil_image_loop)
 
 
-    def __bouble_click_view(self):
+    def __pil_image_loop(self):
+        if self.quit:
+            return
+        pilimg = self.picam.capture_image('main')
+        self.tkimg = ImageTk.PhotoImage(pilimg)
+        if self.pvimg == None:
+            self.pvimg = self.canvas.create_image(1,1,anchor=tk.NW,image=self.tkimg)
+        else:
+            self.canvas.itemconfig(self.pvimg, image=self.tkimg)
+        self.win.after(self.time,self.__pil_image_loop)
+
+
+    def __bouble_click_view(self,e):
+        self.quit=True
         self.win.destroy()
 
 
