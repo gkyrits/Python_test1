@@ -47,12 +47,14 @@ def d_print(obj, indent=0, pre='', out=sys.stdout):
         print(space + str(obj), file=out)
 
 
-def set_config_size(cfg,width,height):
+def cam_config_size(cfg,size):
         main = cfg['main']
-        main['size'] = (width,height)
+        main['size'] = tuple(size)
         cfg['main'] = main
         raw = cfg['raw']
-        raw['size'] = (width,height)
+        if raw == None:
+            return
+        raw['size'] = tuple(size)
         cfg['raw'] = raw
 
 
@@ -185,7 +187,7 @@ class camera_win:
         self.propInf_win = None
         self.sensorInf_win = None
         self.preview_on = False
-        self.pilview_on = False        
+        self.pilview_on = False
         self.fullview_on = False
         self.pvimg = None
         self.hflip = tk.IntVar()
@@ -308,6 +310,7 @@ class camera_win:
     def __snap_pil_image(self):
         print('snap PIL image ...')
         pilimg = self.picam.capture_image('main')
+        print(pilimg.size)
         self.tkimg = ImageTk.PhotoImage(pilimg)
         self.canvas.create_image(1,1,anchor=tk.NW,image=self.tkimg)
         self.canvas.update()
@@ -328,6 +331,7 @@ class camera_win:
             return
         pilimg = self.picam.capture_image('main')
         self.tkimg = ImageTk.PhotoImage(pilimg)
+        #print(pilimg.size)
         if self.pvimg == None:
             self.pvimg = self.canvas.create_image(1,1,anchor=tk.NW,image=self.tkimg)
         else:
@@ -345,11 +349,11 @@ class camera_win:
             print('fullscreen exit')
             self.fullview_on=False
             self.picam.stop()
-            set_config_size(self.cam_prv_cfg, 320, 240)
-            self.picam.align_configuration(self.cam_prv_cfg) 
+            cam_config_size(self.cam_prv_cfg, (320,240))
+            self.picam.align_configuration(self.cam_prv_cfg)
             print("--------")
             d_print(self.cam_prv_cfg)
-            print("--------")             
+            print("--------")
             self.picam.configure(self.cam_prv_cfg)
             self.picam.start()
             self.win.after(100,self.__pil_image_loop)
@@ -363,11 +367,11 @@ class camera_win:
     def close(self):
         self.win.destroy()
 
-##############################################################################################        
+##############################################################################################
 class full_screen_view:
 
     def __init__(self, cam_idx, cam_cfg):
-        self.quit=False        
+        self.quit=False
         self.pvimg=None
         self.win = tk.Toplevel()
         self.win.attributes('-fullscreen', True)
@@ -375,27 +379,43 @@ class full_screen_view:
         self.canvas.bind('<Double-Button-1>',self.__bouble_click_view)
         self.canvas.pack(fill=tk.BOTH, expand=tk.YES)
         self.canvas.update()
-        width = self.canvas.winfo_width()
-        height = self.canvas.winfo_height()
-        print(f'canvas width={width} height={height}')
-        if width > 800:
+        viewsize = [self.canvas.winfo_width(),  self.canvas.winfo_height()]
+        print(f'canvas width={viewsize[0]} height={viewsize[1]}')
+        if viewsize[0] > 800:
             self.time=1000
         else:
             self.time=100
-        self.__initialize_Camera(cam_idx,cam_cfg,width,height)
+        self.__initialize_Camera(cam_idx,cam_cfg,viewsize)
 
-    
-    def __initialize_Camera(self, idx, cfg, width,height):
+
+    def __initialize_Camera(self, idx, cfg, viewsize):
         self.picam = picamera2_inst[idx]
         self.picam.stop()
-        set_config_size(cfg,width,height)
-        self.picam.align_configuration(cfg)        
+        cam_modes = self.picam.sensor_modes
+        self.__select_size(cam_modes,viewsize)
+        cam_config_size(cfg,viewsize)
+        self.picam.align_configuration(cfg)
         print("--------")
         d_print(cfg)
-        print("--------")        
+        print("--------")
         self.picam.configure(cfg)
         self.picam.start()
         self.win.after(100,self.__pil_image_loop)
+
+
+    def __select_size(self,modes,viewsize):
+        oksize = viewsize
+        for mode in modes:
+            if 'size' in mode:
+                modesize = mode['size']
+                print(modesize)
+                if modesize[0] > viewsize[0]:
+                    break
+                if modesize[1] > viewsize[1]:
+                    break
+                oksize = list(modesize)
+        #use of [:] change arg viewsize
+        viewsize[:] = oksize
 
 
     def __pil_image_loop(self):
@@ -403,6 +423,7 @@ class full_screen_view:
             return
         pilimg = self.picam.capture_image('main')
         self.tkimg = ImageTk.PhotoImage(pilimg)
+        #print(pilimg.size)
         if self.pvimg == None:
             self.pvimg = self.canvas.create_image(1,1,anchor=tk.NW,image=self.tkimg)
         else:
