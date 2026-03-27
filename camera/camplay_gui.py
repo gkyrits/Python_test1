@@ -345,7 +345,8 @@ class camera_win:
         if self.pilview_on:
             self.fullview_on=True
             view = full_screen_view(self.idx, self.cam_prv_cfg)
-            set_modal(view.win)
+            if view.win!=None:
+                set_modal(view.win)
             print('fullscreen exit')
             self.fullview_on=False
             self.picam.stop()
@@ -354,7 +355,12 @@ class camera_win:
             print("--------")
             d_print(self.cam_prv_cfg)
             print("--------")
-            self.picam.configure(self.cam_prv_cfg)
+            try:
+                self.picam.configure(self.cam_prv_cfg)
+            except Exception as e:
+                print("Error picam.configure: ", e.__str__())
+                self.win.destroy()
+                return
             self.picam.start()
             self.win.after(100,self.__pil_image_loop)
 
@@ -375,7 +381,7 @@ class full_screen_view:
         self.pvimg=None
         self.win = tk.Toplevel()
         self.win.attributes('-fullscreen', True)
-        self.canvas = tk.Canvas(self.win, bg="lightgray")
+        self.canvas = tk.Canvas(self.win, bg="black", highlightthickness=0)
         self.canvas.bind('<Double-Button-1>',self.__bouble_click_view)
         self.canvas.pack(fill=tk.BOTH, expand=tk.YES)
         self.canvas.update()
@@ -398,7 +404,13 @@ class full_screen_view:
         print("--------")
         d_print(cfg)
         print("--------")
-        self.picam.configure(cfg)
+        try:
+            self.picam.configure(cfg)
+        except Exception as e:
+            print("Error picam.configure: ", e.__str__())
+            self.win.destroy()
+            self.win = None
+            return
         self.picam.start()
         self.win.after(100,self.__pil_image_loop)
 
@@ -425,7 +437,9 @@ class full_screen_view:
         self.tkimg = ImageTk.PhotoImage(pilimg)
         #print(pilimg.size)
         if self.pvimg == None:
-            self.pvimg = self.canvas.create_image(1,1,anchor=tk.NW,image=self.tkimg)
+            x = (self.canvas.winfo_width() - pilimg.width) / 2
+            y = (self.canvas.winfo_height() - pilimg.height) / 2
+            self.pvimg = self.canvas.create_image(x, y, anchor=tk.NW, image=self.tkimg)
         else:
             self.canvas.itemconfig(self.pvimg, image=self.tkimg)
         self.win.after(self.time,self.__pil_image_loop)
