@@ -6,12 +6,15 @@ import PIL.ImageTk as ImageTk
 import threading as thrd
 import sys, io
 
-global Picamera2, Preview, Transform
+global Picamera2, Preview, Transform, Quality
+global H264Encoder, MJPEGEncoder, JpegEncoder, Encoder
 
 def import_special_libs():
-    global Picamera2, Preview, Transform
+    global Picamera2, Preview, Transform, Quality
+    global H264Encoder, MJPEGEncoder, JpegEncoder, Encoder
     try:
         from picamera2 import Picamera2, Preview
+        from picamera2.encoders import Quality, H264Encoder, MJPEGEncoder, JpegEncoder, Encoder
         from libcamera import Transform
     except Exception as e:
         print("Error importing : ", e.__str__())
@@ -228,8 +231,8 @@ class camera_win:
         canvfrm.pack(side=tk.TOP, padx=4, pady=4)
         #bottom butt form
         botfrm = tk.Frame(self.win)
-        tk.Button(botfrm, text="Foto").pack(side=tk.LEFT, padx=2)
-        tk.Button(botfrm, text="Start Rec").pack(side=tk.LEFT, padx=2)
+        tk.Button(botfrm, text="Foto", command=self.__take_foto).pack(side=tk.LEFT, padx=2)
+        tk.Button(botfrm, text="Start Rec", command=self.__take_video_1).pack(side=tk.LEFT, padx=2)
         botfrm.pack(side=tk.BOTTOM, fill=tk.X, pady=4)
         #initialize Camera
         self.__initialize_Camera()
@@ -364,6 +367,69 @@ class camera_win:
             self.picam.start()
             self.win.after(100,self.__pil_image_loop)
 
+
+    def __take_foto(self):
+        print('capture_file...')
+        capture_config = self.picam.create_still_configuration()
+        self.picam.switch_mode_and_capture_file(capture_config, "image.jpg")
+
+
+    def __take_video_1(self):
+        print('capture_video 1.. mp4')
+        self.picam.stop()
+        self.picam.start_and_record_video("test.mp4", duration=10, audio=True)
+        self.picam.stop()
+        self.picam.switch_mode(self.cam_prv_cfg)
+        self.picam.start()
+
+
+    def __take_video_2(self):
+        print('capture_video 2.. h264')
+        self.picam.stop()
+        self.picam.configure(self.picam.create_video_configuration())
+        encoder = H264Encoder()
+        self.picam.start_recording(encoder, 'test.h264')
+        tm.sleep(10)
+        self.picam.stop_recording()
+        self.picam.stop()
+        self.picam.switch_mode(self.cam_prv_cfg)
+        self.picam.start()
+
+    def __take_video_3(self):
+        print('capture_video 3.. mjpeg')
+        self.picam.stop()
+        self.picam.configure(self.picam.create_video_configuration())
+        encoder = MJPEGEncoder()
+        self.picam.start_recording(encoder, 'test.mjpeg')
+        tm.sleep(10)
+        self.picam.stop_recording()
+        self.picam.stop()
+        self.picam.switch_mode(self.cam_prv_cfg)
+        self.picam.start()
+
+    def __take_video_4(self):
+        print('capture_video 4.. mjpg')
+        self.picam.stop()
+        self.picam.configure(self.picam.create_video_configuration())
+        encoder = JpegEncoder()
+        self.picam.start_recording(encoder, 'test.mjpg')
+        tm.sleep(10)
+        self.picam.stop_recording()
+        self.picam.stop()
+        self.picam.switch_mode(self.cam_prv_cfg)
+        self.picam.start()
+
+    def __take_video_5(self):
+        print('capture_video 5.. raw')
+        self.picam.stop()
+        self.picam.configure(self.picam.create_video_configuration())
+        encoder = Encoder()
+        self.picam.start_recording(encoder, 'test.raw')
+        tm.sleep(10)
+        self.picam.stop_recording()
+        self.picam.stop()
+        self.picam.switch_mode(self.cam_prv_cfg)
+        self.picam.start()
 
 
     def on_top(self):
