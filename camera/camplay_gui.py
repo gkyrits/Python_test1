@@ -8,13 +8,16 @@ import sys, io
 
 global Picamera2, Preview, Transform, Quality
 global H264Encoder, MJPEGEncoder, JpegEncoder, Encoder
+global FfmpegOutput
 
 def import_special_libs():
     global Picamera2, Preview, Transform, Quality
     global H264Encoder, MJPEGEncoder, JpegEncoder, Encoder
+    global FfmpegOutput
     try:
         from picamera2 import Picamera2, Preview
         from picamera2.encoders import Quality, H264Encoder, MJPEGEncoder, JpegEncoder, Encoder
+        from picamera2.outputs import FfmpegOutput
         from libcamera import Transform
     except Exception as e:
         print("Error importing : ", e.__str__())
@@ -217,6 +220,7 @@ class camera_win:
         tk.Button(leftfrm, text="Snap", command=self.__snap_pil_image, width=7).pack(side=tk.TOP, padx=2)
         tk.Button(leftfrm, text="View", command=self.__preview_pil_image, width=7).pack(side=tk.TOP, padx=2)
         tk.Button(leftfrm, text="PreView", command=self.__preview_btn, width=7).pack(side=tk.TOP, padx=2)
+        tk.Button(leftfrm, text="Options", command=self.__options_btn, width=7).pack(side=tk.TOP, padx=2)
         #--frame checkbuttons
         ckbtnFrm = tk.Frame(leftfrm)
         tk.Checkbutton(ckbtnFrm, text="H rot", variable=self.hflip, onvalue=1, offvalue=0, command=self.__rotate_ckbox).pack(side=tk.TOP)
@@ -232,7 +236,9 @@ class camera_win:
         #bottom butt form
         botfrm = tk.Frame(self.win)
         tk.Button(botfrm, text="Foto", command=self.__take_foto).pack(side=tk.LEFT, padx=2)
-        tk.Button(botfrm, text="Start Rec", command=self.__take_video_1).pack(side=tk.LEFT, padx=2)
+        tk.Button(botfrm, text="Video", command=self.__take_video_6).pack(side=tk.LEFT, padx=2)
+        self.recBtn = tk.Button(botfrm, text="Start Rec", command=self.__start_video)
+        self.recBtn.pack(side=tk.LEFT, padx=2)
         botfrm.pack(side=tk.BOTTOM, fill=tk.X, pady=4)
         #initialize Camera
         self.__initialize_Camera()
@@ -377,7 +383,7 @@ class camera_win:
     def __take_video_1(self):
         print('capture_video 1.. mp4')
         self.picam.stop()
-        self.picam.start_and_record_video("test.mp4", duration=10, audio=True)
+        self.picam.start_and_record_video("test1.mp4", duration=10, audio=True)
         self.picam.stop()
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
@@ -388,7 +394,7 @@ class camera_win:
         self.picam.stop()
         self.picam.configure(self.picam.create_video_configuration())
         encoder = H264Encoder()
-        self.picam.start_recording(encoder, 'test.h264')
+        self.picam.start_recording(encoder, 'test2.h264')
         tm.sleep(10)
         self.picam.stop_recording()
         self.picam.stop()
@@ -400,7 +406,7 @@ class camera_win:
         self.picam.stop()
         self.picam.configure(self.picam.create_video_configuration())
         encoder = MJPEGEncoder()
-        self.picam.start_recording(encoder, 'test.mjpeg')
+        self.picam.start_recording(encoder, 'test3.mjpeg')
         tm.sleep(10)
         self.picam.stop_recording()
         self.picam.stop()
@@ -412,7 +418,7 @@ class camera_win:
         self.picam.stop()
         self.picam.configure(self.picam.create_video_configuration())
         encoder = JpegEncoder()
-        self.picam.start_recording(encoder, 'test.mjpg')
+        self.picam.start_recording(encoder, 'test4.mjpg')
         tm.sleep(10)
         self.picam.stop_recording()
         self.picam.stop()
@@ -422,7 +428,13 @@ class camera_win:
     def __take_video_5(self):
         print('capture_video 5.. raw')
         self.picam.stop()
-        self.picam.configure(self.picam.create_video_configuration())
+        video_conf = self.picam.create_video_configuration()
+        #cam_config_size(video_conf, [640,480])
+        #self.picam.align_configuration(video_conf)
+        print("---video conf-----")
+        d_print(video_conf)
+        print("--------")
+        self.picam.configure(video_conf)
         encoder = Encoder()
         self.picam.start_recording(encoder, 'test.raw')
         tm.sleep(10)
@@ -430,6 +442,54 @@ class camera_win:
         self.picam.stop()
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
+
+    def __take_video_6(self):
+        print('capture_video 6.. ')
+        self.picam.stop()
+        video_conf = self.picam.create_video_configuration()
+        cam_config_size(video_conf, [640,480])
+        self.picam.align_configuration(video_conf)
+        print("---video conf-----")
+        d_print(video_conf)
+        print("--------")
+        self.picam.configure(video_conf)
+        encoder = H264Encoder()
+        output = FfmpegOutput("test6.mp4", audio=True)
+        self.picam.start_recording(encoder, output)
+        tm.sleep(10)
+        self.picam.stop_recording()
+        self.picam.stop()
+        self.picam.switch_mode(self.cam_prv_cfg)
+        self.picam.start()        
+
+
+    def __start_video(self):
+        print('start recording video.. ')
+        self.recBtn.config(text="Stop Rec", fg="red", activeforeground="red", font="bold", command=self.__stop_video)
+        self.picam.stop()
+        video_conf = self.picam.create_video_configuration()
+        cam_config_size(video_conf, [640,480])
+        self.picam.align_configuration(video_conf)
+        print("---video conf-----")
+        d_print(video_conf)
+        print("--------")
+        self.picam.configure(video_conf)
+        encoder = H264Encoder()
+        output = FfmpegOutput("video.mp4", audio=True)
+        self.picam.start_recording(encoder, output)        
+
+    def __stop_video(self):
+        print('stop recording video.. ')
+        self.recBtn.config(text="Start Rec", fg="black", activeforeground="black", font="TkDefaultFont", command=self.__start_video)
+        self.picam.stop_recording()
+        self.picam.stop()
+        self.picam.switch_mode(self.cam_prv_cfg)
+        self.picam.start()         
+
+
+    def __options_btn(self):
+        print('options button pressed')
+
 
 
     def on_top(self):
