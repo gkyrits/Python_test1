@@ -6,18 +6,20 @@ import PIL.ImageTk as ImageTk
 import threading as thrd
 import sys, io
 
+import webutils as web
+
 global Picamera2, Preview, Transform, Quality
 global H264Encoder, MJPEGEncoder, JpegEncoder, Encoder
-global FfmpegOutput
+global FfmpegOutput, FileOutput
 
 def import_special_libs():
     global Picamera2, Preview, Transform, Quality
     global H264Encoder, MJPEGEncoder, JpegEncoder, Encoder
-    global FfmpegOutput
+    global FfmpegOutput, FileOutput
     try:
         from picamera2 import Picamera2, Preview
         from picamera2.encoders import Quality, H264Encoder, MJPEGEncoder, JpegEncoder, Encoder
-        from picamera2.outputs import FfmpegOutput
+        from picamera2.outputs import FfmpegOutput, FileOutput
         from libcamera import Transform
     except Exception as e:
         print("Error importing : ", e.__str__())
@@ -239,6 +241,8 @@ class camera_win:
         tk.Button(botfrm, text="Video", command=self.__take_video_6).pack(side=tk.LEFT, padx=2)
         self.recBtn = tk.Button(botfrm, text="Start Rec", command=self.__start_video)
         self.recBtn.pack(side=tk.LEFT, padx=2)
+        self.webBtn = tk.Button(botfrm, text="Start Web", command=self.__start_webPage)
+        self.webBtn.pack(side=tk.LEFT, padx=2)
         botfrm.pack(side=tk.BOTTOM, fill=tk.X, pady=4)
         #initialize Camera
         self.__initialize_Camera()
@@ -453,6 +457,9 @@ class camera_win:
         d_print(video_conf)
         print("--------")
         self.picam.configure(video_conf)
+        print("---camera conf-----")
+        d_print(self.picam.camera_configuration())
+        print("--------")
         encoder = H264Encoder()
         output = FfmpegOutput("test6.mp4", audio=True)
         self.picam.start_recording(encoder, output)
@@ -460,7 +467,7 @@ class camera_win:
         self.picam.stop_recording()
         self.picam.stop()
         self.picam.switch_mode(self.cam_prv_cfg)
-        self.picam.start()        
+        self.picam.start()
 
 
     def __start_video(self):
@@ -474,9 +481,12 @@ class camera_win:
         d_print(video_conf)
         print("--------")
         self.picam.configure(video_conf)
+        print("---camera conf-----")
+        d_print(self.picam.camera_configuration())
+        print("--------")
         encoder = H264Encoder()
         output = FfmpegOutput("video.mp4", audio=True)
-        self.picam.start_recording(encoder, output)        
+        self.picam.start_recording(encoder, output)
 
     def __stop_video(self):
         print('stop recording video.. ')
@@ -484,7 +494,73 @@ class camera_win:
         self.picam.stop_recording()
         self.picam.stop()
         self.picam.switch_mode(self.cam_prv_cfg)
-        self.picam.start()         
+        self.picam.start()
+
+
+    def __start_web(self):
+        print('start live stream.. ')
+        self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.__stop_web)
+        self.picam.stop()
+        video_conf = self.picam.create_video_configuration()
+        cam_config_size(video_conf, [640,480])
+        self.picam.align_configuration(video_conf)
+        print("---video conf-----")
+        d_print(video_conf)
+        print("--------")
+        self.picam.configure(video_conf)
+        print("---camera conf-----")
+        d_print(self.picam.camera_configuration())
+        print("--------")
+        encoder = H264Encoder()
+        output = FfmpegOutput("-f hls -fflags nobuffer -hls_time 4 -hls_list_size 3 -hls_flags delete_segments -hls_allow_cache 0 stream.m3u8", audio=True)
+        #output = FfmpegOutput("-f hls -fflags nobuffer -hls_time 1 -hls_list_size 5 -hls_flags delete_segments -hls_flags independent_segments -hls_allow_cache 0 stream.m3u8", audio=True)
+        #output = FfmpegOutput("-f dash -window_size 3 -use_template 1 -use_timeline 1 stream.mpd", audio=True)
+        self.webserver = web.simpleServer()
+        self.webserver.start()
+        self.picam.start_recording(encoder, output)
+
+
+
+    def __stop_web(self):
+        print('stop web.. ')
+        self.webBtn.config(text="Start Web", fg="black", activeforeground="black", font="TkDefaultFont", command=self.__start_web)
+        self.picam.stop_recording()
+        self.picam.stop()
+        self.webserver.stop()
+        self.picam.switch_mode(self.cam_prv_cfg)
+        self.picam.start()
+
+
+    def __start_webPage(self):
+        print('start web Page.. ')
+        self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.__stop_webPage)
+        self.picam.stop()
+        video_conf = self.picam.create_video_configuration()
+        cam_config_size(video_conf, [640,480])
+        self.picam.align_configuration(video_conf)
+        print("---video conf-----")
+        d_print(video_conf)
+        print("--------")
+        self.picam.configure(video_conf)
+        print("---camera conf-----")
+        d_print(self.picam.camera_configuration())
+        print("--------") 
+        #encoder = JpegEncoder()
+        encoder = MJPEGEncoder()
+        output = web.StreamingOutput()
+        self.picam.start_recording(encoder, FileOutput(output))
+        self.webserver = web.pageServer(output)
+        self.webserver.start()
+
+
+    def __stop_webPage(self):
+        print('stop web.. ')
+        self.webBtn.config(text="Start Web", fg="black", activeforeground="black", font="TkDefaultFont", command=self.__start_webPage)
+        self.picam.stop_recording()
+        self.picam.stop()
+        self.webserver.stop()
+        self.picam.switch_mode(self.cam_prv_cfg)
+        self.picam.start()
 
 
     def __options_btn(self):
