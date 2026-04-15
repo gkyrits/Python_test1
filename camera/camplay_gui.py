@@ -242,7 +242,7 @@ class camera_win:
         tk.Button(botfrm, text="Video", command=self.__take_video_6).pack(side=tk.LEFT, padx=2)
         self.recBtn = tk.Button(botfrm, text="Start Rec", command=self.__start_video)
         self.recBtn.pack(side=tk.LEFT, padx=2)
-        self.webBtn = tk.Button(botfrm, text="Start Web", command=self.__start_web_2)
+        self.webBtn = tk.Button(botfrm, text="Start Web", command=self.__start_web_3)
         self.webBtn.pack(side=tk.LEFT, padx=2)
         botfrm.pack(side=tk.BOTTOM, fill=tk.X, pady=4)
         #initialize Camera
@@ -534,36 +534,67 @@ class camera_win:
 
     #udp test:
     #pi : rpicam-vid -t 0 --inline -o udp://<IP_TOU_WINDOWS_PC>:8000
-    #vlc: udp://@:8000
-    #tcp test:
-    #pi : rpicam-vid -t 0 --inline --listen -o tcp://0.0.0.0:8000
-    #vlc: tcp/h264://<IP_TOU_PI>:8000
-
+    #vlc: udp://@:8000 or udp/h264://@:8000
     def __start_web_2(self):
-        print('start live stream.. ')
+        print('start udp live stream.. ')
         self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.__stop_web_2)
         self.picam.stop()
         video_conf = self.picam.create_video_configuration()
         cam_config_size(video_conf, [640,480])
         self.picam.align_configuration(video_conf)
         self.picam.configure(video_conf)
-        #vlc: udp/h264://@:8000
-        #encoder = H264Encoder()
-        #vlc: udp://@:8000
+        #encoder = H264Encoder()        
         encoder = MJPEGEncoder()
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            #sock.connect(("127.0.0.1", 8000))
-            sock.connect(("192.168.1.30", 8000))
-            stream = sock.makefile("wb")
-            self.picam.start_recording(encoder, FileOutput(stream))
-
+        self.sock =  socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        #sock.connect(("127.0.0.1", 8000))
+        self.sock.connect(("192.168.1.30", 8000))
+        stream = self.sock.makefile("wb")
+        self.picam.start_recording(encoder, FileOutput(stream))
 
     def __stop_web_2(self):
         print('stop web.. ')
         self.webBtn.config(text="Start Web", fg="black", activeforeground="black", font="TkDefaultFont", command=self.__start_web_2)
         self.picam.stop_recording()
+        self.picam.stop()        
+        self.sock.close()
+        self.picam.switch_mode(self.cam_prv_cfg)
+        self.picam.start()
+
+
+    #tcp test:
+    #pi : rpicam-vid -t 0 --inline --listen -o tcp://0.0.0.0:8000
+    #vlc: tcp://<IP_TOU_PI>:8000 or tcp/h264://<IP_TOU_PI>:8000
+    def __start_web_3(self):
+        print('start tcp live stream.. ')
+        self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.__stop_web_3)
         self.picam.stop()
-        #sock.stop
+        video_conf = self.picam.create_video_configuration()
+        cam_config_size(video_conf, [640,480])
+        self.picam.align_configuration(video_conf)
+        self.picam.configure(video_conf)
+        encoder = H264Encoder()
+        #encoder = MJPEGEncoder()
+        server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_sock.bind(('0.0.0.0', 8000))
+        server_sock.listen(1)
+        #while True:
+        print('Waiting for TCP connection...')
+        self.sock, addr = server_sock.accept()            
+        print(f'Client connected from {addr}')
+        #set TCP_NODELAY to reduce latency
+        self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)            
+        stream = self.sock.makefile("wb")
+        self.picam.start_recording(encoder, FileOutput(stream), quality=Quality.VERY_LOW)
+        print('Starting Recording to TCP stream...')
+
+
+    def __stop_web_3(self):
+        print('stop web.. ')
+        self.webBtn.config(text="Start Web", fg="black", activeforeground="black", font="TkDefaultFont", command=self.__start_web_3)
+        self.picam.stop_recording()
+        self.picam.stop()        
+        self.sock.close()
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
 
