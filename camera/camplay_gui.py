@@ -34,7 +34,6 @@ INFO_FONT = "Arial 8"
 
 picamera2_inst = [None,None,None,None]
 
-
 ##############################################################################################
 #print a dictionary list
 def d_print(obj, indent=0, pre='', out=sys.stdout):
@@ -72,6 +71,8 @@ def set_modal(win):
     win.wait_window()
     win.grab_release()
 
+##############################################################################################
+# Available Window Class
 ##############################################################################################
 class main_win:
     _TEXT_LABEL = "Available Cameras"
@@ -183,6 +184,8 @@ class main_win:
     def run(self):
         self.root.mainloop()
 
+##############################################################################################
+# Camera Window Class
 ##############################################################################################
 class camera_win:
     INFO_PROP_ID = 0
@@ -309,7 +312,8 @@ class camera_win:
             self.picam.start_preview(Preview.QT, width=320, height=240)
 
 
-
+    #----------------------------------
+    #default QT preview using picamera2
     def __preview_btn(self):
         if not self.preview_on:
             self.preview_on = True
@@ -320,7 +324,8 @@ class camera_win:
             self.picam.stop_preview()
             self.picam.start_preview(Preview.NULL)
 
-
+    #----------------------------------
+    #preview foto using PIL
     def __snap_pil_image(self):
         print('snap PIL image ...')
         pilimg = self.picam.capture_image('main')
@@ -329,7 +334,8 @@ class camera_win:
         self.canvas.create_image(1,1,anchor=tk.NW,image=self.tkimg)
         self.canvas.update()
 
-
+    #----------------------------------
+    #preview video using PIL
     def __preview_pil_image(self):
         if not self.pilview_on:
             # start PIL thread
@@ -353,7 +359,8 @@ class camera_win:
         if self.pilview_on:
             self.win.after(100,self.__pil_image_loop)
 
-
+    #----------------------------------
+    #full screen mode
     def __bouble_click_view(self,e):
         print(f'bouble_click_view of [{self.cam_model}]')
         if self.pilview_on:
@@ -379,12 +386,14 @@ class camera_win:
             self.win.after(100,self.__pil_image_loop)
 
     #----------------------------------
+    #take foto files support jpg, png, bmp, ...
     def __take_foto(self):
         print('capture_file...')
         capture_config = self.picam.create_still_configuration()
         self.picam.switch_mode_and_capture_file(capture_config, "image.jpg")
 
     #----------------------------------
+    #take video files 10sec in different formats using different encoders
     def __take_video_1(self):
         print('capture_video 1.. mp4')
         self.picam.stop()
@@ -441,7 +450,7 @@ class camera_win:
         print("--------")
         self.picam.configure(video_conf)
         encoder = Encoder()
-        self.picam.start_recording(encoder, 'test.raw')
+        self.picam.start_recording(encoder, 'test5.raw')
         tm.sleep(10)
         self.picam.stop_recording()
         self.picam.stop()
@@ -449,7 +458,7 @@ class camera_win:
         self.picam.start()
 
     def __take_video_6(self):
-        print('capture_video 6.. ')
+        print('capture_video 6.. mp4')
         self.picam.stop()
         video_conf = self.picam.create_video_configuration()
         cam_config_size(video_conf, [640,480])
@@ -471,6 +480,7 @@ class camera_win:
         self.picam.start()
 
     #----------------------------------
+    #video file support all video formats (.mp4, .avi, .ts, .mov, ...)
     def __start_video(self):
         print('start recording video.. ')
         self.recBtn.config(text="Stop Rec", fg="red", activeforeground="red", font="bold", command=self.__stop_video)
@@ -498,6 +508,10 @@ class camera_win:
         self.picam.start()
 
     #----------------------------------
+    #standard live streams (using Ffmpeg)
+    #HSL:  web/vlc: http://<IP_PI>:8000/stream.m3u8 
+    #DASH: web/vlc: http://<IP_PI>:8000/stream.mpd
+    #UDP:  vlc: udp://@:8000
     def __start_web(self):
         print('start live stream.. ')
         self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.__stop_web)
@@ -514,9 +528,8 @@ class camera_win:
         print("--------")
         encoder = H264Encoder()
         output = FfmpegOutput("-f hls -fflags nobuffer -hls_time 4 -hls_list_size 3 -hls_flags delete_segments -hls_allow_cache 0 stream.m3u8", audio=True)
-        #output = FfmpegOutput("-f hls -fflags nobuffer -hls_time 1 -hls_list_size 5 -hls_flags delete_segments -hls_flags independent_segments -hls_allow_cache 0 stream.m3u8", audio=True)
         #output = FfmpegOutput("-f dash -window_size 3 -use_template 1 -use_timeline 1 stream.mpd", audio=True)
-        #output = FfmpegOutput("-f mpegts udp://192.168.2.2:8000")
+        #output = FfmpegOutput("-f mpegts udp://192.168.2.2:8000")  ##<IP_WINDOWS_PC>
         self.webserver = web.simpleServer()
         self.webserver.start()
         self.picam.start_recording(encoder, output)
@@ -534,7 +547,7 @@ class camera_win:
 
     #----------------------------------
     #udp test:
-    #pi : rpicam-vid -t 0 --inline -o udp://<IP_TOU_WINDOWS_PC>:8000
+    #pi test: rpicam-vid -t 0 --inline -o udp://<IP_WINDOWS_PC>:8000
     #vlc: udp://@:8000 or udp/h264://@:8000
     def __start_web_2(self):
         print('start udp live stream.. ')
@@ -547,8 +560,8 @@ class camera_win:
         #encoder = H264Encoder()
         encoder = MJPEGEncoder()
         self.sock =  socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        #sock.connect(("127.0.0.1", 8000))
-        self.sock.connect(("192.168.2.5", 8000))
+        #sock.connect(("127.0.0.1", 8000))       #<localhost>
+        self.sock.connect(("192.168.2.5", 8000)) #<IP_WINDOWS_PC>
         stream = self.sock.makefile("wb")
         self.picam.start_recording(encoder, FileOutput(stream))
 
@@ -563,8 +576,8 @@ class camera_win:
 
     #----------------------------------
     #tcp test:
-    #pi : rpicam-vid -t 0 --inline --listen -o tcp://0.0.0.0:8000
-    #vlc: tcp://<IP_TOU_PI>:8000 or tcp/h264://<IP_TOU_PI>:8000
+    #pi test: rpicam-vid -t 0 --inline --listen -o tcp://0.0.0.0:8000
+    #vlc: tcp://<IP_PI>:8000 or tcp/h264://<IP_PI>:8000
     def __start_web_3(self):
         print('start tcp live stream.. ')
         self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.__stop_web_3)
@@ -618,6 +631,8 @@ class camera_win:
         self.picam.start()
 
     #----------------------------------
+    #web page test
+    #pc web: http://192.168.1.31:8000
     def __start_webPage(self):
         print('start web Page.. ')
         self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.__stop_webPage)
@@ -648,11 +663,11 @@ class camera_win:
         self.webserver.stop()
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
+    #----------------------------------
 
 
     def __options_btn(self):
         print('options button pressed')
-
 
 
     def on_top(self):
@@ -662,6 +677,8 @@ class camera_win:
     def close(self):
         self.win.destroy()
 
+##############################################################################################
+# Full Screen Preview Window Class
 ##############################################################################################
 class full_screen_view:
 
@@ -741,6 +758,8 @@ class full_screen_view:
 
 
 ##############################################################################################
+# Text Info Window Class
+##############################################################################################
 class info_win:
 
     def __init__(self, parent, model, info, id):
@@ -789,6 +808,8 @@ class info_win:
 
 
 
+##############################################################################################
+# Main
 ##############################################################################################
 #test print cam infos
 def test_print(camera_info):
