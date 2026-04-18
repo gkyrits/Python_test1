@@ -378,13 +378,13 @@ class camera_win:
             self.picam.start()
             self.win.after(100,self.__pil_image_loop)
 
-
+    #----------------------------------
     def __take_foto(self):
         print('capture_file...')
         capture_config = self.picam.create_still_configuration()
         self.picam.switch_mode_and_capture_file(capture_config, "image.jpg")
 
-
+    #----------------------------------
     def __take_video_1(self):
         print('capture_video 1.. mp4')
         self.picam.stop()
@@ -470,7 +470,7 @@ class camera_win:
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
 
-
+    #----------------------------------
     def __start_video(self):
         print('start recording video.. ')
         self.recBtn.config(text="Stop Rec", fg="red", activeforeground="red", font="bold", command=self.__stop_video)
@@ -497,7 +497,7 @@ class camera_win:
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
 
-
+    #----------------------------------
     def __start_web(self):
         print('start live stream.. ')
         self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.__stop_web)
@@ -532,6 +532,7 @@ class camera_win:
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
 
+    #----------------------------------
     #udp test:
     #pi : rpicam-vid -t 0 --inline -o udp://<IP_TOU_WINDOWS_PC>:8000
     #vlc: udp://@:8000 or udp/h264://@:8000
@@ -543,11 +544,11 @@ class camera_win:
         cam_config_size(video_conf, [640,480])
         self.picam.align_configuration(video_conf)
         self.picam.configure(video_conf)
-        #encoder = H264Encoder()        
+        #encoder = H264Encoder()
         encoder = MJPEGEncoder()
         self.sock =  socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         #sock.connect(("127.0.0.1", 8000))
-        self.sock.connect(("192.168.1.30", 8000))
+        self.sock.connect(("192.168.2.5", 8000))
         stream = self.sock.makefile("wb")
         self.picam.start_recording(encoder, FileOutput(stream))
 
@@ -555,12 +556,12 @@ class camera_win:
         print('stop web.. ')
         self.webBtn.config(text="Start Web", fg="black", activeforeground="black", font="TkDefaultFont", command=self.__start_web_2)
         self.picam.stop_recording()
-        self.picam.stop()        
+        self.picam.stop()
         self.sock.close()
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
 
-
+    #----------------------------------
     #tcp test:
     #pi : rpicam-vid -t 0 --inline --listen -o tcp://0.0.0.0:8000
     #vlc: tcp://<IP_TOU_PI>:8000 or tcp/h264://<IP_TOU_PI>:8000
@@ -572,33 +573,51 @@ class camera_win:
         cam_config_size(video_conf, [640,480])
         self.picam.align_configuration(video_conf)
         self.picam.configure(video_conf)
-        encoder = H264Encoder()
-        #encoder = MJPEGEncoder()
-        server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server_sock.bind(('0.0.0.0', 8000))
-        server_sock.listen(1)
-        #while True:
-        print('Waiting for TCP connection...')
-        self.sock, addr = server_sock.accept()            
-        print(f'Client connected from {addr}')
-        #set TCP_NODELAY to reduce latency
-        self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)            
-        stream = self.sock.makefile("wb")
-        self.picam.start_recording(encoder, FileOutput(stream), quality=Quality.VERY_LOW)
-        print('Starting Recording to TCP stream...')
+        self.encoder = H264Encoder()
+        #self.encoder = MJPEGEncoder()
+        self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server_sock.bind(('0.0.0.0', 8000))
+        self.server_sock.listen(1)
+        self.tcp_closed = False
+        self.sock = None
+        self.tcp_thread=thrd.Thread(target=self.__wait_tcp_client_3)
+        self.tcp_thread.start()
 
+    def __wait_tcp_client_3(self):
+        while True:
+            print('Waiting for TCP connection...')
+            try:
+                self.sock, addr = self.server_sock.accept()
+            except Exception as e:
+                print(f'TCP server socket closed: {e}')
+                break
+            if self.tcp_closed:
+                break
+            print(f'Client connected from {addr}')
+            self.picam.stop_recording()
+            #set TCP_NODELAY to reduce latency
+            self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            stream = self.sock.makefile("wb")
+            self.picam.start_recording(self.encoder, FileOutput(stream), quality=Quality.VERY_LOW)
+            print('Starting Recording to TCP stream...')
 
     def __stop_web_3(self):
         print('stop web.. ')
         self.webBtn.config(text="Start Web", fg="black", activeforeground="black", font="TkDefaultFont", command=self.__start_web_3)
         self.picam.stop_recording()
-        self.picam.stop()        
-        self.sock.close()
+        self.tcp_closed = True
+        self.server_sock.shutdown(socket.SHUT_RDWR)
+        self.server_sock.close()
+        if self.sock!=None:
+            self.sock.close()
+        self.tcp_thread.join()
+        print('tcp server closed.')
+        self.picam.stop()
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
 
-
+    #----------------------------------
     def __start_webPage(self):
         print('start web Page.. ')
         self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.__stop_webPage)
@@ -612,7 +631,7 @@ class camera_win:
         self.picam.configure(video_conf)
         print("---camera conf-----")
         d_print(self.picam.camera_configuration())
-        print("--------") 
+        print("--------")
         #encoder = JpegEncoder()
         encoder = MJPEGEncoder()
         output = web.StreamingOutput()
