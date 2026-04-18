@@ -9,6 +9,9 @@ import sys, io
 import webutils as web
 import socket
 
+import cv2
+import numpy as np
+
 global Picamera2, Preview, Transform, Quality
 global H264Encoder, MJPEGEncoder, JpegEncoder, Encoder
 global FfmpegOutput, FileOutput
@@ -223,7 +226,7 @@ class camera_win:
         mnBtn1['menu'] = mnBtn1.menu
         #left butt form
         leftfrm = tk.Frame(self.win)
-        tk.Button(leftfrm, text="Snap", command=self.__snap_pil_image, width=7).pack(side=tk.TOP, padx=2)
+        tk.Button(leftfrm, text="Snap", command=self.__snap_buffer_image, width=7).pack(side=tk.TOP, padx=2)
         tk.Button(leftfrm, text="View", command=self.__preview_pil_image, width=7).pack(side=tk.TOP, padx=2)
         tk.Button(leftfrm, text="PreView", command=self.__preview_btn, width=7).pack(side=tk.TOP, padx=2)
         tk.Button(leftfrm, text="Options", command=self.__options_btn, width=7).pack(side=tk.TOP, padx=2)
@@ -333,6 +336,40 @@ class camera_win:
         self.tkimg = ImageTk.PhotoImage(pilimg)
         self.canvas.create_image(1,1,anchor=tk.NW,image=self.tkimg)
         self.canvas.update()
+
+    #----------------------------------
+    #test foto using buffer caprure
+    def __snap_buffer_image(self):
+        print('snap buffer image ...')
+        print('--------')
+        d_print(self.picam.camera_configuration())
+        print('--------')
+        buffer = self.picam.capture_buffer()
+        #pilimg = self.picam.helpers.make_image(buffer, self.picam.camera_configuration()["main"])
+        pilimg = self.__make_pil_image(buffer, self.picam.camera_configuration()["main"])
+        self.tkimg = ImageTk.PhotoImage(pilimg)
+        self.canvas.create_image(1,1,anchor=tk.NW,image=self.tkimg)
+        self.canvas.update()        
+
+    def __make_pil_image(self, buffer, config):
+        frm = config['format']
+        if frm == 'YUYV':
+            size = config['size']
+            width, height = size[0], size[1]
+            # 1. Μετατροπή των bytes σε numpy array
+            # Τα YUYV δεδομένα έχουν 2 bytes ανά pixel
+            raw_array = np.frombuffer(buffer, dtype=np.uint8)
+            # 2. Αναδιάταξη σε σχήμα (height, width, 2)
+            yuyv_image = raw_array.reshape((height, width, 2))
+            # 3. Μετατροπή από YUYV σε BGR (χρησιμοποιώντας OpenCV)
+            bgr_image = cv2.cvtColor(yuyv_image, cv2.COLOR_YUV2BGR_YUYV)
+            # 4. Μετατροπή από BGR σε RGB (για την Pillow)
+            rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
+            # 5. Δημιουργία Pillow Image
+            pilimg = Image.fromarray(rgb_image)            
+        else:
+            pilimg = self.picam.helpers.make_image(buffer, config)
+        return pilimg    
 
     #----------------------------------
     #preview video using PIL
