@@ -7,10 +7,9 @@ import threading as thrd
 import sys, io
 
 import webutils as web
+import camutils as utl
 import socket
 
-import cv2
-import numpy as np
 
 global Picamera2, Preview, Transform, Quality
 global H264Encoder, MJPEGEncoder, JpegEncoder, Encoder
@@ -345,31 +344,13 @@ class camera_win:
         d_print(self.picam.camera_configuration())
         print('--------')
         buffer = self.picam.capture_buffer()
-        #pilimg = self.picam.helpers.make_image(buffer, self.picam.camera_configuration()["main"])
-        pilimg = self.__make_pil_image(buffer, self.picam.camera_configuration()["main"])
+        config =  self.picam.camera_configuration()["main"]
+        #pilimg = self.picam.helpers.make_image(buffer, config)
+        pilimg = utl.make_pil_image(buffer, config)
         self.tkimg = ImageTk.PhotoImage(pilimg)
         self.canvas.create_image(1,1,anchor=tk.NW,image=self.tkimg)
-        self.canvas.update()        
+        self.canvas.update()
 
-    def __make_pil_image(self, buffer, config):
-        frm = config['format']
-        if frm == 'YUYV':
-            size = config['size']
-            width, height = size[0], size[1]
-            # 1. Μετατροπή των bytes σε numpy array
-            # Τα YUYV δεδομένα έχουν 2 bytes ανά pixel
-            raw_array = np.frombuffer(buffer, dtype=np.uint8)
-            # 2. Αναδιάταξη σε σχήμα (height, width, 2)
-            yuyv_image = raw_array.reshape((height, width, 2))
-            # 3. Μετατροπή από YUYV σε BGR (χρησιμοποιώντας OpenCV)
-            bgr_image = cv2.cvtColor(yuyv_image, cv2.COLOR_YUV2BGR_YUYV)
-            # 4. Μετατροπή από BGR σε RGB (για την Pillow)
-            rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
-            # 5. Δημιουργία Pillow Image
-            pilimg = Image.fromarray(rgb_image)            
-        else:
-            pilimg = self.picam.helpers.make_image(buffer, config)
-        return pilimg    
 
     #----------------------------------
     #preview video using PIL
@@ -386,7 +367,10 @@ class camera_win:
     def __pil_image_loop(self):
         if self.fullview_on:
             return
-        pilimg = self.picam.capture_image('main')
+        #pilimg = self.picam.capture_image('main')
+        buffer = self.picam.capture_buffer()
+        config = self.picam.camera_configuration()["main"]
+        pilimg = utl.make_pil_image(buffer, config)
         self.tkimg = ImageTk.PhotoImage(pilimg)
         #print(pilimg.size)
         if self.pvimg == None:
@@ -776,7 +760,10 @@ class full_screen_view:
     def __pil_image_loop(self):
         if self.quit:
             return
-        pilimg = self.picam.capture_image('main')
+        #pilimg = self.picam.capture_image('main')
+        buffer = self.picam.capture_buffer()
+        config = self.picam.camera_configuration()["main"]
+        pilimg = utl.make_pil_image(buffer, config)
         self.tkimg = ImageTk.PhotoImage(pilimg)
         #print(pilimg.size)
         if self.pvimg == None:
