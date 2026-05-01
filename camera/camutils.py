@@ -1,8 +1,11 @@
+######################################
+# Convert image buffer to PIL
+######################################
+
 import numpy as np
 import PIL.Image as Image
 import io
 import cv2
-
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 #code is from /usr/lib/python3/dist-packages/picamera2/request.py
@@ -101,4 +104,41 @@ def make_pil_image(buffer, config):
         pilimg = Image.fromarray(rgb_image)            
     else:
         pilimg = _make_image(buffer, config)
-    return pilimg     
+    return pilimg
+
+
+######################################
+# send/receive dictonary data
+######################################
+
+import socket
+import pickle
+import struct
+
+CMD_IMAGE = 1
+
+def send_dict(sock: socket.socket, data_dict):
+    data_bytes = pickle.dumps(data_dict, protocol=pickle.HIGHEST_PROTOCOL)
+    length_prefix = struct.pack('!I', len(data_bytes))
+    sock.sendall(length_prefix + data_bytes)
+
+
+def recv_dict(sock: socket.socket):
+    raw_len = _recv_exact(sock,4)
+    if not raw_len:
+        return None
+    msg_len = struct.unpack('!I', raw_len)[0]
+    body = _recv_exact(sock,msg_len)
+    if not body:
+        return None
+    return pickle.loads(body)
+
+
+def _recv_exact(sock: socket.socket, size):
+    buf = b''
+    while len(buf) < size:
+        chunk = sock.recv(size - len(buf))
+        if not chunk:
+            return None
+        buf += chunk
+    return buf

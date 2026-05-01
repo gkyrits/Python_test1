@@ -1,9 +1,9 @@
 import tkinter as tk
 import threading as thrd
+import camutils as utl
 import socket
-
-
-
+    
+    
 class main_win:
     APP_TITLE = "Camera Client"
     PORT = 8000
@@ -57,6 +57,17 @@ class main_win:
         tk.Message(win,text=msg, justify='left', width=200, relief=tk.GROOVE).pack(fill=tk.BOTH, expand=tk.YES, padx=2, pady=2)
 
 
+    def client_loop(self):
+        while True:
+            width = self.canvas.winfo_width()
+            height = self.canvas.winfo_height()
+            reqInfo = {'Cmd': utl.CMD_IMAGE, 'Size': (width, height)}
+            utl.send_dict(reqInfo)
+            print('sent dict:', reqInfo)
+            ackInfo = utl.recv_dict()
+            print('received dict:', ackInfo)
+
+
     def client_thead(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.statusLbl.configure(text='Wait Connect')
@@ -70,7 +81,7 @@ class main_win:
             print('client_thead Exit!')
             return
         self.statusLbl.configure(text="Connected")
-        #...
+        self.client_loop()
 
 
     def connect_btn(self):

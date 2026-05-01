@@ -247,7 +247,7 @@ class camera_win:
         tk.Button(botfrm, text="Video", command=self.__take_video_6).pack(side=tk.LEFT, padx=2)
         self.recBtn = tk.Button(botfrm, text="Start Rec", command=self.__start_video)
         self.recBtn.pack(side=tk.LEFT, padx=2)
-        self.webBtn = tk.Button(botfrm, text="Start Web", command=self.__start_web_3)
+        self.webBtn = tk.Button(botfrm, text="Start Web", command=self.__start_web_4)
         self.webBtn.pack(side=tk.LEFT, padx=2)
         botfrm.pack(side=tk.BOTTOM, fill=tk.X, pady=4)
         #initialize Camera
@@ -682,6 +682,67 @@ class camera_win:
         self.picam.stop_recording()
         self.picam.stop()
         self.webserver.stop()
+        self.picam.switch_mode(self.cam_prv_cfg)
+        self.picam.start()
+
+    #----------------------------------
+    #tcp custom server:
+    #send cupture buffer on request
+    def __start_web_4(self):
+        print('start tcp server.. ')
+        self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.__stop_web_4)
+        self.picam.stop()
+        video_conf = self.picam.create_video_configuration()
+        cam_config_size(video_conf, [640,480])
+        self.picam.align_configuration(video_conf)
+        self.picam.configure(video_conf)
+        self.picam.start()
+        #open socket ...
+        self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server_sock.bind(('0.0.0.0', 8000))
+        self.server_sock.listen(1)
+        self.tcp_closed = False
+        self.sock = None
+        self.tcp_thread=thrd.Thread(target=self.__wait_tcp_client_4)
+        self.tcp_thread.start()
+
+
+    def __parse_tcp_cmds_4(self):
+        while True:
+            try:
+                reqInfo = utl.recv_dict()
+            except Exception as e:
+                print(f'TCP server socket closed: {e}')
+                break                
+            print('received dict:', reqInfo)
+
+
+    def __wait_tcp_client_4(self):
+        while True:
+            print('Waiting for TCP connection...')
+            try:
+                self.sock, addr = self.server_sock.accept()
+            except Exception as e:
+                print(f'TCP server socket closed: {e}')
+                break
+            if self.tcp_closed:
+                break
+            print(f'Client connected from {addr}')            
+            self.__parse_tcp_cmds_4()
+
+
+    def __stop_web_4(self):
+        print('stop tcp server.. ')
+        self.webBtn.config(text="Start Web", fg="black", activeforeground="black", font="TkDefaultFont", command=self.__start_web_4)    
+        self.tcp_closed = True
+        self.server_sock.shutdown(socket.SHUT_RDWR)
+        self.server_sock.close()
+        if self.sock!=None:
+            self.sock.close()
+        self.tcp_thread.join()
+        print('tcp server closed.')
+        self.picam.stop()
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
     #----------------------------------
