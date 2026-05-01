@@ -61,11 +61,21 @@ class main_win:
         while True:
             width = self.canvas.winfo_width()
             height = self.canvas.winfo_height()
-            reqInfo = {'Cmd': utl.CMD_IMAGE, 'Size': (width, height)}
-            utl.send_dict(reqInfo)
-            print('sent dict:', reqInfo)
-            ackInfo = utl.recv_dict()
-            print('received dict:', ackInfo)
+            reqInfo = {'Cmd': utl.CMD_IMAGE_REQ, 'Size': (width, height)}
+            if  self.sock == None:
+                return
+            try:
+                utl.send_dict(self.sock, reqInfo)
+                print('sent dict:', reqInfo)
+                ackInfo = utl.recv_dict(self.sock)
+                if ackInfo==None:
+                    return
+                print('received dict:', ackInfo)
+            except Exception as e:
+                print(f'Error1: {e}')
+                self.message_win(str(e))
+                return
+
 
 
     def client_thead(self):
@@ -82,6 +92,9 @@ class main_win:
             return
         self.statusLbl.configure(text="Connected")
         self.client_loop()
+        self.statusLbl.configure(text='Disconnected')
+        self.sock = None
+        print('client_thead Exit!')        
 
 
     def connect_btn(self):
@@ -97,9 +110,9 @@ class main_win:
                 print(f'Error2: {e}')
                 self.message_win(str(e))
                 return
-            print('wait thead..')
-            self.client_thrd.join()
             self.sock = None
+            print('wait thead..')
+            self.client_thrd.join()            
             print('Closed!')
 
 

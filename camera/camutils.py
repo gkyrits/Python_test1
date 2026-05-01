@@ -115,7 +115,8 @@ import socket
 import pickle
 import struct
 
-CMD_IMAGE = 1
+CMD_IMAGE_REQ = 1
+CMD_IMG_CFG_ACK = 2
 
 def send_dict(sock: socket.socket, data_dict):
     data_bytes = pickle.dumps(data_dict, protocol=pickle.HIGHEST_PROTOCOL)

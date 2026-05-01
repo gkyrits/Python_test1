@@ -344,7 +344,7 @@ class camera_win:
         d_print(self.picam.camera_configuration())
         print('--------')
         buffer = self.picam.capture_buffer()
-        config =  self.picam.camera_configuration()["main"]
+        config = self.picam.camera_configuration()["main"]
         #pilimg = self.picam.helpers.make_image(buffer, config)
         pilimg = utl.make_pil_image(buffer, config)
         self.tkimg = ImageTk.PhotoImage(pilimg)
@@ -708,14 +708,25 @@ class camera_win:
         self.tcp_thread.start()
 
 
+    def __send_image_4(self):
+        buffer = self.picam.capture_buffer()
+        config = self.picam.camera_configuration()["main"]
+        ackInfo1 = {'Cmd':utl.CMD_IMG_CFG_ACK, 'Config':config}
+        utl.send_dict(self.sock, ackInfo1)
+
+
     def __parse_tcp_cmds_4(self):
         while True:
             try:
-                reqInfo = utl.recv_dict()
+                reqInfo = utl.recv_dict(self.sock)
             except Exception as e:
                 print(f'TCP server socket closed: {e}')
-                break                
+                return
+            if reqInfo==None:
+                    return
             print('received dict:', reqInfo)
+            if reqInfo['Cmd'] == utl.CMD_IMAGE_REQ:
+                self.__send_image_4()
 
 
     def __wait_tcp_client_4(self):
