@@ -1,5 +1,8 @@
 import tkinter as tk
+import PIL.Image as Image
+import PIL.ImageTk as ImageTk
 import threading as thrd
+import time as tm
 import camutils as utl
 import socket
     
@@ -10,6 +13,8 @@ class main_win:
 
     def __init__(self):
         self.sock = None
+        self.tkimg = None
+        self.pvimg = None
         self.root = tk.Tk()
         self.root.title(self.APP_TITLE)
         self.root.minsize(250, 150)
@@ -57,24 +62,55 @@ class main_win:
         tk.Message(win,text=msg, justify='left', width=200, relief=tk.GROOVE).pack(fill=tk.BOTH, expand=tk.YES, padx=2, pady=2)
 
 
+    def draw_image(self):
+        print('Draw Image...')
+        if self.pvimg == None:
+            self.pvimg = self.canvas.create_image(1,1,anchor=tk.NW,image=self.tkimg)
+        else:
+            self.canvas.itemconfig(self.pvimg, image=self.tkimg)
+        self.canvas.update()        
+
+
     def client_loop(self):
+        camcfg = None
         while True:
             width = self.canvas.winfo_width()
             height = self.canvas.winfo_height()
-            reqInfo = {'Cmd': utl.CMD_IMAGE_REQ, 'Size': (width, height)}
+            reqInfo1 = {'Cmd': utl.CMG_IMG_CFG_REQ, 'Size': (width, height)}
+            reqInfo2 = {'Cmd': utl.CMG_IMG_BUF_REQ}
             if  self.sock == None:
                 return
             try:
-                utl.send_dict(self.sock, reqInfo)
-                print('sent dict:', reqInfo)
+                #send CMG_IMG_CFG_REQ
+                utl.send_dict(self.sock, reqInfo1)
+                print('sent dict:', reqInfo1)
+                #wait receive
                 ackInfo = utl.recv_dict(self.sock)
                 if ackInfo==None:
                     return
                 print('received dict:', ackInfo)
+                if ackInfo['Cmd'] == utl.CMD_IMG_CFG_ACK:
+                    camcfg = ackInfo['Config']
+                #send CMG_IMG_BUF_REQ    
+                utl.send_dict(self.sock, reqInfo2)
+                print('sent dict:', reqInfo2)
+                #wait receive
+                ackInfo = utl.recv_dict(self.sock)
+                if ackInfo==None:
+                    return                                   
             except Exception as e:
                 print(f'Error1: {e}')
                 self.message_win(str(e))
                 return
+            #receive CMD_IMG_BUF_ACK    
+            if ackInfo['Cmd'] == utl.CMD_IMG_BUF_ACK:
+                buffer =  ackInfo['Buffer']
+            if camcfg != None:
+                pilimg = utl.make_pil_image(buffer, camcfg)
+                self.tkimg = ImageTk.PhotoImage(pilimg)
+                self.draw_image()
+                #self.root.after(1,self.draw_image)
+                #tm.sleep(1)
 
 
 

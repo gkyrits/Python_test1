@@ -708,11 +708,16 @@ class camera_win:
         self.tcp_thread.start()
 
 
-    def __send_image_4(self):
-        buffer = self.picam.capture_buffer()
+    def __send_image_cfg(self):
         config = self.picam.camera_configuration()["main"]
-        ackInfo1 = {'Cmd':utl.CMD_IMG_CFG_ACK, 'Config':config}
-        utl.send_dict(self.sock, ackInfo1)
+        ackInfo = {'Cmd':utl.CMD_IMG_CFG_ACK, 'Config':config}
+        utl.send_dict(self.sock, ackInfo)
+
+
+    def __send_image_buffer(self):
+        buffer = self.picam.capture_buffer()
+        ackInfo = {'Cmd':utl.CMD_IMG_BUF_ACK, 'Buffer':buffer}
+        utl.send_dict(self.sock, ackInfo)
 
 
     def __parse_tcp_cmds_4(self):
@@ -725,8 +730,10 @@ class camera_win:
             if reqInfo==None:
                     return
             print('received dict:', reqInfo)
-            if reqInfo['Cmd'] == utl.CMD_IMAGE_REQ:
-                self.__send_image_4()
+            if reqInfo['Cmd'] == utl.CMG_IMG_CFG_REQ:
+                self.__send_image_cfg()
+            if reqInfo['Cmd'] == utl.CMG_IMG_BUF_REQ:
+                self.__send_image_buffer()                
 
 
     def __wait_tcp_client_4(self):
