@@ -17,7 +17,7 @@ class main_win:
         self.pilimg = None  # Keep PIL image reference
         self.pvimg = None
         self.last_update_time = 0
-        self.min_update_interval = 0.033  # ~30 fps throttle (0.05=20fps) (0.016=60fps)
+        self.min_update_interval = 0.033  # fps throttle (0.033=30fps) (0.05=20fps) (0.016=60fps)
         self.update_pending = False  # Prevent multiple updates queued
         self.root = tk.Tk()
         self.root.title(self.APP_TITLE)
@@ -126,7 +126,7 @@ class main_win:
         try:
             self.sock.connect((self.ipStr.get(),self.PORT))           
         except Exception as e:
-            print(f'Error1: {e}')
+            print(f'Error2: {e}')
             self.message_win(str(e))
             self.statusLbl.configure(text='Disconnected')
             self.sock = None
@@ -149,12 +149,12 @@ class main_win:
                 self.sock.shutdown(socket.SHUT_RDWR)
                 self.sock.close()
             except Exception as e:
-                print(f'Error2: {e}')
+                print(f'Error3: {e}')
                 self.message_win(str(e))
                 return
             self.sock = None
-            print('wait thead..')
-            self.client_thrd.join()            
+            #print('wait thead..')
+            #self.client_thrd.join()
             print('Closed!')
 
 
