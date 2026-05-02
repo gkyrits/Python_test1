@@ -14,7 +14,11 @@ class main_win:
     def __init__(self):
         self.sock = None
         self.tkimg = None
+        self.pilimg = None  # Keep PIL image reference
         self.pvimg = None
+        self.last_update_time = 0
+        self.min_update_interval = 0.033  # ~30 fps throttle (0.05=20fps) (0.016=60fps)
+        self.update_pending = False  # Prevent multiple updates queued
         self.root = tk.Tk()
         self.root.title(self.APP_TITLE)
         self.root.minsize(250, 150)
@@ -63,12 +67,12 @@ class main_win:
 
 
     def draw_image(self):
-        print('Draw Image...')
-        if self.pvimg == None:
-            self.pvimg = self.canvas.create_image(1,1,anchor=tk.NW,image=self.tkimg)
-        else:
+        #print('Draw Image...')
+        self.update_pending = False
+        if self.pvimg == None and self.tkimg is not None:
+            self.pvimg = self.canvas.create_image(1, 1, anchor=tk.NW, image=self.tkimg)
+        elif self.tkimg is not None:
             self.canvas.itemconfig(self.pvimg, image=self.tkimg)
-        self.canvas.update()        
 
 
     def client_loop(self):
@@ -83,17 +87,17 @@ class main_win:
             try:
                 #send CMG_IMG_CFG_REQ
                 utl.send_dict(self.sock, reqInfo1)
-                print('sent dict:', reqInfo1)
+                #print('sent dict:', reqInfo1)
                 #wait receive
                 ackInfo = utl.recv_dict(self.sock)
                 if ackInfo==None:
                     return
-                print('received dict:', ackInfo)
+                #print('received dict:', ackInfo)
                 if ackInfo['Cmd'] == utl.CMD_IMG_CFG_ACK:
                     camcfg = ackInfo['Config']
                 #send CMG_IMG_BUF_REQ    
                 utl.send_dict(self.sock, reqInfo2)
-                print('sent dict:', reqInfo2)
+                #print('sent dict:', reqInfo2)
                 #wait receive
                 ackInfo = utl.recv_dict(self.sock)
                 if ackInfo==None:
@@ -106,11 +110,13 @@ class main_win:
             if ackInfo['Cmd'] == utl.CMD_IMG_BUF_ACK:
                 buffer =  ackInfo['Buffer']
             if camcfg != None:
-                pilimg = utl.make_pil_image(buffer, camcfg)
-                self.tkimg = ImageTk.PhotoImage(pilimg)
-                self.draw_image()
-                #self.root.after(1,self.draw_image)
-                #tm.sleep(1)
+                current_time = tm.time()
+                if current_time - self.last_update_time >= self.min_update_interval and not self.update_pending:
+                    self.pilimg = utl.make_pil_image(buffer, camcfg)
+                    self.tkimg = ImageTk.PhotoImage(self.pilimg)
+                    self.update_pending = True
+                    self.root.after(0, self.draw_image)
+                    self.last_update_time = current_time
 
 
 
