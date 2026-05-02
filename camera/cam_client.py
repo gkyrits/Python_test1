@@ -13,9 +13,10 @@ class main_win:
 
     def __init__(self):
         self.sock = None
-        self.tkimg = None
+        self.tkimg = [None, None]  # Two PhotoImage objects for double buffering
         self.pilimg = None  # Keep PIL image reference
         self.pvimg = None
+        self.current_img_idx = 0  # Index of current image being displayed
         self.last_update_time = 0
         self.min_update_interval = 0.033  # fps throttle (0.033=30fps) (0.05=20fps) (0.016=60fps)
         self.update_pending = False  # Prevent multiple updates queued
@@ -69,10 +70,10 @@ class main_win:
     def draw_image(self):
         #print('Draw Image...')
         self.update_pending = False
-        if self.pvimg == None and self.tkimg is not None:
-            self.pvimg = self.canvas.create_image(1, 1, anchor=tk.NW, image=self.tkimg)
-        elif self.tkimg is not None:
-            self.canvas.itemconfig(self.pvimg, image=self.tkimg)
+        if self.pvimg == None and self.tkimg[self.current_img_idx] is not None:
+            self.pvimg = self.canvas.create_image(1, 1, anchor=tk.NW, image=self.tkimg[self.current_img_idx])
+        elif self.tkimg[self.current_img_idx] is not None:
+            self.canvas.itemconfig(self.pvimg, image=self.tkimg[self.current_img_idx])
 
 
     def client_loop(self):
@@ -113,7 +114,11 @@ class main_win:
                 current_time = tm.time()
                 if current_time - self.last_update_time >= self.min_update_interval and not self.update_pending:
                     self.pilimg = utl.make_pil_image(buffer, camcfg)
-                    self.tkimg = ImageTk.PhotoImage(self.pilimg)
+                    # Update the non-current image (double buffering)
+                    next_idx = 1 - self.current_img_idx
+                    self.tkimg[next_idx] = ImageTk.PhotoImage(self.pilimg)
+                    # Switch to the updated image
+                    self.current_img_idx = next_idx
                     self.update_pending = True
                     self.root.after(0, self.draw_image)
                     self.last_update_time = current_time
