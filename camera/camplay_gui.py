@@ -729,11 +729,15 @@ class camera_win:
                 return
             if reqInfo==None:
                     return
-            print('received dict:', reqInfo)
-            if reqInfo['Cmd'] == utl.CMG_IMG_CFG_REQ:
-                self.__send_image_cfg()
-            if reqInfo['Cmd'] == utl.CMG_IMG_BUF_REQ:
-                self.__send_image_buffer()                
+            #print('received dict:', reqInfo)
+            try:
+                if reqInfo['Cmd'] == utl.CMG_IMG_CFG_REQ:
+                    self.__send_image_cfg()
+                if reqInfo['Cmd'] == utl.CMG_IMG_BUF_REQ:
+                    self.__send_image_buffer()
+            except Exception as e:
+                print(f'TCP server send: {e}')
+                return
 
 
     def __wait_tcp_client_4(self):
