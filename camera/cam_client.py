@@ -3,7 +3,7 @@ import PIL.Image as Image
 import PIL.ImageTk as ImageTk
 import threading as thrd
 import time as tm
-import camutils as utl
+import sockutils as scutl
 import socket
     
     
@@ -81,26 +81,26 @@ class main_win:
         while True:
             width = self.canvas.winfo_width()
             height = self.canvas.winfo_height()
-            reqInfo1 = {'Cmd': utl.CMG_IMG_CFG_REQ, 'Size': (width, height)}
-            reqInfo2 = {'Cmd': utl.CMG_IMG_BUF_REQ}
+            reqInfo1 = {'Cmd': scutl.CMG_IMG_CFG_REQ, 'Size': (width, height)}
+            reqInfo2 = {'Cmd': scutl.CMG_IMG_BUF_REQ}
             if  self.sock == None:
                 return
             try:
                 #send CMG_IMG_CFG_REQ
-                utl.send_dict(self.sock, reqInfo1)
+                scutl.send_dict(self.sock, reqInfo1)
                 #print('sent dict:', reqInfo1)
                 #wait receive
-                ackInfo = utl.recv_dict(self.sock)
+                ackInfo = scutl.recv_dict(self.sock)
                 if ackInfo==None:
                     return
                 #print('received dict:', ackInfo)
-                if ackInfo['Cmd'] == utl.CMD_IMG_CFG_ACK:
+                if ackInfo['Cmd'] == scutl.CMD_IMG_CFG_ACK:
                     camcfg = ackInfo['Config']
                 #send CMG_IMG_BUF_REQ    
-                utl.send_dict(self.sock, reqInfo2)
+                scutl.send_dict(self.sock, reqInfo2)
                 #print('sent dict:', reqInfo2)
                 #wait receive
-                ackInfo = utl.recv_dict(self.sock)
+                ackInfo = scutl.recv_dict(self.sock)
                 if ackInfo==None:
                     return                                   
             except Exception as e:
@@ -108,12 +108,12 @@ class main_win:
                 self.message_win(str(e))
                 return
             #receive CMD_IMG_BUF_ACK    
-            if ackInfo['Cmd'] == utl.CMD_IMG_BUF_ACK:
+            if ackInfo['Cmd'] == scutl.CMD_IMG_BUF_ACK:
                 buffer =  ackInfo['Buffer']
             if camcfg != None:
                 current_time = tm.time()
                 if current_time - self.last_update_time >= self.min_update_interval and not self.update_pending:
-                    self.pilimg = utl.make_pil_image(buffer, camcfg)
+                    self.pilimg = scutl.make_pil_image(buffer, camcfg)
                     # Update the non-current image (double buffering)
                     next_idx = 1 - self.current_img_idx
                     self.tkimg[next_idx] = ImageTk.PhotoImage(self.pilimg)
