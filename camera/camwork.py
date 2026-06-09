@@ -9,6 +9,7 @@ import socket
 import webutils as web
 import sockutils as scutl
 import genutils as utl
+import camoptions as opt
 
 import camplay_gui as gui
 
@@ -60,7 +61,7 @@ class camera_win:
     INFO_PROP_ID = 0
     INFO_SENSOR_ID = 1
 
-    def __init__(self, idx, cam_model, cam_num):
+    def __init__(self, idx, cam_model, cam_num, root=False):
         self.idx = idx
         self.cam_num = cam_num
         self.cam_model = cam_model
@@ -71,15 +72,18 @@ class camera_win:
         self.pilview_on = False
         self.fullview_on = False
         self.pvimg = None
-        self.hflip = tk.IntVar()
-        self.vflip = tk.IntVar()
         print(f'Start camera win {self.idx}')
         #build window
-        self.win = tk.Toplevel()
+        if not root:
+            self.win = tk.Toplevel()
+        else:
+            self.win = tk.Tk()
         self.win.title(cam_model)
         self.win.geometry("420x310+150+100")
         self.win.resizable(0,0)
         self.win.bind('<Destroy>',self.__close_win)
+        self.hflip = tk.IntVar()
+        self.vflip = tk.IntVar()        
         #menu
         mnBar = tk.Frame(self.win, relief=tk.SUNKEN, borderwidth=1, height=20)
         mnBar.pack(fill=tk.X)
@@ -641,6 +645,8 @@ class camera_win:
 
     def __options_btn(self):
         print('options button pressed')
+        optWin = opt.options_win(self.cam_model,self.picam.camera_properties,self.picam.sensor_modes)
+        set_modal(optWin.win)
 
 
     def on_top(self):
@@ -652,6 +658,9 @@ class camera_win:
 
     def close(self):
         self.win.destroy()
+
+    def run(self):
+        self.win.mainloop()        
 
 ##############################################################################################
 # Full Screen Preview Window Class

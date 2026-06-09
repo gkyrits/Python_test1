@@ -160,7 +160,13 @@ if __name__ == '__main__':
     camera_info = Picamera2.global_camera_info()
     #test_print(camera_info)
     #open Gui
-    mainWin=main_win(camera_info)
-    #...
-    mainWin.run()
+    if(len(camera_info) == 0):
+        print("No camera found!")
+    elif(len(camera_info) == 1):
+        cam_model =  camera_info[0]['Model']
+        camWin=cam.camera_win(0, cam_model, 0, root=True)        
+        camWin.run()
+    else :    
+        mainWin=main_win(camera_info)        
+        mainWin.run()
     print("End")
