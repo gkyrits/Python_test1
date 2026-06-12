@@ -11,7 +11,7 @@ _cam2_sens_obj = [{'format': 'MJPEG'}, {'format': 'YUYV'}]
 _cam3_prop_obj = {'Model': 'USB2.0 PC CAMERA', 'Location': 0, 'PixelArraySize': (640, 480), 'PixelArrayActiveAreas': [(0, 0, 640, 480)], 'SystemDevices': (20751,)}
 _cam3_sens_obj = [{'format': 'YUYV'}]
 
-_call_cnt=0
+_call_cnt=1
 
 
 def global_camera_info():
