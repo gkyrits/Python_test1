@@ -120,7 +120,7 @@ class camera_win:
         self.recBtn.pack(side=tk.LEFT, padx=2)
         self.webBtn = tk.Button(botfrm, text="Start Web", command=self.__start_web_4)
         self.webBtn.pack(side=tk.LEFT, padx=2)
-        botfrm.pack(side=tk.BOTTOM, fill=tk.X, pady=4)
+        botfrm.pack(side=tk.BOTTOM, fill=tk.X, pady=4)                
         #initialize Camera
         self.__initialize_Camera()
 
@@ -283,8 +283,18 @@ class camera_win:
     #take foto files support jpg, png, bmp, ...
     def __take_foto(self):
         print('capture_file...')
+        opt.update_options()
+        self.picam.options['quality'] = opt.cam_options["foto"]["quality"]
+        self.picam.options['compress_level'] = opt.cam_options["foto"]["compression"]
         capture_config = self.picam.create_still_configuration()
-        self.picam.switch_mode_and_capture_file(capture_config, "image.jpg")
+        capture_config["transform"] = Transform(hflip=self.hflip.get(), vflip=self.vflip.get())
+        capture_config["main"]["size"] = opt.cam_options["foto"]["size"]
+        #print("--------")
+        #utl.d_print(capture_config)
+        #print("--------")        
+        foto_path = utl.get_filename(opt.cam_options,"foto")
+        print('save foto to path: '+ foto_path)
+        self.picam.switch_mode_and_capture_file(capture_config, foto_path)
 
     #----------------------------------
     #take video files 10sec in different formats using different encoders

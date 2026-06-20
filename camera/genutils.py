@@ -30,6 +30,34 @@ def d_print(obj, indent=0, pre='', out=sys.stdout):
 
 
 ##############################################################################################
+# filename utils
+##############################################################################################
+
+def get_dtime_post():
+    """Get a date-time string for filename postfix."""
+    from datetime import datetime
+    now = datetime.now()
+    return now.strftime("_%Y%m%d_%H%M%S")
+
+def get_filename(options, part):
+    """Get a filename based on configured option."""
+    path = options[part]['path']
+    name = options[part]['name']
+    ext = options[part]['format']
+    dtime_post = options[part]['fname_dtime']
+    if dtime_post:
+        post = utl.get_dtime_post()
+    else:
+        post = ""
+    if path and name and ext:
+        return f"{path}/{name}{post}.{ext}"
+    else:
+        return "foto.jpg"
+
+    
+
+
+##############################################################################################
 # Text Info Window Class
 ##############################################################################################
 class info_win:

@@ -26,8 +26,9 @@ cam_options = {
     }
 }
 
-class options_win:
-    option_file = "cam_options.json"
+option_file = "cam_options.json"
+
+class options_win:    
 
     def __init__(self, model, cam_prop,cam_modes):
         #foto variables
@@ -180,7 +181,7 @@ class options_win:
         #load options from file
         import json
         try:
-            with open(self.option_file, 'r') as f:
+            with open(option_file, 'r') as f:
                 options = json.load(f)
             #foto options
             self.foto_path.set(options["foto"]["path"])
@@ -200,7 +201,7 @@ class options_win:
             #stream options
             self.stream_size = tuple(options["stream"]["size"])
         except FileNotFoundError:
-            print(f"Options file {self.option_file} not found. Using default options.")
+            print(f"Options file {option_file} not found. Using default options.")
 
 
     def _save_options(self):
@@ -228,8 +229,37 @@ class options_win:
             }
         }
         import json
-        with open(self.option_file, 'w') as f:
+        with open(option_file, 'w') as f:
             json.dump(options, f, indent=4)
-        print(f"Options saved to {self.option_file}")
+        print(f"Options saved to {option_file}")
         #close window
-        self.win.destroy()        
+        self.win.destroy()
+
+############################################
+
+def update_options():
+    #update options from file
+    import json
+    try:
+        with open(option_file, 'r') as f:
+            options = json.load(f)
+        #foto options
+        cam_options["foto"]["path"] = options["foto"]["path"]
+        cam_options["foto"]["size"] = tuple(options["foto"]["size"])
+        cam_options["foto"]["format"] = options["foto"]["format"]
+        cam_options["foto"]["quality"] = options["foto"]["quality"]
+        cam_options["foto"]["compression"] = options["foto"]["compression"]
+        cam_options["foto"]["name"] = options["foto"]["name"]
+        cam_options["foto"]["fname_dtime"] = options["foto"]["fname_dtime"]
+        cam_options["foto"]["fname_incnum"] = options["foto"]["fname_incnum"]
+        #video options
+        cam_options["video"]["path"] = options["video"]["path"]
+        cam_options["video"]["size"] = tuple(options["video"]["size"])
+        cam_options["video"]["name"] = options["video"]["name"]
+        cam_options["video"]["fname_dtime"] = options["video"]["fname_dtime"]
+        cam_options["video"]["fname_incnum"] = options["video"]["fname_incnum"]
+        #stream options
+        cam_options["stream"]["size"] = tuple(options["stream"]["size"])
+    except FileNotFoundError:
+        print(f"Options file {option_file} not found. Using default options.")
+        
