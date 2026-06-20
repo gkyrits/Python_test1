@@ -22,11 +22,16 @@ class options_win:
         p1=nb.add('Foto')
         p2=nb.add('Video')
         p3=nb.add('Stream')
+        #--(foto)
         self.dir_path(p1)
+        self.image_quality(p1)
         self.image_size(p1)
         self.image_format(p1)
+        self.file_name(p1)
+        #---(video)
         self.dir_path(p2)
         self.image_size(p2)
+        #---(stream)
         self.image_size(p3)
         nb.pack(padx=3, pady=3, fill=tk.BOTH, expand=1)      
         frm1.pack(side=tk.TOP,fill=tk.BOTH, expand=1)  
@@ -65,3 +70,29 @@ class options_win:
         cbx.selectitem(cbx_entries[0])
         cbx.pack(side=tk.LEFT, padx=2)
         frm.pack(side=tk.LEFT, anchor=tk.N)
+
+
+    def image_quality(self,parent):
+        frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
+        
+        # JPEG Quality row
+        tk.Label(frm, text="JPEG Quality :").grid(row=0, column=0, sticky=tk.W, padx=2)
+        tk.Label(frm, text="0").grid(row=0, column=1, sticky=tk.W, padx=2)
+        tk.Scale(frm, from_=0, to=95, orient=tk.HORIZONTAL, showvalue=0).grid(row=0, column=2, sticky=tk.EW, padx=2)
+        
+        # PNG Compression row
+        tk.Label(frm, text="PNG Compression :").grid(row=1, column=0, sticky=tk.W, padx=2)
+        tk.Label(frm, text="0").grid(row=1, column=1, sticky=tk.W, padx=2)
+        tk.Scale(frm, from_=0, to=9, orient=tk.HORIZONTAL, showvalue=0).grid(row=1, column=2, sticky=tk.EW, padx=2)
+        
+        frm.columnconfigure(2, weight=1)
+        frm.pack(side=tk.TOP, fill=tk.X, anchor=tk.W) 
+
+
+    def file_name(self,parent):
+        frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
+        tk.Label(frm, text="File Name").pack(side=tk.TOP, anchor=tk.W)
+        tk.Entry(frm, width=20).pack(side=tk.TOP, fill=tk.X, expand=1, padx=4)
+        tk.Checkbutton(frm, text="Num").pack(side=tk.LEFT, padx=2)
+        tk.Checkbutton(frm, text="Date").pack(side=tk.LEFT, padx=2)
+        frm.pack(side=tk.TOP, anchor=tk.W, fill=tk.X)
