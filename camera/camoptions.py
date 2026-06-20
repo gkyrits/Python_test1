@@ -1,16 +1,56 @@
 import tkinter as tk
 import Pmw as tk2
 
-BOX_FONT = "Arial 8"
+#BOX_FONT = "Arial 8"
+
+cam_options = {
+    "foto": {
+        "path": "",
+        "size": (2560, 1920),
+        "format": "jpeg",
+        "quality": 75,
+        "compression": 3,
+        "name": "foto",
+        "fname_dtime": True,
+        "fname_incnum": False
+    },
+    "video": {
+        "path": "",
+        "size": (1280, 960),
+        "name": "video",
+        "fname_dtime": True,
+        "fname_incnum": False
+    },
+    "stream": {
+        "size": (640, 480)
+    }
+}
 
 class options_win:
+    option_file = "cam_options.json"
 
     def __init__(self, model, cam_prop,cam_modes):
         #foto variables
-        self.qual_var = tk.IntVar(value=75)
-        self.compr_var = tk.IntVar(value=3)
         self.qual_lbl = None
-        self.compr_lbl = None
+        self.compr_lbl = None        
+        self.foto_path = tk.StringVar()
+        self.foto_qual = tk.IntVar(value=75)
+        self.foto_compr = tk.IntVar(value=3)        
+        self.foto_size = (2560,1920)
+        self.foto_format = "jpeg"
+        self.foto_name = tk.StringVar(value="foto")
+        self.foto_fname_dtime = tk.BooleanVar(value=True)
+        self.foto_fname_incnum = tk.BooleanVar(value=False)
+        #video variables
+        self.video_path = tk.StringVar()
+        self.video_size = (1280,960)
+        self.video_name = tk.StringVar(value="video")
+        self.video_fname_dtime = tk.BooleanVar(value=True)
+        self.video_fname_incnum = tk.BooleanVar(value=False)
+        #sream variables
+        self.stream_size = (640,480)
+        #load options from file
+        self._load_options()
         #create new window
         self.win = tk.Toplevel()
         tk2.initialise(self.win)
@@ -19,8 +59,8 @@ class options_win:
         #self.win.resizable(0,0)
         #add buttons_frm ======
         frm2=tk.Frame(self.win)
-        tk.Button(frm2, text="Ok").pack(side=tk.LEFT, padx=5)
-        tk.Button(frm2, text="Cancel").pack(side=tk.LEFT, padx=5)
+        tk.Button(frm2, text="Ok", command=self._save_options).pack(side=tk.LEFT, padx=5)
+        tk.Button(frm2, text="Cancel", command=self.win.destroy).pack(side=tk.LEFT, padx=5)
         frm2.pack(side=tk.BOTTOM, anchor=tk.W, pady=3)        
         #add main_frm ======
         frm1=tk.Frame(self.win)
@@ -29,89 +69,167 @@ class options_win:
         p2=nb.add('Video')
         p3=nb.add('Stream')
         #--(foto)
-        self.dir_path(p1)
-        self.file_name(p1,"foto")
+        self.dir_path(p1,self.foto_path)
+        self.file_name(p1,self.foto_name,self.foto_fname_dtime,self.foto_fname_incnum)
         self.image_quality(p1)
-        self.foto_options(p1)
+        self.foto_options(p1,"foto_size")
         #---(video)
-        self.dir_path(p2)
-        self.file_name(p2,"video")
-        self.image_size(p2)
-        #---(stream)
-        self.image_size(p3)
+        self.dir_path(p2,self.video_path)
+        self.file_name(p2,self.video_name,self.video_fname_dtime,self.video_fname_incnum)
+        self.image_size(p2,"video_size")
+        #---(stream)        
+        self.image_size(p3,"stream_size")
         nb.pack(padx=3, pady=3, fill=tk.BOTH, expand=1)      
         frm1.pack(side=tk.TOP,fill=tk.BOTH, expand=1)  
 
 
-    def dir_path(self,parent):
-        path = tk.StringVar()
+    def dir_path(self,parent,path_var):        
         frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
         tk.Label(frm, text="Save Path").pack(side=tk.TOP, anchor=tk.W)
-        tk.Entry(frm, textvariable=path, width=20).pack(side=tk.LEFT, fill=tk.X, expand=1, padx=2)
-        tk.Button(frm, text="..", command=lambda: self._browse_dir(path)).pack(side=tk.RIGHT, padx=2)
+        tk.Entry(frm, textvariable=path_var, width=20).pack(side=tk.LEFT, fill=tk.X, expand=1, padx=2)
+        tk.Button(frm, text="..", command=lambda: self._browse_dir(path_var)).pack(side=tk.RIGHT, padx=2)
         frm.pack(side=tk.TOP, anchor=tk.W, fill=tk.X)
 
-    def _browse_dir(self, path):
+    def _browse_dir(self, path_var):
         from tkinter import filedialog
         seldir = filedialog.askdirectory(title="Select Directory")
         if seldir:
-            path.set(seldir)
+            path_var.set(seldir)
 
 
-    def image_size(self,parent):
+    def image_size(self,parent, size_attr):
         frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
         tk.Label(frm, text="Image Size").pack(side=tk.TOP, anchor=tk.W)
         cbx_entries = ['160x120', '320x240', '640x480', "1280x960", "2560x1920"] 
-        cbx = tk2.ComboBox(frm, labelpos='w', entry_width=10, listheight=80, dropdown=1, scrolledlist_items=cbx_entries) # label_text='Size:',
-        cbx.selectitem(cbx_entries[1])
+        cur_size = getattr(self, size_attr)
+        cbx = tk2.ComboBox(frm, labelpos='w', entryfield_entry_width=10, listheight=80, dropdown=1, scrolledlist_items=cbx_entries, 
+                           selectioncommand=lambda size: self._update_size(size, size_attr))
+        #cbx.selectitem(cbx_entries[1])
+        cbx.selectitem(f"{cur_size[0]}x{cur_size[1]}")
         cbx.pack(side=tk.LEFT, padx=2)
         frm.pack(side=tk.LEFT, anchor=tk.NW)
 
+    def _update_size(self, size, size_attr):
+        width, height = map(int, size.split('x'))
+        setattr(self, size_attr, (width, height))
 
     def image_format(self,parent):
         frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
         tk.Label(frm, text="Image Format").pack(side=tk.TOP, anchor=tk.W)
         cbx_entries = ['jpeg', 'png', 'bmp', "gif"] 
-        cbx = tk2.ComboBox(frm, labelpos='w', entry_width=10, listheight=80, dropdown=1, scrolledlist_items=cbx_entries) # label_text='Size:',
-        cbx.selectitem(cbx_entries[0])
+        cbx = tk2.ComboBox(frm, labelpos='w', entryfield_entry_width=10, listheight=80, dropdown=1, scrolledlist_items=cbx_entries, selectioncommand=self._update_foto_format)
+        cbx.selectitem(self.foto_format)
         cbx.pack(side=tk.LEFT, padx=2)
         frm.pack(side=tk.LEFT, anchor=tk.W)
 
-    def foto_options(self,parent):    
+    def _update_foto_format(self, fmt):
+        self.foto_format = fmt
+
+
+    def foto_options(self,parent, size_attr):    
         frm=tk.Frame(parent)
-        self.image_size(frm)
+        self.image_size(frm,size_attr)
         self.image_format(frm)
         frm.pack(side=tk.TOP,  anchor=tk.W)
 
     def _slider_change(self, var):
-        self.qual_lbl.config(text=str(self.qual_var.get()))
-        self.compr_lbl.config(text=str(self.compr_var.get()))
+        self.qual_lbl.config(text=str(self.foto_qual.get()))
+        self.compr_lbl.config(text=str(self.foto_compr.get()))
 
     def image_quality(self,parent):
         frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)        
         # JPEG Quality row        
         tk.Label(frm, text="JPEG Quality :").grid(row=0, column=0, sticky=tk.W, padx=2)
-        self.qual_lbl = tk.Label(frm, text=str(self.qual_var.get()))
+        self.qual_lbl = tk.Label(frm, text=str(self.foto_qual.get()))
         self.qual_lbl.grid(row=0, column=1, sticky=tk.W, padx=2)
-        tk.Scale(frm, from_=0, to=95, orient=tk.HORIZONTAL, showvalue=0, variable=self.qual_var, command=self._slider_change).grid(row=0, column=2, sticky=tk.EW, padx=2)
+        tk.Scale(frm, from_=0, to=95, orient=tk.HORIZONTAL, showvalue=0, variable=self.foto_qual, command=self._slider_change).grid(row=0, column=2, sticky=tk.EW, padx=2)
         # PNG Compression row        
         tk.Label(frm, text="PNG Compression :").grid(row=1, column=0, sticky=tk.W, padx=2)
-        self.compr_lbl = tk.Label(frm, text=str(self.compr_var.get()))
+        self.compr_lbl = tk.Label(frm, text=str(self.foto_compr.get()))
         self.compr_lbl.grid(row=1, column=1, sticky=tk.W, padx=2)
-        tk.Scale(frm, from_=0, to=9, orient=tk.HORIZONTAL, showvalue=0, variable=self.compr_var, command=self._slider_change).grid(row=1, column=2, sticky=tk.EW, padx=2)
+        tk.Scale(frm, from_=0, to=9, orient=tk.HORIZONTAL, showvalue=0, variable=self.foto_compr, command=self._slider_change).grid(row=1, column=2, sticky=tk.EW, padx=2)
         frm.columnconfigure(2, weight=1)
         frm.pack(side=tk.TOP, fill=tk.X, anchor=tk.W) 
 
 
-    def file_name(self,parent,fname=""):
-        fname = tk.StringVar(value=fname)
+    def file_name(self,parent,fname,fname_dtime,fname_incnum):        
         frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
         frmnm=tk.Frame(frm)
         tk.Label(frmnm, text="File Name").pack(side=tk.TOP, anchor=tk.W)
         tk.Entry(frmnm, width=20, textvariable=fname).pack(side=tk.LEFT, anchor=tk.W, padx=4)
         frmnm.pack(side=tk.LEFT, anchor=tk.W)
         frmopt = tk.Frame(frm)
-        tk.Checkbutton(frmopt, text="Auto Number", pady=0).pack(side=tk.TOP, anchor=tk.W, padx=2)
-        tk.Checkbutton(frmopt, text="DateTime", pady=0).pack(side=tk.TOP, anchor=tk.W, padx=2)        
+        auto_num_chk = tk.Checkbutton(frmopt, text="Auto Number", variable=fname_incnum, pady=0)
+        auto_num_chk.pack(side=tk.TOP, anchor=tk.W, padx=2)
+        date_chk = tk.Checkbutton(frmopt, text="DateTime", variable=fname_dtime, pady=0)
+        date_chk.pack(side=tk.TOP, anchor=tk.W, padx=2)
+        if fname_incnum.get():
+            auto_num_chk.select()
+        else:
+            auto_num_chk.deselect()
+        if fname_dtime.get():
+            date_chk.select()
+        else:
+            date_chk.deselect()
         frmopt.pack(side=tk.LEFT, anchor=tk.W)        
         frm.pack(side=tk.TOP, anchor=tk.W, fill=tk.X) 
+
+    #================================================
+
+    def _load_options(self):
+        #load options from file
+        import json
+        try:
+            with open(self.option_file, 'r') as f:
+                options = json.load(f)
+            #foto options
+            self.foto_path.set(options["foto"]["path"])
+            self.foto_size = tuple(options["foto"]["size"])
+            self.foto_format = options["foto"]["format"]
+            self.foto_qual.set(options["foto"]["quality"])
+            self.foto_compr.set(options["foto"]["compression"])
+            self.foto_name.set(options["foto"]["name"])
+            self.foto_fname_dtime.set(options["foto"]["fname_dtime"])
+            self.foto_fname_incnum.set(options["foto"]["fname_incnum"])
+            #video options
+            self.video_path.set(options["video"]["path"])
+            self.video_size = tuple(options["video"]["size"])
+            self.video_name.set(options["video"]["name"])
+            self.video_fname_dtime.set(options["video"]["fname_dtime"])
+            self.video_fname_incnum.set(options["video"]["fname_incnum"])
+            #stream options
+            self.stream_size = tuple(options["stream"]["size"])
+        except FileNotFoundError:
+            print(f"Options file {self.option_file} not found. Using default options.")
+
+
+    def _save_options(self):
+        #save options to file
+        options = {
+            "foto": {
+                "path": self.foto_path.get(),
+                "size": self.foto_size,
+                "format": self.foto_format,
+                "quality": self.foto_qual.get(),
+                "compression": self.foto_compr.get(),
+                "name": self.foto_name.get(),
+                "fname_dtime": self.foto_fname_dtime.get(),
+                "fname_incnum": self.foto_fname_incnum.get()
+            },
+            "video": {
+                "path": self.video_path.get(),
+                "size": self.video_size,
+                "name": self.video_name.get(),
+                "fname_dtime": self.video_fname_dtime.get(),
+                "fname_incnum": self.video_fname_incnum.get()
+            },
+            "stream": {
+                "size": self.stream_size
+            }
+        }
+        import json
+        with open(self.option_file, 'w') as f:
+            json.dump(options, f, indent=4)
+        print(f"Options saved to {self.option_file}")
+        #close window
+        self.win.destroy()        
