@@ -24,9 +24,8 @@ class options_win:
         p3=nb.add('Stream')
         #--(foto)
         self.dir_path(p1)
-        self.image_quality(p1)
-        self.image_size(p1)
-        self.image_format(p1)
+        self.image_quality(p1)        
+        self.foto_options(p1)        
         self.file_name(p1)
         #---(video)
         self.dir_path(p2)
@@ -59,7 +58,7 @@ class options_win:
         cbx = tk2.ComboBox(frm, labelpos='w', entry_width=10, listheight=80, dropdown=1, scrolledlist_items=cbx_entries) # label_text='Size:',
         cbx.selectitem(cbx_entries[1])
         cbx.pack(side=tk.LEFT, padx=2)
-        frm.pack(side=tk.LEFT, anchor=tk.N)
+        frm.pack(side=tk.LEFT, anchor=tk.NW)
 
 
     def image_format(self,parent):
@@ -69,22 +68,25 @@ class options_win:
         cbx = tk2.ComboBox(frm, labelpos='w', entry_width=10, listheight=80, dropdown=1, scrolledlist_items=cbx_entries) # label_text='Size:',
         cbx.selectitem(cbx_entries[0])
         cbx.pack(side=tk.LEFT, padx=2)
-        frm.pack(side=tk.LEFT, anchor=tk.N)
+        frm.pack(side=tk.LEFT, anchor=tk.W)
+
+    def foto_options(self,parent):    
+        frm=tk.Frame(parent)
+        self.image_size(frm)
+        self.image_format(frm)
+        frm.pack(side=tk.TOP,  anchor=tk.W)
 
 
     def image_quality(self,parent):
-        frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
-        
+        frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)        
         # JPEG Quality row
         tk.Label(frm, text="JPEG Quality :").grid(row=0, column=0, sticky=tk.W, padx=2)
         tk.Label(frm, text="0").grid(row=0, column=1, sticky=tk.W, padx=2)
-        tk.Scale(frm, from_=0, to=95, orient=tk.HORIZONTAL, showvalue=0).grid(row=0, column=2, sticky=tk.EW, padx=2)
-        
+        tk.Scale(frm, from_=0, to=95, orient=tk.HORIZONTAL, showvalue=0).grid(row=0, column=2, sticky=tk.EW, padx=2)        
         # PNG Compression row
         tk.Label(frm, text="PNG Compression :").grid(row=1, column=0, sticky=tk.W, padx=2)
         tk.Label(frm, text="0").grid(row=1, column=1, sticky=tk.W, padx=2)
-        tk.Scale(frm, from_=0, to=9, orient=tk.HORIZONTAL, showvalue=0).grid(row=1, column=2, sticky=tk.EW, padx=2)
-        
+        tk.Scale(frm, from_=0, to=9, orient=tk.HORIZONTAL, showvalue=0).grid(row=1, column=2, sticky=tk.EW, padx=2)        
         frm.columnconfigure(2, weight=1)
         frm.pack(side=tk.TOP, fill=tk.X, anchor=tk.W) 
 
@@ -92,7 +94,8 @@ class options_win:
     def file_name(self,parent):
         frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
         tk.Label(frm, text="File Name").pack(side=tk.TOP, anchor=tk.W)
-        tk.Entry(frm, width=20).pack(side=tk.TOP, fill=tk.X, expand=1, padx=4)
+        tk.Entry(frm, width=20).pack(side=tk.TOP, anchor=tk.W, padx=4)
         tk.Checkbutton(frm, text="Num").pack(side=tk.LEFT, padx=2)
         tk.Checkbutton(frm, text="Date").pack(side=tk.LEFT, padx=2)
-        frm.pack(side=tk.TOP, anchor=tk.W, fill=tk.X)
+        #frm.place(x=0, rely=1.0, anchor=tk.SW)
+        frm.pack(side=tk.TOP, anchor=tk.W, fill=tk.X) 
