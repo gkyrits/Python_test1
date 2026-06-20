@@ -5,7 +5,13 @@ BOX_FONT = "Arial 8"
 
 class options_win:
 
-    def __init__(self, model, cam_prop,cam_modes):        
+    def __init__(self, model, cam_prop,cam_modes):
+        #foto variables
+        self.qual_var = tk.IntVar(value=75)
+        self.compr_var = tk.IntVar(value=3)
+        self.qual_lbl = None
+        self.compr_lbl = None
+        #create new window
         self.win = tk.Toplevel()
         tk2.initialise(self.win)
         self.win.title("Options Model: "+model)
@@ -24,11 +30,12 @@ class options_win:
         p3=nb.add('Stream')
         #--(foto)
         self.dir_path(p1)
-        self.image_quality(p1)        
-        self.foto_options(p1)        
-        self.file_name(p1)
+        self.file_name(p1,"foto")
+        self.image_quality(p1)
+        self.foto_options(p1)
         #---(video)
         self.dir_path(p2)
+        self.file_name(p2,"video")
         self.image_size(p2)
         #---(stream)
         self.image_size(p3)
@@ -41,10 +48,10 @@ class options_win:
         frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
         tk.Label(frm, text="Save Path").pack(side=tk.TOP, anchor=tk.W)
         tk.Entry(frm, textvariable=path, width=20).pack(side=tk.LEFT, fill=tk.X, expand=1, padx=2)
-        tk.Button(frm, text="..", command=lambda: self.browse_dir(path)).pack(side=tk.RIGHT, padx=2)
+        tk.Button(frm, text="..", command=lambda: self._browse_dir(path)).pack(side=tk.RIGHT, padx=2)
         frm.pack(side=tk.TOP, anchor=tk.W, fill=tk.X)
 
-    def browse_dir(self, path):
+    def _browse_dir(self, path):
         from tkinter import filedialog
         seldir = filedialog.askdirectory(title="Select Directory")
         if seldir:
@@ -76,26 +83,35 @@ class options_win:
         self.image_format(frm)
         frm.pack(side=tk.TOP,  anchor=tk.W)
 
+    def _slider_change(self, var):
+        self.qual_lbl.config(text=str(self.qual_var.get()))
+        self.compr_lbl.config(text=str(self.compr_var.get()))
 
     def image_quality(self,parent):
         frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)        
-        # JPEG Quality row
+        # JPEG Quality row        
         tk.Label(frm, text="JPEG Quality :").grid(row=0, column=0, sticky=tk.W, padx=2)
-        tk.Label(frm, text="0").grid(row=0, column=1, sticky=tk.W, padx=2)
-        tk.Scale(frm, from_=0, to=95, orient=tk.HORIZONTAL, showvalue=0).grid(row=0, column=2, sticky=tk.EW, padx=2)        
-        # PNG Compression row
+        self.qual_lbl = tk.Label(frm, text=str(self.qual_var.get()))
+        self.qual_lbl.grid(row=0, column=1, sticky=tk.W, padx=2)
+        tk.Scale(frm, from_=0, to=95, orient=tk.HORIZONTAL, showvalue=0, variable=self.qual_var, command=self._slider_change).grid(row=0, column=2, sticky=tk.EW, padx=2)
+        # PNG Compression row        
         tk.Label(frm, text="PNG Compression :").grid(row=1, column=0, sticky=tk.W, padx=2)
-        tk.Label(frm, text="0").grid(row=1, column=1, sticky=tk.W, padx=2)
-        tk.Scale(frm, from_=0, to=9, orient=tk.HORIZONTAL, showvalue=0).grid(row=1, column=2, sticky=tk.EW, padx=2)        
+        self.compr_lbl = tk.Label(frm, text=str(self.compr_var.get()))
+        self.compr_lbl.grid(row=1, column=1, sticky=tk.W, padx=2)
+        tk.Scale(frm, from_=0, to=9, orient=tk.HORIZONTAL, showvalue=0, variable=self.compr_var, command=self._slider_change).grid(row=1, column=2, sticky=tk.EW, padx=2)
         frm.columnconfigure(2, weight=1)
         frm.pack(side=tk.TOP, fill=tk.X, anchor=tk.W) 
 
 
-    def file_name(self,parent):
+    def file_name(self,parent,fname=""):
+        fname = tk.StringVar(value=fname)
         frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
-        tk.Label(frm, text="File Name").pack(side=tk.TOP, anchor=tk.W)
-        tk.Entry(frm, width=20).pack(side=tk.TOP, anchor=tk.W, padx=4)
-        tk.Checkbutton(frm, text="Num").pack(side=tk.LEFT, padx=2)
-        tk.Checkbutton(frm, text="Date").pack(side=tk.LEFT, padx=2)
-        #frm.place(x=0, rely=1.0, anchor=tk.SW)
+        frmnm=tk.Frame(frm)
+        tk.Label(frmnm, text="File Name").pack(side=tk.TOP, anchor=tk.W)
+        tk.Entry(frmnm, width=20, textvariable=fname).pack(side=tk.LEFT, anchor=tk.W, padx=4)
+        frmnm.pack(side=tk.LEFT, anchor=tk.W)
+        frmopt = tk.Frame(frm)
+        tk.Checkbutton(frmopt, text="Auto Number", pady=0).pack(side=tk.TOP, anchor=tk.W, padx=2)
+        tk.Checkbutton(frmopt, text="DateTime", pady=0).pack(side=tk.TOP, anchor=tk.W, padx=2)        
+        frmopt.pack(side=tk.LEFT, anchor=tk.W)        
         frm.pack(side=tk.TOP, anchor=tk.W, fill=tk.X) 
