@@ -17,6 +17,10 @@ cam_options = {
     "video": {
         "path": "",
         "size": (1280, 960),
+        "format": "mp4",
+        "quality": "medium",
+        "encoder": "auto",
+        "duration": 10,
         "name": "video",
         "fname_dtime": True,
         "fname_incnum": False
@@ -45,6 +49,10 @@ class options_win:
         #video variables
         self.video_path = tk.StringVar()
         self.video_size = (1280,960)
+        self.video_format = "mp4"
+        self.video_quality = "medium"
+        self.video_encoder = "auto"
+        self.video_duration = tk.IntVar(value=10)
         self.video_name = tk.StringVar(value="video")
         self.video_fname_dtime = tk.BooleanVar(value=True)
         self.video_fname_incnum = tk.BooleanVar(value=False)
@@ -72,12 +80,13 @@ class options_win:
         #--(foto)
         self.dir_path(p1,self.foto_path)
         self.file_name(p1,self.foto_name,self.foto_fname_dtime,self.foto_fname_incnum)
-        self.image_quality(p1)
+        self.image_quality_fnc(p1)
         self.foto_options(p1,"foto_size")
         #---(video)
         self.dir_path(p2,self.video_path)
         self.file_name(p2,self.video_name,self.video_fname_dtime,self.video_fname_incnum)
-        self.image_size(p2,"video_size")
+        self.video_encoder_options(p2)
+        self.video_options(p2,"video_size")
         #---(stream)        
         self.image_size(p3,"stream_size")
         nb.pack(padx=3, pady=3, fill=tk.BOTH, expand=1)      
@@ -114,7 +123,8 @@ class options_win:
         width, height = map(int, size.split('x'))
         setattr(self, size_attr, (width, height))
 
-    def image_format(self,parent):
+
+    def image_format_fnc(self,parent):
         frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
         tk.Label(frm, text="Image Format").pack(side=tk.TOP, anchor=tk.W)
         cbx_entries = ['jpeg', 'png', 'bmp', "gif"] 
@@ -130,14 +140,15 @@ class options_win:
     def foto_options(self,parent, size_attr):    
         frm=tk.Frame(parent)
         self.image_size(frm,size_attr)
-        self.image_format(frm)
+        self.image_format_fnc(frm)
         frm.pack(side=tk.TOP,  anchor=tk.W)
+
 
     def _slider_change(self, var):
         self.qual_lbl.config(text=str(self.foto_qual.get()))
         self.compr_lbl.config(text=str(self.foto_compr.get()))
 
-    def image_quality(self,parent):
+    def image_quality_fnc(self,parent):
         frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)        
         # JPEG Quality row        
         tk.Label(frm, text="JPEG Quality :").grid(row=0, column=0, sticky=tk.W, padx=2)
@@ -153,6 +164,68 @@ class options_win:
         frm.pack(side=tk.TOP, fill=tk.X, anchor=tk.W) 
 
 
+    def video_format_fnc(self,parent):
+        frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
+        tk.Label(frm, text="Video Format").pack(side=tk.TOP, anchor=tk.W)
+        cbx_entries = ['mp4', 'avi', 'mov', 'mkv', "h264", "mjpg", "mjpeg"]
+        cbx = tk2.ComboBox(frm, labelpos='w', entryfield_entry_width=10, listheight=80, dropdown=1, scrolledlist_items=cbx_entries, selectioncommand=self._update_video_format)
+        cbx.selectitem(self.video_format)
+        cbx.pack(side=tk.LEFT, padx=2)
+        frm.pack(side=tk.LEFT, anchor=tk.W)
+
+    def _update_video_format(self, fmt):
+        self.video_format = fmt
+
+    def video_quality_fnc(self,parent):
+        #frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
+        frm=tk.Frame(parent)
+        tk.Label(frm, text="Video Quality").pack(side=tk.TOP, anchor=tk.W)
+        cbx_entries = ['very low','low', 'medium', 'high', 'very high']
+        cbx = tk2.ComboBox(frm, labelpos='w', entryfield_entry_width=10, listheight=80, dropdown=1, scrolledlist_items=cbx_entries, selectioncommand=self._update_video_quality)
+        cbx.selectitem(self.video_quality)
+        cbx.pack(side=tk.LEFT, padx=2)
+        frm.pack(side=tk.LEFT, anchor=tk.W)
+
+    def _update_video_quality(self, quality):
+        self.video_quality = quality
+
+
+    def video_options(self,parent, size_attr):    
+        frm=tk.Frame(parent)
+        self.image_size(frm,size_attr)
+        self.video_format_fnc(frm)        
+        frm.pack(side=tk.TOP,  anchor=tk.W)
+
+
+    def video_encoder_fnc(self,parent):
+        #frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
+        frm=tk.Frame(parent)
+        tk.Label(frm, text="Video Encoder").pack(side=tk.TOP, anchor=tk.W)
+        cbx_entries = ['auto','FFMPEG', 'H264', 'MJPEG', 'jpeg', 'none']
+        cbx = tk2.ComboBox(frm, labelpos='w', entryfield_entry_width=10, listheight=80, dropdown=1, scrolledlist_items=cbx_entries, selectioncommand=self._update_video_encoder)
+        cbx.selectitem(self.video_encoder)
+        cbx.pack(side=tk.LEFT, padx=2)
+        frm.pack(side=tk.LEFT, anchor=tk.W)
+
+    def _update_video_encoder(self, encoder):
+        self.video_encoder = encoder
+
+
+    def video_encoder_options(self,parent):
+        frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)  
+        self.video_encoder_fnc(frm)
+        self.video_quality_fnc(frm)
+        #..duration
+        frmnm=tk.Frame(frm)
+        tk.Label(frmnm, text="Duration").pack(side=tk.TOP, anchor=tk.W)
+        tk.Entry(frmnm, width=5, textvariable=self.video_duration).pack(side=tk.LEFT, anchor=tk.W, padx=4)
+        tk.Label(frmnm, text="Sec").pack(side=tk.LEFT, anchor=tk.W)
+        frmnm.pack(side=tk.LEFT, anchor=tk.W)   
+        #...     
+        frm.pack(side=tk.TOP, fill=tk.X, anchor=tk.W) 
+
+
+    #---file name frame
     def file_name(self,parent,fname,fname_dtime,fname_incnum):        
         frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
         frmnm=tk.Frame(frm)
