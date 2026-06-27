@@ -271,6 +271,10 @@ class options_win:
             self.video_name.set(options["video"]["name"])
             self.video_fname_dtime.set(options["video"]["fname_dtime"])
             self.video_fname_incnum.set(options["video"]["fname_incnum"])
+            self.video_format = options["video"]["format"]
+            self.video_quality = options["video"]["quality"]
+            self.video_encoder = options["video"]["encoder"]
+            self.video_duration.set(options["video"]["duration"])            
             #stream options
             self.stream_size = tuple(options["stream"]["size"])
         except FileNotFoundError:
@@ -295,7 +299,11 @@ class options_win:
                 "size": self.video_size,
                 "name": self.video_name.get(),
                 "fname_dtime": self.video_fname_dtime.get(),
-                "fname_incnum": self.video_fname_incnum.get()
+                "fname_incnum": self.video_fname_incnum.get(),
+                "format": self.video_format,
+                "quality": self.video_quality,
+                "encoder": self.video_encoder,
+                "duration": self.video_duration.get()
             },
             "stream": {
                 "size": self.stream_size
@@ -331,6 +339,10 @@ def update_options():
         cam_options["video"]["name"] = options["video"]["name"]
         cam_options["video"]["fname_dtime"] = options["video"]["fname_dtime"]
         cam_options["video"]["fname_incnum"] = options["video"]["fname_incnum"]
+        cam_options["video"]["format"] = options["video"]["format"]
+        cam_options["video"]["quality"] = options["video"]["quality"]
+        cam_options["video"]["encoder"] = options["video"]["encoder"]
+        cam_options["video"]["duration"] = options["video"]["duration"]
         #stream options
         cam_options["stream"]["size"] = tuple(options["stream"]["size"])
     except FileNotFoundError:
