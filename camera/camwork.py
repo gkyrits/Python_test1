@@ -96,9 +96,9 @@ class camera_win:
         mnBtn1['menu'] = mnBtn1.menu
         #left butt form
         leftfrm = tk.Frame(self.win)
-        tk.Button(leftfrm, text="Snap", command=self.__snap_buffer_image, width=7).pack(side=tk.TOP, padx=2)
-        tk.Button(leftfrm, text="View", command=self.__preview_pil_image, width=7).pack(side=tk.TOP, padx=2)
-        tk.Button(leftfrm, text="PreView", command=self.__preview_btn, width=7).pack(side=tk.TOP, padx=2)
+        tk.Button(leftfrm, text="Snap", command=self.snap_buffer_image, width=7).pack(side=tk.TOP, padx=2)
+        tk.Button(leftfrm, text="PreView", command=self.preview_pil_video, width=7).pack(side=tk.TOP, padx=2)
+        tk.Button(leftfrm, text="QTView", command=self.QTpreview_btn, width=7).pack(side=tk.TOP, padx=2)
         tk.Button(leftfrm, text="Options", command=self.__options_btn, width=7).pack(side=tk.TOP, padx=2)
         #--frame checkbuttons
         ckbtnFrm = tk.Frame(leftfrm)
@@ -114,8 +114,8 @@ class camera_win:
         canvfrm.pack(side=tk.TOP, padx=4, pady=4)
         #bottom butt form
         botfrm = tk.Frame(self.win)
-        tk.Button(botfrm, text="Foto", command=self.__take_foto).pack(side=tk.LEFT, padx=2)
-        tk.Button(botfrm, text="Video", command=self.__take_video_6).pack(side=tk.LEFT, padx=2)
+        tk.Button(botfrm, text="Foto", command=self.take_foto).pack(side=tk.LEFT, padx=2)
+        tk.Button(botfrm, text="Video", command=self.snap_ffmpeg_video).pack(side=tk.LEFT, padx=2)
         self.recBtn = tk.Button(botfrm, text="Start Rec", command=self.__start_video)
         self.recBtn.pack(side=tk.LEFT, padx=2)
         self.webBtn = tk.Button(botfrm, text="Start Web", command=self.__start_web_4)
@@ -189,7 +189,7 @@ class camera_win:
 
     #----------------------------------
     #default QT preview using picamera2
-    def __preview_btn(self):
+    def QTpreview_btn(self):
         if not self.preview_on:
             self.preview_on = True
             self.picam.stop_preview()
@@ -201,7 +201,7 @@ class camera_win:
 
     #----------------------------------
     #preview foto using PIL
-    def __snap_pil_image(self):
+    def snap_pil_image(self):
         print('snap PIL image ...')
         pilimg = self.picam.capture_image('main')
         print(pilimg.size)
@@ -211,7 +211,7 @@ class camera_win:
 
     #----------------------------------
     #test foto using buffer caprure
-    def __snap_buffer_image(self):
+    def snap_buffer_image(self):
         print('snap buffer image ...')
         print('--------')
         utl.d_print(self.picam.camera_configuration())
@@ -227,7 +227,7 @@ class camera_win:
 
     #----------------------------------
     #preview video using PIL
-    def __preview_pil_image(self):
+    def preview_pil_video(self):
         if not self.pilview_on:
             # start PIL thread
             print('preview PIL start ...')
@@ -281,7 +281,7 @@ class camera_win:
 
     #----------------------------------
     #take foto files support jpg, png, bmp, ...
-    def __take_foto(self):
+    def take_foto(self):
         print('capture_file...')
         opt.update_options()
         self.picam.options['quality'] = opt.cam_options["foto"]["quality"]
@@ -298,10 +298,11 @@ class camera_win:
 
     #----------------------------------
     #take video files 10sec in different formats using different encoders
-    def __take_video_1(self):
-        print('capture_video 1.. mp4')
+    #auto video snap
+    def snap_auto_video(self, duration=10, path="test1.mp4"):
+        print('snap_auto_video.. duration='+str(duration)+' sec  path='+path)
         self.picam.stop()
-        self.picam.start_and_record_video("test1.mp4", duration=10, audio=True)
+        self.picam.start_and_record_video(path, duration=duration, audio=True)
         self.picam.stop()
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
@@ -343,6 +344,7 @@ class camera_win:
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
 
+
     def __take_video_5(self):
         print('capture_video 5.. raw')
         self.picam.stop()
@@ -361,8 +363,10 @@ class camera_win:
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
 
-    def __take_video_6(self):
-        print('capture_video 6.. mp4')
+
+    #FFMPEG video snap
+    def snap_ffmpeg_video(self, duration=10, path="test6.mp4"):
+        print('snap_ffmpeg_video.. duration='+str(duration)+' sec  path='+path)
         self.picam.stop()
         video_conf = self.picam.create_video_configuration()
         cam_config_size(video_conf, [640,480])
@@ -375,13 +379,26 @@ class camera_win:
         utl.d_print(self.picam.camera_configuration())
         print("--------")
         encoder = H264Encoder()
-        output = FfmpegOutput("test6.mp4", audio=True)
+        output = FfmpegOutput(path, audio=True)
         self.picam.start_recording(encoder, output)
-        tm.sleep(10)
+        tm.sleep(duration)
         self.picam.stop_recording()
         self.picam.stop()
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
+
+
+    def snap_video(self):
+        encod = opt.cam_options["video"]["encoder"]
+        format = opt.cam_options["video"]["format"]
+        duration = opt.cam_options["video"]["duration"]
+        path = utl.get_filename(opt.cam_options,"video")
+        if encod == "auto":
+            self.snap_auto_video(duration=duration, path=path)
+        elif encod == "FFMPEG":
+            self.snap_ffmpeg_video(duration=duration, path=path)
+        pass
+
 
     #----------------------------------
     #video file support all video formats (.mp4, .avi, .ts, .mov, ...)
