@@ -115,8 +115,8 @@ class camera_win:
         #bottom butt form
         botfrm = tk.Frame(self.win)
         tk.Button(botfrm, text="Foto", command=self.take_foto).pack(side=tk.LEFT, padx=2)
-        tk.Button(botfrm, text="Video", command=self.snap_ffmpeg_video).pack(side=tk.LEFT, padx=2)
-        self.recBtn = tk.Button(botfrm, text="Start Rec", command=self.__start_video)
+        tk.Button(botfrm, text="Video", command=self.snap_video).pack(side=tk.LEFT, padx=2)
+        self.recBtn = tk.Button(botfrm, text="Start Rec", command=self.start_video)
         self.recBtn.pack(side=tk.LEFT, padx=2)
         self.webBtn = tk.Button(botfrm, text="Start Web", command=self.__start_web_4)
         self.webBtn.pack(side=tk.LEFT, padx=2)
@@ -299,7 +299,7 @@ class camera_win:
     #----------------------------------
     #take video files 10sec in different formats using different encoders
     #auto video snap
-    def snap_auto_video(self, duration=10, path="test1.mp4"):
+    def snap_auto_video(self, size=(1280, 960), quality="medium", duration=10, path="test.mp4"):
         print('snap_auto_video.. duration='+str(duration)+' sec  path='+path)
         self.picam.stop()
         self.picam.start_and_record_video(path, duration=duration, audio=True)
@@ -308,45 +308,51 @@ class camera_win:
         self.picam.start()
 
 
-    def __take_video_2(self):
-        print('capture_video 2.. h264')
+    def snap_h264_video(self, size=(1280, 960), quality="medium", duration=10, path="test.h264"):
+        print('snap_h264_video.. duration='+str(duration)+' sec  path='+path)
         self.picam.stop()
-        self.picam.configure(self.picam.create_video_configuration())
+        video_conf = self.picam.create_video_configuration()
+        cam_config_size(video_conf, [640,480])
+        self.picam.align_configuration(video_conf)
+        self.picam.configure(video_conf)
         encoder = H264Encoder()
-        self.picam.start_recording(encoder, 'test2.h264')
-        tm.sleep(10)
+        self.picam.start_recording(encoder, path)
+        tm.sleep(duration)
         self.picam.stop_recording()
         self.picam.stop()
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
 
-    def __take_video_3(self):
-        print('capture_video 3.. mjpeg')
+    def snap_mjpeg_video(self, size=(1280, 960), quality="medium", duration=10, path="test.mjpeg"):
+        print('snap_mjpeg_video.. duration='+str(duration)+' sec  path='+path)
         self.picam.stop()
-        self.picam.configure(self.picam.create_video_configuration())
+        video_conf = self.picam.create_video_configuration()
+        cam_config_size(video_conf, [640,480])
+        self.picam.align_configuration(video_conf)
+        self.picam.configure(video_conf)
         encoder = MJPEGEncoder()
-        self.picam.start_recording(encoder, 'test3.mjpeg')
-        tm.sleep(10)
+        self.picam.start_recording(encoder, path)
+        tm.sleep(duration)
         self.picam.stop_recording()
         self.picam.stop()
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
 
-    def __take_video_4(self):
-        print('capture_video 4.. mjpg')
+    def snap_jpeg_video(self, size=(1280, 960), quality="medium", duration=10, path="test4.jpg"):
+        print('snap_jpeg_video.. duration='+str(duration)+' sec  path='+path)
         self.picam.stop()
         self.picam.configure(self.picam.create_video_configuration())
         encoder = JpegEncoder()
-        self.picam.start_recording(encoder, 'test4.mjpg')
-        tm.sleep(10)
+        self.picam.start_recording(encoder, path)
+        tm.sleep(duration)
         self.picam.stop_recording()
         self.picam.stop()
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
 
 
-    def __take_video_5(self):
-        print('capture_video 5.. raw')
+    def snap_raw_video(self, size=(1280, 960), quality="medium", duration=10, path="test.raw"):
+        print('snap_raw_video.. duration='+str(duration)+' sec  path='+path)
         self.picam.stop()
         video_conf = self.picam.create_video_configuration()
         #cam_config_size(video_conf, [640,480])
@@ -356,8 +362,8 @@ class camera_win:
         print("--------")
         self.picam.configure(video_conf)
         encoder = Encoder()
-        self.picam.start_recording(encoder, 'test5.raw')
-        tm.sleep(10)
+        self.picam.start_recording(encoder, path)
+        tm.sleep(duration)
         self.picam.stop_recording()
         self.picam.stop()
         self.picam.switch_mode(self.cam_prv_cfg)
@@ -365,11 +371,11 @@ class camera_win:
 
 
     #FFMPEG video snap
-    def snap_ffmpeg_video(self, duration=10, path="test6.mp4"):
+    def snap_ffmpeg_video(self, size=(1280, 960), quality="medium", duration=10, path="test.mp4"):
         print('snap_ffmpeg_video.. duration='+str(duration)+' sec  path='+path)
         self.picam.stop()
         video_conf = self.picam.create_video_configuration()
-        cam_config_size(video_conf, [640,480])
+        cam_config_size(video_conf, size)
         self.picam.align_configuration(video_conf)
         print("---video conf-----")
         utl.d_print(video_conf)
@@ -390,24 +396,33 @@ class camera_win:
 
     def snap_video(self):
         encod = opt.cam_options["video"]["encoder"]
-        format = opt.cam_options["video"]["format"]
         duration = opt.cam_options["video"]["duration"]
+        size = opt.cam_options["video"]["size"]
+        quality = opt.cam_options["video"]["quality"]
         path = utl.get_filename(opt.cam_options,"video")
         if encod == "auto":
-            self.snap_auto_video(duration=duration, path=path)
+            self.snap_auto_video(size=size, quality=quality, duration=duration, path=path)
         elif encod == "FFMPEG":
-            self.snap_ffmpeg_video(duration=duration, path=path)
-        pass
+            self.snap_ffmpeg_video(size=size, quality=quality, duration=duration, path=path)
+        elif encod == "H264":    
+            self.snap_h264_video(size=size, quality=quality, duration=duration, path=path)
+        elif encod == "MJPEG":    
+            self.snap_mjpeg_video(size=size, quality=quality, duration=duration, path=path)
+        elif encod == "jpeg":    
+            self.snap_jpeg_video(size=size, quality=quality, duration=duration, path=path)
+        elif encod == "none":
+            self.snap_raw_video(size=size, quality=quality, duration=duration, path=path)    
 
 
     #----------------------------------
     #video file support all video formats (.mp4, .avi, .ts, .mov, ...)
-    def __start_video(self):
-        print('start recording video.. ')
-        self.recBtn.config(text="Stop Rec", fg="red", activeforeground="red", font="bold", command=self.__stop_video)
+    def start_video(self):        
+        path = utl.get_filename(opt.cam_options,"video")
+        print('start recording video to path: '+ path)
+        self.recBtn.config(text="Stop Rec", fg="red", activeforeground="red", font="bold", command=self.stop_video)
         self.picam.stop()
         video_conf = self.picam.create_video_configuration()
-        cam_config_size(video_conf, [640,480])
+        cam_config_size(video_conf, opt.cam_options["video"]["size"])
         self.picam.align_configuration(video_conf)
         print("---video conf-----")
         utl.d_print(video_conf)
@@ -420,9 +435,9 @@ class camera_win:
         output = FfmpegOutput("video.mp4", audio=True)
         self.picam.start_recording(encoder, output)
 
-    def __stop_video(self):
+    def stop_video(self):
         print('stop recording video.. ')
-        self.recBtn.config(text="Start Rec", fg="black", activeforeground="black", font="TkDefaultFont", command=self.__start_video)
+        self.recBtn.config(text="Start Rec", fg="black", activeforeground="black", font="TkDefaultFont", command=self.start_video)
         self.picam.stop_recording()
         self.picam.stop()
         self.picam.switch_mode(self.cam_prv_cfg)
