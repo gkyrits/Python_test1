@@ -44,6 +44,17 @@ def get_filename(options, part):
     path = options[part]['path']
     name = options[part]['name']
     ext = options[part]['format']
+    #fix extension for video format
+    if part == "video":
+        encod = options[part]['encoder']
+        if encod == "H264":
+            ext = "h264"
+        elif encod == "MJPEG":
+            ext = "mjpeg"
+        elif encod == "jpeg":
+            ext = "jpeg"
+        elif encod == "none":
+            ext = "raw"
     dtime_post = options[part]['fname_dtime']
     if dtime_post:
         post = utl.get_dtime_post()
