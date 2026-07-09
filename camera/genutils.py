@@ -39,13 +39,13 @@ def get_dtime_post():
     now = datetime.now()
     return now.strftime("_%Y%m%d_%H%M%S")
 
-def get_filename(options, part):
+def get_filename(options, part, fix=True):
     """Get a filename based on configured option."""
     path = options[part]['path']
     name = options[part]['name']
     ext = options[part]['format']
     #fix extension for video format
-    if part == "video":
+    if part == "video" and fix:
         encod = options[part]['encoder']
         if encod == "H264":
             ext = "h264"
