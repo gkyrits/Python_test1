@@ -417,9 +417,10 @@ class camera_win:
         self.picam.configure(video_conf)
         print("---camera conf-----")
         utl.d_print(self.picam.camera_configuration())
-        print("--------")
+        print("--------")        
         encoder = H264Encoder()
-        output = FfmpegOutput(path, audio=True)
+        audioSync = opt.cam_options["video"]["audio_sync"]
+        output = FfmpegOutput(path, audio=True, audio_sync=audioSync)
         self.picam.start_recording(encoder, output, quality=video_qual)
         tm.sleep(duration)
         self.picam.stop_recording()
@@ -470,7 +471,8 @@ class camera_win:
         utl.d_print(self.picam.camera_configuration())
         print("--------")
         encoder = H264Encoder()
-        output = FfmpegOutput(path, audio=True)        
+        audioSync = opt.cam_options["video"]["audio_sync"]
+        output = FfmpegOutput(path, audio=True, audio_sync=audioSync)
         self.picam.start_recording(encoder, output, quality=video_qual)
 
     def stop_video(self):

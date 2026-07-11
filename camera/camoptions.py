@@ -21,6 +21,7 @@ cam_options = {
         "quality": "medium",
         "encoder": "auto",
         "duration": 10,
+        "audio_sync": 2.0,
         "name": "video",
         "fname_dtime": True,
         "fname_incnum": False
@@ -56,6 +57,7 @@ class options_win:
         self.video_name = tk.StringVar(value="video")
         self.video_fname_dtime = tk.BooleanVar(value=True)
         self.video_fname_incnum = tk.BooleanVar(value=False)
+        self.video_audio_sync = tk.DoubleVar(value=2.0)
         #sream variables
         self.stream_size = (640,480)
         #load options from file
@@ -193,7 +195,8 @@ class options_win:
     def video_options(self,parent, size_attr):    
         frm=tk.Frame(parent)
         self.image_size(frm,size_attr)
-        self.video_format_fnc(frm)        
+        self.video_format_fnc(frm)
+        self.audio_options(frm)
         frm.pack(side=tk.TOP,  anchor=tk.W)
 
 
@@ -222,7 +225,15 @@ class options_win:
         tk.Label(frmnm, text="Sec").pack(side=tk.LEFT, anchor=tk.W)
         frmnm.pack(side=tk.LEFT, anchor=tk.W)   
         #...     
-        frm.pack(side=tk.TOP, fill=tk.X, anchor=tk.W) 
+        frm.pack(side=tk.TOP, fill=tk.X, anchor=tk.W)
+
+
+    def audio_options(self,parent):
+        frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)  
+        tk.Label(frm, text="Audio Sync").pack(side=tk.TOP, anchor=tk.W)
+        tk.Entry(frm, width=5, textvariable=self.video_audio_sync).pack(side=tk.LEFT, anchor=tk.W, padx=4)
+        tk.Label(frm, text="Sec").pack(side=tk.LEFT, anchor=tk.W)
+        frm.pack(side=tk.LEFT, fill=tk.X, anchor=tk.W)        
 
 
     #---file name frame
@@ -274,7 +285,8 @@ class options_win:
             self.video_format = options["video"]["format"]
             self.video_quality = options["video"]["quality"]
             self.video_encoder = options["video"]["encoder"]
-            self.video_duration.set(options["video"]["duration"])            
+            self.video_duration.set(options["video"]["duration"])
+            self.video_audio_sync.set(options["video"]["audio_sync"])
             #stream options
             self.stream_size = tuple(options["stream"]["size"])
         except FileNotFoundError:
@@ -303,7 +315,8 @@ class options_win:
                 "format": self.video_format,
                 "quality": self.video_quality,
                 "encoder": self.video_encoder,
-                "duration": self.video_duration.get()
+                "duration": self.video_duration.get(),
+                "audio_sync": self.video_audio_sync.get()
             },
             "stream": {
                 "size": self.stream_size
@@ -343,8 +356,11 @@ def update_options():
         cam_options["video"]["quality"] = options["video"]["quality"]
         cam_options["video"]["encoder"] = options["video"]["encoder"]
         cam_options["video"]["duration"] = options["video"]["duration"]
+        cam_options["video"]["audio_sync"] = options["video"]["audio_sync"]
         #stream options
         cam_options["stream"]["size"] = tuple(options["stream"]["size"])
     except FileNotFoundError:
         print(f"Options file {option_file} not found. Using default options.")
+    except Exception as e:
+        print(f"Error loading options: {e}. Using default options.")
         
