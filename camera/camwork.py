@@ -118,7 +118,7 @@ class camera_win:
         tk.Button(botfrm, text="Video", command=self.snap_video).pack(side=tk.LEFT, padx=2)
         self.recBtn = tk.Button(botfrm, text="Start Rec", command=self.start_video)
         self.recBtn.pack(side=tk.LEFT, padx=2)
-        self.webBtn = tk.Button(botfrm, text="Start Web", command=self.__start_web_4)
+        self.webBtn = tk.Button(botfrm, text="Start Web", command=self.start_stream)
         self.webBtn.pack(side=tk.LEFT, padx=2)
         botfrm.pack(side=tk.BOTTOM, fill=tk.X, pady=4)                
         #initialize Camera
@@ -488,12 +488,12 @@ class camera_win:
     #HSL:  web/vlc: http://<IP_PI>:8000/stream.m3u8 
     #DASH: web/vlc: http://<IP_PI>:8000/stream.mpd
     #UDP:  vlc: udp://@:8000
-    def __start_web(self):
+    def start_ffmpeg_stream(self,type="HLS", size=(640,480), quality="medium"):
         print('start live stream.. ')
-        self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.__stop_web)
         self.picam.stop()
         video_conf = self.picam.create_video_configuration()
-        cam_config_size(video_conf, [640,480])
+        video_conf["transform"] = Transform(hflip=self.hflip.get(), vflip=self.vflip.get())
+        cam_config_size(video_conf, size)
         self.picam.align_configuration(video_conf)
         print("---video conf-----")
         utl.d_print(video_conf)
@@ -503,18 +503,19 @@ class camera_win:
         utl.d_print(self.picam.camera_configuration())
         print("--------")
         encoder = H264Encoder()
-        output = FfmpegOutput("-f hls -fflags nobuffer -hls_time 4 -hls_list_size 3 -hls_flags delete_segments -hls_allow_cache 0 stream.m3u8", audio=True)
-        #output = FfmpegOutput("-f dash -window_size 3 -use_template 1 -use_timeline 1 stream.mpd", audio=True)
-        #output = FfmpegOutput("-f mpegts udp://192.168.2.2:8000")  ##<IP_WINDOWS_PC>
+        if type == "HLS":
+            output = FfmpegOutput("-f hls -fflags nobuffer -hls_time 4 -hls_list_size 3 -hls_flags delete_segments -hls_allow_cache 0 stream.m3u8", audio=True)
+        elif type == "DASH":
+            output = FfmpegOutput("-f dash -window_size 3 -use_template 1 -use_timeline 1 stream.mpd", audio=True)
+        elif type == "UDP":
+            output = FfmpegOutput("-f mpegts udp://192.168.2.2:8000")  ##<IP_WINDOWS_PC>
         self.webserver = web.simpleServer()
         self.webserver.start()
-        self.picam.start_recording(encoder, output)
+        self.picam.start_recording(encoder, output, quality=self.get_video_quality(quality))
 
 
-
-    def __stop_web(self):
-        print('stop web.. ')
-        self.webBtn.config(text="Start Web", fg="black", activeforeground="black", font="TkDefaultFont", command=self.__start_web)
+    def stop_ffmpeg_stream(self):
+        print('stop stream  .. ')
         self.picam.stop_recording()
         self.picam.stop()
         self.webserver.stop()
@@ -525,9 +526,8 @@ class camera_win:
     #udp test:
     #pi test: rpicam-vid -t 0 --inline -o udp://<IP_WINDOWS_PC>:8000
     #vlc: udp://@:8000 or udp/h264://@:8000
-    def __start_web_2(self):
+    def start_udp_stream(self):
         print('start udp live stream.. ')
-        self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.__stop_web_2)
         self.picam.stop()
         video_conf = self.picam.create_video_configuration()
         cam_config_size(video_conf, [640,480])
@@ -541,9 +541,8 @@ class camera_win:
         stream = self.sock.makefile("wb")
         self.picam.start_recording(encoder, FileOutput(stream))
 
-    def __stop_web_2(self):
-        print('stop web.. ')
-        self.webBtn.config(text="Start Web", fg="black", activeforeground="black", font="TkDefaultFont", command=self.__start_web_2)
+    def stop_udp_stream(self):
+        print('stop udp stream.. ')
         self.picam.stop_recording()
         self.picam.stop()
         self.sock.close()
@@ -554,9 +553,8 @@ class camera_win:
     #tcp test:
     #pi test: rpicam-vid -t 0 --inline --listen -o tcp://0.0.0.0:8000
     #vlc: tcp://<IP_PI>:8000 or tcp/h264://<IP_PI>:8000
-    def __start_web_3(self):
+    def start_tcp_stream(self):
         print('start tcp live stream.. ')
-        self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.__stop_web_3)
         self.picam.stop()
         video_conf = self.picam.create_video_configuration()
         cam_config_size(video_conf, [640,480])
@@ -591,9 +589,8 @@ class camera_win:
             self.picam.start_recording(self.encoder, FileOutput(stream), quality=Quality.VERY_LOW)
             print('Starting Recording to TCP stream...')
 
-    def __stop_web_3(self):
-        print('stop web.. ')
-        self.webBtn.config(text="Start Web", fg="black", activeforeground="black", font="TkDefaultFont", command=self.__start_web_3)
+    def stop_tcp_stream(self):
+        print('stop tcp stream.. ')
         self.picam.stop_recording()
         self.tcp_closed = True
         self.server_sock.shutdown(socket.SHUT_RDWR)
@@ -609,9 +606,8 @@ class camera_win:
     #----------------------------------
     #web page test
     #pc web: http://192.168.1.31:8000
-    def __start_webPage(self):
+    def start_webPage(self):
         print('start web Page.. ')
-        self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.__stop_webPage)
         self.picam.stop()
         video_conf = self.picam.create_video_configuration()
         cam_config_size(video_conf, [640,480])
@@ -631,9 +627,8 @@ class camera_win:
         self.webserver.start()
 
 
-    def __stop_webPage(self):
+    def stop_webPage(self):
         print('stop web.. ')
-        self.webBtn.config(text="Start Web", fg="black", activeforeground="black", font="TkDefaultFont", command=self.__start_webPage)
         self.picam.stop_recording()
         self.picam.stop()
         self.webserver.stop()
@@ -643,9 +638,8 @@ class camera_win:
     #----------------------------------
     #tcp custom server:
     #send cupture buffer on request
-    def __start_web_4(self):
+    def start_tcp_server(self):
         print('start tcp server.. ')
-        self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.__stop_web_4)
         self.picam.stop()
         video_conf = self.picam.create_video_configuration()
         cam_config_size(video_conf, [640,480])
@@ -709,9 +703,8 @@ class camera_win:
             self.__parse_tcp_cmds_4()
 
 
-    def __stop_web_4(self):
+    def stop_tcp_server(self):
         print('stop tcp server.. ')
-        self.webBtn.config(text="Start Web", fg="black", activeforeground="black", font="TkDefaultFont", command=self.__start_web_4)    
         self.tcp_closed = True
         self.server_sock.shutdown(socket.SHUT_RDWR)
         self.server_sock.close()
@@ -722,8 +715,35 @@ class camera_win:
         self.picam.stop()
         self.picam.switch_mode(self.cam_prv_cfg)
         self.picam.start()
-    #----------------------------------
 
+    #------------------------------------------
+    def start_stream(self):
+        print('start stream.. ')
+        self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.stop_stream)
+        opt.update_options()
+        size = opt.cam_options["stream"]["size"]
+        quality = opt.cam_options["stream"]["quality"]
+        self.stream_type = opt.cam_options["stream"]["type"]
+        if self.stream_type == "FFMPEG HLS":
+            self.start_ffmpeg_stream('HLS')
+        elif self.stream_type == "FFMPEG DASH":
+            self.start_ffmpeg_stream('DASH')
+        elif self.stream_type == "FFMPEG UDP":
+            self.start_ffmpeg_stream('UDP')
+        #...
+
+    def stop_stream(self):
+        print('stop stream.. ')
+        self.webBtn.config(text="Start Web", fg="black", activeforeground="black", font="TkDefaultFont", command=self.start_stream)
+        if self.stream_type == "FFMPEG HLS":
+            self.stop_ffmpeg_stream()
+        elif self.stream_type == "FFMPEG DASH":
+            self.stop_ffmpeg_stream()
+        elif self.stream_type == "FFMPEG UDP":
+            self.stop_ffmpeg_stream()
+        #...
+    
+    #=========================================================================
 
     def __options_btn(self):
         print('options button pressed')
