@@ -27,6 +27,8 @@ cam_options = {
         "fname_incnum": False
     },
     "stream": {
+        "type": "FFMPEG HSL",
+        "quality": "medium",
         "size": (640, 480)
     }
 }
@@ -59,6 +61,8 @@ class options_win:
         self.video_fname_incnum = tk.BooleanVar(value=False)
         self.video_audio_sync = tk.DoubleVar(value=2.0)
         #sream variables
+        self.stream_type = tk.StringVar(value="FFMPEG HSL")
+        self.stream_quality = tk.StringVar(value="medium")
         self.stream_size = (640,480)
         #load options from file
         self._load_options()
@@ -89,8 +93,9 @@ class options_win:
         self.file_name(p2,self.video_name,self.video_fname_dtime,self.video_fname_incnum)
         self.video_encoder_options(p2)
         self.video_options(p2,"video_size")
-        #---(stream)        
-        self.image_size(p3,"stream_size")
+        #---(stream)
+        self.stream_type_fnc(p3)
+        self.stream_options(p3,"stream_size")
         nb.pack(padx=3, pady=3, fill=tk.BOTH, expand=1)      
         frm1.pack(side=tk.TOP,fill=tk.BOTH, expand=1)  
 
@@ -178,18 +183,22 @@ class options_win:
     def _update_video_format(self, fmt):
         self.video_format = fmt
 
-    def video_quality_fnc(self,parent):
+    def video_quality_fnc(self,parent, option='video'):
         #frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
         frm=tk.Frame(parent)
         tk.Label(frm, text="Video Quality").pack(side=tk.TOP, anchor=tk.W)
         cbx_entries = ['very low','low', 'medium', 'high', 'very high']
-        cbx = tk2.ComboBox(frm, labelpos='w', entryfield_entry_width=10, listheight=80, dropdown=1, scrolledlist_items=cbx_entries, selectioncommand=self._update_video_quality)
-        cbx.selectitem(self.video_quality)
+        cbx = tk2.ComboBox(frm, labelpos='w', entryfield_entry_width=10, listheight=80, dropdown=1, scrolledlist_items=cbx_entries, selectioncommand=lambda quality: self._update_video_quality(quality, option))
+        current_quality = self.video_quality if option == 'video' else self.stream_quality.get()
+        cbx.selectitem(current_quality)
         cbx.pack(side=tk.LEFT, padx=2)
         frm.pack(side=tk.LEFT, anchor=tk.W)
 
-    def _update_video_quality(self, quality):
-        self.video_quality = quality
+    def _update_video_quality(self, quality, option='video'):
+        if option == 'video':
+            self.video_quality = quality
+        elif option == 'stream':
+            self.stream_quality.set(quality)
 
 
     def video_options(self,parent, size_attr):    
@@ -235,6 +244,35 @@ class options_win:
         tk.Label(frm, text="Sec").pack(side=tk.LEFT, anchor=tk.W)
         frm.pack(side=tk.LEFT, fill=tk.X, anchor=tk.W)        
 
+
+    def stream_type_fnc(self,parent):
+        frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
+        tk.Label(frm, text="Stream Type").pack(side=tk.TOP, anchor=tk.W)
+        cbx_entries = ['FFMPEG HSL (web/vlc: http://<PI>:8000/stream.m3u8)', 
+                       'FFMPEG DASH (web/vlc: http://<PI>:8000/stream.mpd)',
+                       'FFMPEG UDP (vlc: udp://@:8000)',
+                       'UDP (vlc: udp://@:8000 or udp/h264://@:8000)',
+                       'TCP (vlc: tcp://<PI>:8000 or tcp/h264://<PI>:8000)',
+                       'PAGE (http://<PI>:8000)',                       
+                       'TCP SERVER']
+        cbx = tk2.ComboBox(frm, labelpos='w', entryfield_entry_width=60, listheight=120, dropdown=1, scrolledlist_items=cbx_entries, selectioncommand=self._update_stream_type)
+        #find index of current stream type in cbx_entries
+        current_stream_type = self.stream_type.get()
+        index = next((i for i, entry in enumerate(cbx_entries) if entry.startswith(current_stream_type)), 0)
+        cbx.selectitem(cbx_entries[index])
+        cbx.pack(side=tk.LEFT, padx=2)
+        frm.pack(side=tk.TOP, anchor=tk.W)
+
+    def _update_stream_type(self, stream_type):
+        #update stream type variable with first part of the selected entry
+        stream_type = stream_type.split('(')[0].strip()
+        self.stream_type.set(stream_type)
+
+    def stream_options(self,parent, size_attr):    
+        frm=tk.Frame(parent)
+        self.image_size(frm,size_attr)
+        self.video_quality_fnc(frm, option='stream')
+        frm.pack(side=tk.TOP,  anchor=tk.W)
 
     #---file name frame
     def file_name(self,parent,fname,fname_dtime,fname_incnum):        
@@ -288,9 +326,13 @@ class options_win:
             self.video_duration.set(options["video"]["duration"])
             self.video_audio_sync.set(options["video"]["audio_sync"])
             #stream options
+            self.stream_type.set(options["stream"]["type"])
+            self.stream_quality.set(options["stream"]["quality"])
             self.stream_size = tuple(options["stream"]["size"])
         except FileNotFoundError:
             print(f"Options file {option_file} not found. Using default options.")
+        except Exception as e:
+            print(f"Error loading options: {e}. Using default options.")    
 
 
     def _save_options(self):
@@ -319,6 +361,8 @@ class options_win:
                 "audio_sync": self.video_audio_sync.get()
             },
             "stream": {
+                "type": self.stream_type.get(),
+                "quality": self.stream_quality.get(),
                 "size": self.stream_size
             }
         }
@@ -359,6 +403,8 @@ def update_options():
         cam_options["video"]["audio_sync"] = options["video"]["audio_sync"]
         #stream options
         cam_options["stream"]["size"] = tuple(options["stream"]["size"])
+        cam_options["stream"]["type"] = options["stream"]["type"]
+        cam_options["stream"]["quality"] = options["stream"]["quality"]
     except FileNotFoundError:
         print(f"Options file {option_file} not found. Using default options.")
     except Exception as e:
