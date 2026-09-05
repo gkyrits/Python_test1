@@ -20,6 +20,10 @@ global FfmpegOutput, FileOutput
 
 Picamera2 = None
 
+#fixed capture framerate used for FFmpeg recordings, so the sensor can't vary frame duration (auto-exposure)
+#and desync the muxed video length from the real-time audio track
+FIXED_FRAME_RATE = 30
+
 def import_special_libs():
     global Picamera2, Preview, Transform, Quality
     global H264Encoder, MJPEGEncoder, JpegEncoder, Encoder
@@ -410,6 +414,8 @@ class camera_win:
         video_conf = self.picam.create_video_configuration()
         video_conf["transform"] = Transform(hflip=self.hflip.get(), vflip=self.vflip.get())
         cam_config_size(video_conf, size)
+        #lock a fixed FrameRate so the actual capture rate can't drift (auto-exposure varies frame duration otherwise), which is what causes video/audio speed mismatch in FfmpegOutput
+        video_conf["controls"] = {**video_conf.get("controls", {}), "FrameRate": FIXED_FRAME_RATE}
         self.picam.align_configuration(video_conf)
         print("---video conf-----")
         utl.d_print(video_conf)
@@ -420,7 +426,8 @@ class camera_win:
         print("--------")        
         encoder = H264Encoder()
         audioSync = opt.cam_options["video"]["audio_sync"]
-        output = FfmpegOutput(path, audio=True, audio_sync=audioSync)
+        #fps_mode vfr keeps mp4 DTS strictly monotonic (fixes ffmpeg's "Non-monotonous DTS" warning/corruption)
+        output = FfmpegOutput(f"-fps_mode vfr {path}", audio=True, audio_sync=audioSync)
         self.picam.start_recording(encoder, output, quality=video_qual)
         tm.sleep(duration)
         self.picam.stop_recording()
@@ -462,6 +469,8 @@ class camera_win:
         video_conf = self.picam.create_video_configuration()
         video_conf["transform"] = Transform(hflip=self.hflip.get(), vflip=self.vflip.get())
         cam_config_size(video_conf, opt.cam_options["video"]["size"])
+        #lock a fixed FrameRate so the actual capture rate can't drift (auto-exposure varies frame duration otherwise), which is what causes video/audio speed mismatch in FfmpegOutput
+        video_conf["controls"] = {**video_conf.get("controls", {}), "FrameRate": FIXED_FRAME_RATE}
         self.picam.align_configuration(video_conf)
         print("---video conf-----")
         utl.d_print(video_conf)
@@ -472,7 +481,8 @@ class camera_win:
         print("--------")
         encoder = H264Encoder()
         audioSync = opt.cam_options["video"]["audio_sync"]
-        output = FfmpegOutput(path, audio=True, audio_sync=audioSync)
+        #fps_mode vfr keeps mp4 DTS strictly monotonic (fixes ffmpeg's "Non-monotonous DTS" warning/corruption)
+        output = FfmpegOutput(f"-fps_mode vfr {path}", audio=True, audio_sync=audioSync)
         self.picam.start_recording(encoder, output, quality=video_qual)
 
     def stop_video(self):
