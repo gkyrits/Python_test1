@@ -15,6 +15,8 @@ import subprocess as proc
 import sys
 import os
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 LCD_SIZE = "320x240"
 FULL_SCREEN = 0
 
@@ -278,7 +280,7 @@ class Gui:
                if self.nightTime :
                   if icon_num in icon_night_map.keys():
                      icon_num=icon_night_map[icon_num]
-               icon_file='icons/'+str(icon_num)+'.png'
+               icon_file=os.path.join(BASE_DIR,'icons',str(icon_num)+'.png')
                self.img=tk.PhotoImage(file=icon_file)
                self.wthr_image.config(image=self.img)
 
@@ -512,7 +514,7 @@ class Gui:
         temperCol="red"  
         humidCol="red4"
         infoCol="blue" 
-        self.img = tk.PhotoImage(file='icons/13.png')        
+        self.img = tk.PhotoImage(file=os.path.join(BASE_DIR,'icons','13.png'))        
         self.wthrFrm=tk.Frame(parent,bg=wthr_bg)
         for row in range(6): # 6 rows
             self.wthrFrm.rowconfigure(row, weight=1) #resize grid height
@@ -595,7 +597,7 @@ class Gui:
             if (hour>='20:') or (hour<='06:'):
                 if icon_num in icon_night_map.keys():
                     icon_num=icon_night_map[icon_num]
-            icon_file='small_icons/'+str(icon_num)+'.png'
+            icon_file=os.path.join(BASE_DIR,'small_icons',str(icon_num)+'.png')
             self.smlimg[col] = tk.PhotoImage(file=icon_file)
             imgLbl=tk.Label(parent, image=self.smlimg[col],  bg=prnt_bg)
             imgLbl.grid(row=2, column=col+1)
