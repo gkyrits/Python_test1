@@ -128,6 +128,7 @@ class Gui:
         self.wthrFrm_on=True
         self.frcst_tmout=None
         self.smlimg = [None,None,None,None,None,None,None,None]
+        self.root.protocol("WM_DELETE_WINDOW", self.btn_exit)
         self.init_clock_window()
 
      def __str__(self):
@@ -302,7 +303,10 @@ class Gui:
      def btn_exit(self):
         global exit  
         exit=True
-        self.root.destroy()
+        try:
+            self.root.destroy()
+        except Exception:
+            pass
 
 
      def keys_panel(self,parent):
@@ -720,12 +724,17 @@ class Gui:
         
 #======== Time Thread ========
 def update_guiDateTime(clk: Gui):
-     time_inf = tm.localtime(tm.time())
-     #print(time_inf)
-     time = "{0:02d}:{1:02d}:{2:02d}".format(time_inf.tm_hour,time_inf.tm_min,time_inf.tm_sec)
-     clk.update_clock(time)
-     date = "{0:d}/{1:d}/{2:d}/{3:d}".format(time_inf.tm_mday,time_inf.tm_mon,time_inf.tm_year,time_inf.tm_wday)
-     clk.update_date(date)     
+     if exit:
+          return
+     try:
+          time_inf = tm.localtime(tm.time())
+          #print(time_inf)
+          time = "{0:02d}:{1:02d}:{2:02d}".format(time_inf.tm_hour,time_inf.tm_min,time_inf.tm_sec)
+          clk.update_clock(time)
+          date = "{0:d}/{1:d}/{2:d}/{3:d}".format(time_inf.tm_mday,time_inf.tm_mon,time_inf.tm_year,time_inf.tm_wday)
+          clk.update_date(date)
+     except (RuntimeError, tk.TclError):
+          pass
 
 def time_thread():
      global gui,exit
@@ -741,20 +750,31 @@ def weather_thread(tmout):
      global gui,exit,wthr_count,wthr_pressure
      tm_cnt=0
      wthr_count=1
-     info = wthr.get_weather_info()
-     wthr_pressure = info['Pressure'] 
-     gui.update_weather(info)
+     try:
+          info = wthr.get_weather_info()
+          wthr_pressure = info['Pressure'] 
+          if not exit:
+               gui.update_weather(info)
+     except (RuntimeError, tk.TclError):
+          return
+     except Exception:
+          pass
      while True:          
           if exit:
                break
           tm_cnt += 1
           if tm_cnt>tmout:
             wthr_count += 1
-            info = wthr.get_weather_info()
-            wthr_pressure = info['Pressure']
-            if exit:
-               break            
-            gui.update_weather(info)            
+            try:
+                info = wthr.get_weather_info()
+                wthr_pressure = info['Pressure']
+                if exit:
+                   break            
+                gui.update_weather(info)
+            except (RuntimeError, tk.TclError):
+                break
+            except Exception:
+                pass            
             tm_cnt=0
           tm.sleep(1)
 
@@ -791,23 +811,40 @@ def get_sensors_info():
 def sensor_thread(tmout):
     global gui,exit,sense_need_update
     sense_tm_cnt=0
-    read_sensors_info()
-    info = get_sensors_info()
-    gui.update_sensor(info)
+    try:
+        read_sensors_info()
+        if exit:
+            return
+        info = get_sensors_info()
+        gui.update_sensor(info)
+    except (RuntimeError, tk.TclError):
+        return
+    except Exception:
+        pass
     while True:          
         if exit:
             break
         sense_tm_cnt += 1        
         if sense_tm_cnt>tmout:
-            read_sensors_info()
-            if exit:
-               break             
-            info = get_sensors_info()           
-            gui.update_sensor(info)
+            try:
+                read_sensors_info()
+                if exit:
+                   break             
+                info = get_sensors_info()           
+                gui.update_sensor(info)
+            except (RuntimeError, tk.TclError):
+                break
+            except Exception:
+                pass
             sense_tm_cnt=0
         if sense_need_update:
-            info = get_sensors_info()
-            gui.update_sensor(info)
+            try:
+                info = get_sensors_info()
+                gui.update_sensor(info)
+            except (RuntimeError, tk.TclError):
+                break
+            except Exception:
+                pass
             sense_need_update=False
         tm.sleep(1)
 
@@ -819,30 +856,35 @@ def cpuInfo_thread():
      while True:          
           if exit:
                break
-          if not gui.cpuinfo_active():
-              tm.sleep(1)
-              continue
-          #print('get cpu info...')
-          cpu_usage=cpu.get_cpuUsage()
-          if exit:
-               break
-          cpu_temp=cpu.get_cpuTemp()
-          if exit:
-               break          
-          gui.update_cpu(cpu_usage,cpu_temp)
-          gui.update_ethIp(ip.get_ip_address("eth0"))
-          if exit:
-               break 
-          gui.update_wanIp(ip.get_ip_address("wlan0"))
-          if exit:
-               break
-          if battery.exist():
-               bat_info=batt.get_baterry_info(battery)
-               if exit:         
+          try:
+              if not gui.cpuinfo_active():
+                  tm.sleep(1)
+                  continue
+              #print('get cpu info...')
+              cpu_usage=cpu.get_cpuUsage()
+              if exit:
                    break
-               gui.update_battery(bat_info['Percent'],bat_info['Current'])
-          else:
-               gui.update_battery(0,0)    
+              cpu_temp=cpu.get_cpuTemp()
+              if exit:
+                   break          
+              gui.update_cpu(cpu_usage,cpu_temp)
+              gui.update_ethIp(ip.get_ip_address("eth0"))
+              if exit:
+                   break 
+              gui.update_wanIp(ip.get_ip_address("wlan0"))
+              if exit:
+                   break
+              if battery.exist():
+                   bat_info=batt.get_baterry_info(battery)
+                   if exit:         
+                       break
+                   gui.update_battery(bat_info['Percent'],bat_info['Current'])
+              else:
+                   gui.update_battery(0,0)
+          except (RuntimeError, tk.TclError):
+              break
+          except Exception:
+              pass    
           if exit:
                break          
           tm.sleep(5)
@@ -886,24 +928,33 @@ gui = Gui()
 # register Keys
 #register_keys()
 # start time thread
-tm_thrd=thrd.Thread(target=time_thread)
+tm_thrd=thrd.Thread(target=time_thread, daemon=True)
 tm_thrd.start()
 # start lanIp thread
-cpu_thrd=thrd.Thread(target=cpuInfo_thread)
+cpu_thrd=thrd.Thread(target=cpuInfo_thread, daemon=True)
 cpu_thrd.start()
 # start wheather thread
-wether_thrd=thrd.Thread(target=weather_thread, args=(120,)) # sec update
+wether_thrd=thrd.Thread(target=weather_thread, args=(120,), daemon=True) # sec update
 wether_thrd.start()
 # start sensor thread
-sensor_thrd=thrd.Thread(target=sensor_thread, args=(60,)) # sec update
+sensor_thrd=thrd.Thread(target=sensor_thread, args=(60,), daemon=True) # sec update
 sensor_thrd.start()
 
-gui.run()
-cansel_threads()
-tm_thrd.join()
-cpu_thrd.join()
-wether_thrd.join()
-sensor_thrd.join()
+try:
+    gui.run()
+except KeyboardInterrupt:
+    pass
+finally:
+    exit = True
+    try:
+        gui.root.destroy()
+    except Exception:
+        pass
+    cansel_threads()
+    tm_thrd.join(timeout=1)
+    cpu_thrd.join(timeout=1)
+    wether_thrd.join(timeout=1)
+    sensor_thrd.join(timeout=1)
 
 screensaver_disable(False)
 print("End...")
