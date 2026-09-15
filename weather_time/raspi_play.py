@@ -219,7 +219,8 @@ class Gui:
      def graph_window(self):
          win=tk.Toplevel()
          win.geometry(LCD_SIZE+'+0+0')
-         win.overrideredirect(1)
+         if FULL_SCREEN:
+            win.overrideredirect(1)
          plot.draw_form(win)         
 
 

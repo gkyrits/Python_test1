@@ -3,7 +3,7 @@ import time as tm
 import repository as repo
 
 LCD_SIZE = '320x240'
-FULL_SCREEN = 1
+FULL_SCREEN = 0
 
 CURRENT_PLOT = 1
 backhours = 48
@@ -77,28 +77,33 @@ def parce_info(year,month,backepoch,info):
         return
     if rec_web_humid < 0 or rec_web_humid > 100:
         return
-    if rec_sens_press < 900 or rec_sens_press > 1100:
-        return
+    if rec_sens_press != 0:
+        if rec_sens_press < 900 or rec_sens_press > 1100:
+            return
     #check if data is not more diff from previous data
+    #(don't clamp against a 0 placeholder left by an earlier invalid/missing reading)
     if len(time_data) > 0:
         last_web_temp = web_temp_data[-1]
-        if abs(last_web_temp - rec_web_temp) > 10:
+        if last_web_temp != 0 and abs(last_web_temp - rec_web_temp) > 10:
             rec_web_temp = last_web_temp
             #return
         last_web_humid = web_humid_data[-1]
-        if abs(last_web_humid - rec_web_humid) > 10:
+        if last_web_humid != 0 and abs(last_web_humid - rec_web_humid) > 10:
             rec_web_humid = last_web_humid
             #return
         last_web_press = sens_press_data[-1]
-        if abs(last_web_press - rec_sens_press) > 5:
+        if last_web_press != 0 and abs(last_web_press - rec_sens_press) > 5:
             rec_sens_press = last_web_press
             #return
-        if abs(sens_temp_data[-1] - rec_sens_temp) > 5:
+        if sens_temp_data[-1] != 0 and abs(sens_temp_data[-1] - rec_sens_temp) > 5:
             rec_sens_temp = sens_temp_data[-1]
             #return
-        if abs(sens_humid_data[-1] - rec_sens_humid) > 5:
+        if sens_humid_data[-1] != 0 and abs(sens_humid_data[-1] - rec_sens_humid) > 5:
             rec_sens_humid = sens_humid_data[-1]
-            #return    
+            #return   
+    #not add if all data is zero
+    if rec_web_temp == 0 and rec_web_humid == 0 and rec_sens_press == 0 and rec_sens_temp == 0 and rec_sens_humid == 0:
+        return
     #add data to lists
     time_data.append(rec_time)
     web_temp_data.append(rec_web_temp)
