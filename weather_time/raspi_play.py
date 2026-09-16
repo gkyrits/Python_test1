@@ -8,6 +8,7 @@ import battery as batt
 import aht10sense as sense1
 import si7021sense as sense2
 import mpl3115sense as sense3
+import pihatsense as sense4
 #import matplotgraph as plot
 import simplegraph as plot
 import repository as repo
@@ -25,6 +26,8 @@ infoWin = False
 wthr_count = 0
 wthr_pressure = 1013  #for set MPL3115 sea pressure
 sense_need_update=False
+
+USE_PI_SENSE_HAT = 1 #TODO: must auto detect
 
 EN=0
 GR=1
@@ -294,8 +297,10 @@ class Gui:
         sense_txt='SENSOR '+str(self.sense_id)
         self.room_sensor.config(text=sense_txt)
         self.room_temper.config(text='{:.1f}'.format(info['Temperature']))
+        if (USE_PI_SENSE_HAT) and (self.sense_id==3):
+            self.room_temper.config(text='{:.1f}'.format(info['Pressure_Temper']))
         if (self.sense_id==1) or (self.sense_id==2):
-            self.room_humid.config(text='{} %'.format(info['Humidity']))
+            self.room_humid.config(text='{:.1f} %'.format(info['Humidity']))
         elif self.sense_id==3:
             self.room_press.config(text='{:.1f} hPa'.format(info['Pressure']))
             self.room_altit.config(text='{:.1f} m'.format(info['Altitude']))
@@ -782,30 +787,43 @@ def weather_thread(tmout):
 
 #======== Sensor Thread ======
 
-def update_mpl1315_seaPressure(info):
+def update_seaPressure(info):
     global wthr_pressure
     seaPress = info['SeaPressure']
     if seaPress != wthr_pressure:
-         sense3.set_sea_pressure(wthr_pressure)
-         print('Update mpl1315 sea pressure : %d' %wthr_pressure)
+        if USE_PI_SENSE_HAT:
+            sense4.set_sea_pressure(wthr_pressure)
+        else:    
+            sense3.set_sea_pressure(wthr_pressure)
+        print('Update mpl1315 sea pressure : %d' %wthr_pressure)
 
 def read_sensors_info():
     print('*read_sensors_info*')
     repo.info['sens1'] = sense1.get_sensor_info()
-    repo.info['sens2'] = sense2.get_sensor_info()
-    repo.info['sens3'] = sense3.get_sensor_info()    
-    update_mpl1315_seaPressure(repo.info['sens3'])
-    repo.info['web'] = wthr.get_small_info()
+    repo.info['sens2'] = sense2.get_sensor_info()    
+    repo.info['sens3'] = sense3.get_sensor_info()        
+    repo.info['sens4'] = sense4.get_sensor_info()
+    if USE_PI_SENSE_HAT:
+        update_seaPressure(repo.info['sens4'])
+    else:
+        update_seaPressure(repo.info['sens3'])
+    repo.info['web'] = wthr.get_small_info()    
     repo.save_info_binary()
 
 def get_sensors_info():
     global gui
     if gui.sense_id==1:
-        return repo.info['sens1']
+        if USE_PI_SENSE_HAT:
+            return repo.info['sens4']
+        else:
+            return repo.info['sens1']
     elif gui.sense_id==2:
         return repo.info['sens2']
     elif gui.sense_id==3:
-        return repo.info['sens3']    
+        if USE_PI_SENSE_HAT:
+            return repo.info['sens4']
+        else:
+            return repo.info['sens3']
     else:
         return repo.info['sens1']
 

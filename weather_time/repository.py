@@ -5,7 +5,9 @@ import os
 FILE = 'sensor'  # file name to save info
 DIR  = 'repository'  # directory to save info
 
-info = {'sens1': {}, 'sens2': {}, 'sens3': {}, 'web': {}}
+USE_PI_SENSE_HAT = 1 #TODO: must auto detect
+
+info = {'sens1': {}, 'sens2': {}, 'sens3': {}, 'sens4': {}, 'web': {}}
 
 # get year_month string
 def __get_year_month():
@@ -28,6 +30,7 @@ key_mapping = {
     'sens1' : 's1',
     'sens2' : 's2',
     'sens3' : 's3',
+    'sens4' : 's4',
     'web' : 'w',
     'Temperature': 'T',
     'Humidity': 'H',
@@ -77,18 +80,28 @@ def save_info_binary():
                                 int(time_parts[2]).to_bytes(1, 'big'), 
                                 int(time_parts[3]).to_bytes(1, 'big')))
             #save sensor1
-            temp = int(info['sens1']['Temperature'] * 10)
-            hum = int(info['sens1']['Humidity'])
+            if USE_PI_SENSE_HAT:
+                temp = int(info['sens4']['Temperature'] * 10)
+                hum = int(info['sens4']['Humidity'])
+            else:
+                temp = int(info['sens1']['Temperature'] * 10)
+                hum = int(info['sens1']['Humidity'])                    
             f.write(struct.pack('hc', temp, hum.to_bytes(1, 'big')))
             #save sensor2
             temp = int(info['sens2']['Temperature'] * 10)
             hum = int(info['sens2']['Humidity'])
             f.write(struct.pack('hc', temp, hum.to_bytes(1, 'big')))
             #save sensor3
-            temp = int(info['sens3']['Temperature'] * 10)
-            press = int(info['sens3']['Pressure'] * 10)
-            alt = int(info['sens3']['Altitude'] * 10)
-            sea = int(info['sens3']['SeaPressure'] * 10)
+            if USE_PI_SENSE_HAT:
+                temp = int(info['sens4']['Pressure_Temper'] * 10)
+                press = int(info['sens4']['Pressure'] * 10)
+                alt = int(info['sens4']['Altitude'] * 10)
+                sea = int(info['sens4']['SeaPressure'] * 10)
+            else:
+                temp = int(info['sens3']['Temperature'] * 10)
+                press = int(info['sens3']['Pressure'] * 10)
+                alt = int(info['sens3']['Altitude'] * 10)
+                sea = int(info['sens3']['SeaPressure'] * 10)                
             f.write(struct.pack('hhhh', temp, press, alt, sea))
             #save web
             temp = int(info['web']['Temperature'] * 10)
