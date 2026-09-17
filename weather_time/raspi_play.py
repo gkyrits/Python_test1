@@ -12,6 +12,7 @@ import pihatsense as sense4
 #import matplotgraph as plot
 import simplegraph as plot
 import repository as repo
+import optionmenu as optmenu
 import subprocess as proc
 import sys
 import os
@@ -171,7 +172,12 @@ class Gui:
      def key2_press(self):
         print('Key2 press!')
         #self.__info_window('Key2 press!')
-        self.root.after(10,self.__info_window,'Key2 press!')
+        #self.root.after(10,self.__info_window,'Key2 press!')
+        win=tk.Toplevel()
+        win.geometry(LCD_SIZE+'+0+0')
+        if FULL_SCREEN:
+            win.overrideredirect(1)
+        optmenu.draw_form(win)         
 
      def key3_press(self):
         print('Key3 press! - Exit')

@@ -7,6 +7,7 @@ FULL_SCREEN = 0
 
 win_col = 'DarkSeaGreen1'
 win_col2 = "light yellow"
+tab_col = "light steel blue"
 
 win_font=('Arial', 7)
 win_fontB=('Arial', 7, 'bold')
@@ -28,7 +29,7 @@ def draw_form(win):
     p2=nb.add(tabs[1], tab_height=1, tab_pady=0, page_pady=0)
     p3=nb.add(tabs[2], tab_height=1, tab_pady=0, page_pady=0)
     for page_name in tabs:
-        nb.tab(page_name).configure(font=win_fontB, background=win_col)
+        nb.tab(page_name).configure(font=win_fontB, background=tab_col)
         nb.page(page_name).configure(background=win_col2)
     nb.component('hull').configure(background=win_col)
     test_page(p1)
