@@ -833,7 +833,7 @@ def read_sensors_info():
         update_seaPressure(repo.info['sens4'])
     else:
         update_seaPressure(repo.info['sens3'])
-    repo.info['web'] = wthr.get_small_info()    
+    repo.info['web'] = wthr.get_small_info()
     repo.save_info_binary()
 
 def get_sensors_info():

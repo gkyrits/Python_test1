@@ -214,7 +214,12 @@ def draw_plot_time_info(canvas):
 def draw_limits():
     global leftfrm,infofrm
     if infofrm:
-        infofrm.destroy()
+        try:
+            if infofrm.winfo_exists():
+                infofrm.destroy()
+        except tk.TclError:
+            pass
+        infofrm = None
     infofrm = tk.Frame(leftfrm, bg=win_col)
     rowidx=0
     if web_temp_var.get() :
@@ -358,7 +363,11 @@ def draw_plots(canvas):
 
 def canvas_resize(event):
     # Redraw the plots when the canvas is resized    
-    draw_plots(event.widget)   
+    try:
+        if event.widget.winfo_exists():
+            draw_plots(event.widget)
+    except tk.TclError:
+        pass
 
 
 def delete_info(event):
@@ -550,7 +559,7 @@ def draw_form(win,waitWin=None):
 
 #################################################################
 
-if __name__ == '__main__':
+def main():
     root = tk.Tk()
     root.title('Test Graph')
     root.geometry(LCD_SIZE+'+0+0')
@@ -560,3 +569,6 @@ if __name__ == '__main__':
     draw_form(root)
     root.mainloop()
     print('End of program')
+
+if __name__ == '__main__':
+    main()
