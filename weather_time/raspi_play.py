@@ -151,7 +151,8 @@ class Gui:
      def clockPanel_dblClick(self,e):
         #print('Clock click! :%s' % e.widget)
         #self.__info_window('Clock click!')
-        self.graph_window()
+        waitWin = self.__wait_window('Wait Load Graph ..')
+        self.graph_window(waitWin)
 
      def sensePanel_dblClick(self,e):
         #print('Info click! :%s' % e.widget)
@@ -166,18 +167,14 @@ class Gui:
      def key1_press(self):
         print('Key1 press!')     
         #self.__info_window('Key1 press!')
-        #self.root.after(10,self.__info_window,'Key1 press!')
-        self.root.after(10,self.radio_play)
+        self.root.after(10,self.__info_window,'Key1 press!')
+        #self.root.after(10,self.radio_play)
 
      def key2_press(self):
         print('Key2 press!')
         #self.__info_window('Key2 press!')
         #self.root.after(10,self.__info_window,'Key2 press!')
-        win=tk.Toplevel()
-        win.geometry(LCD_SIZE+'+0+0')
-        if FULL_SCREEN:
-            win.overrideredirect(1)
-        optmenu.draw_form(win)         
+        self.root.after(10,self.option_window)
 
      def key3_press(self):
         print('Key3 press! - Exit')
@@ -194,13 +191,19 @@ class Gui:
         win.wait_window()
         win.grab_release()        
 
+     def __center_form(self, win, width, height):
+        display_width, display_height = map(int, LCD_SIZE.split('x', 1))
+        x_pos = (display_width - width) // 2
+        y_pos = (display_height - height) // 2
+        win.geometry(f'{width}x{height}+{x_pos}+{y_pos}')
+
      def __info_window(self,info):
          global infoWin
          if infoWin:
             return
          infoWin=True
          win=tk.Toplevel(bg="green")
-         win.geometry('220x80+50+80')
+         self.__center_form(win, 220, 80)
          win.overrideredirect(1)
          bg_col="yellow green"
          frm=tk.Frame(win, bg=bg_col, relief=tk.GROOVE, borderwidth=2)
@@ -212,6 +215,16 @@ class Gui:
          self.__set_modal(win)         
          tmout.cancel()   
          infoWin=False
+
+     def __wait_window(self,info):        
+         waitWin=tk.Toplevel(bg="green")
+         self.__center_form(waitWin, 220, 80)
+         waitWin.overrideredirect(1)
+         bg_col="yellow green"
+         frm=tk.Frame(waitWin, bg=bg_col, relief=tk.GROOVE, borderwidth=2)
+         tk.Label(frm,text=info, bg=bg_col, font='bold').pack(side=tk.TOP)
+         frm.pack(padx=5, pady=5, fill=tk.BOTH, expand=tk.YES)
+         return waitWin
          
      def radio_play(self):
          rel_radio_path='/../radioPlayer'
@@ -225,13 +238,20 @@ class Gui:
             return   
          
 
-     def graph_window(self):
+     def graph_window(self,waitWin):
+         waitWin.update_idletasks()        
          win=tk.Toplevel()
          win.geometry(LCD_SIZE+'+0+0')
          if FULL_SCREEN:
-            win.overrideredirect(1)
-         plot.draw_form(win)         
+            win.overrideredirect(1)         
+         plot.draw_form(win,waitWin)         
 
+     def option_window(self):
+        win=tk.Toplevel()
+        win.geometry(LCD_SIZE+'+0+0')
+        if FULL_SCREEN:
+            win.overrideredirect(1)
+        optmenu.draw_form(win)  
 
      def update_clock(self,time):
         time_part = time.split(":")

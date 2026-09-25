@@ -483,7 +483,7 @@ def get_backhours_str():
         return str(backhours//24)+'d'    
 
 
-def draw_form(win):
+def draw_form(win,waitWin=None):
     global canvas,leftfrm,backhours_lbl
     global web_temp_var,web_humid_var,sens_press_var,sens_temp_var,sens_humid_var
     web_temp_var = tk.BooleanVar(value=web_temp_val)
@@ -492,7 +492,10 @@ def draw_form(win):
     sens_temp_var = tk.BooleanVar(value=sens_temp_val)
     sens_humid_var = tk.BooleanVar(value=sens_humid_val)
     #get data from repository
+    tm.sleep(1)  #add a delay for sumulating data retrieval
     get_initdata()
+    if waitWin:
+        waitWin.destroy()
     #set background color to toplevel win
     win.config(bg=win_col)
     #tools Frame    
