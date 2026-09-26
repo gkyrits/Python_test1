@@ -224,6 +224,8 @@ class Gui:
          frm=tk.Frame(waitWin, bg=bg_col, relief=tk.GROOVE, borderwidth=2)
          tk.Label(frm,text=info, bg=bg_col, font='bold').pack(side=tk.TOP)
          frm.pack(padx=5, pady=5, fill=tk.BOTH, expand=tk.YES)
+         waitWin.lift()
+         waitWin.update() #force paint now, update_idletasks() alone won't draw it on Windows
          return waitWin
          
      def radio_play(self):
@@ -239,7 +241,7 @@ class Gui:
          
 
      def graph_window(self,waitWin):
-         waitWin.update_idletasks()        
+         waitWin.update()
          win=tk.Toplevel()
          win.geometry(LCD_SIZE+'+0+0')
          if FULL_SCREEN:
