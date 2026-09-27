@@ -1,9 +1,13 @@
 import struct
 import time
 import os
+import json
 
 FILE = 'sensor'  # file name to save info
-DIR  = 'repository'  # directory to save info
+# directory to save info, next to this module so every process (sensor_server,
+# raspi_play, graphs) uses the same one whatever the working directory
+DIR  = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'repository')
+LATEST_FILE = 'latest.json'  # last sensors/weather values, written by sensor_server
 
 USE_PI_SENSE_HAT = 1 #TODO: must auto detect
 
@@ -110,6 +114,35 @@ def save_info_binary():
             f.close()
     except Exception as e:
         print('Fail to save info to file:', e)
+
+# save last values (sensors, weather) for the display apps
+# write to a temp file and rename, so a reader never sees a half written file
+def save_latest(data):
+    try:
+        os.makedirs(DIR, exist_ok=True)
+        file_path = os.path.join(DIR, LATEST_FILE)
+        tmp_path = file_path + '.tmp'
+        with open(tmp_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False)
+        os.replace(tmp_path, file_path)
+    except Exception as e:
+        print('Fail to save latest info:', e)
+
+# load last values, None if missing or unreadable
+def load_latest():
+    try:
+        with open(os.path.join(DIR, LATEST_FILE), 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+# modification time of latest file, 0 if missing
+def latest_mtime():
+    try:
+        return os.path.getmtime(os.path.join(DIR, LATEST_FILE))
+    except OSError:
+        return 0
+
 
 #test save_info_binary()
 def test_save_info_binary():

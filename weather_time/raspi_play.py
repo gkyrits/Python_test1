@@ -5,10 +5,6 @@ import ipaddr as ip
 import cpuinfo as cpu
 import weather as wthr
 import battery as batt
-import aht10sense as sense1
-import si7021sense as sense2
-import mpl3115sense as sense3
-import pihatsense as sense4
 #import matplotgraph as plot
 import simplegraph as plot
 import repository as repo
@@ -27,10 +23,9 @@ FULL_SCREEN = 0
 exit = False
 infoWin = False
 wthr_count = 0
-wthr_pressure = 1013  #for set MPL3115 sea pressure
 sense_need_update=False
 
-USE_PI_SENSE_HAT = 1 #TODO: must auto detect
+USE_PI_SENSE_HAT = repo.USE_PI_SENSE_HAT
 
 EN=0
 GR=1
@@ -805,128 +800,57 @@ def time_thread():
           gui.post(update_guiDateTime,gui)
 
 
-#======== Weather Thread ======
-def set_wthr_pressure(info):
-     global wthr_pressure
-     #keep last good value, a failed request leaves Pressure at 0
-     press = info['Pressure']
-     if info['Error']=='' and isinstance(press,(int,float)) and press>0:
-          wthr_pressure = info['Pressure']
+#======== Repository Thread ======
+# sensor_server polls the weather site and sensors and saves the last values
+# in the repository, here we only show them
 
-def weather_thread(tmout):
-     global gui,exit,wthr_count,wthr_pressure
-     tm_cnt=0
-     wthr_count=1
-     try:
-          info = wthr.get_weather_info()
-          set_wthr_pressure(info)
-          if not exit:
-               gui.post(gui.update_weather,info)
-     except (RuntimeError, tk.TclError):
-          return
-     except Exception:
-          pass
-     while True:          
-          if exit:
-               break
-          tm_cnt += 1
-          if tm_cnt>tmout:
-            wthr_count += 1
-            try:
-                info = wthr.get_weather_info()
-                set_wthr_pressure(info)
-                if exit:
-                   break
-                gui.post(gui.update_weather,info)
-            except (RuntimeError, tk.TclError):
-                break
-            except Exception:
-                pass            
-            tm_cnt=0
-          tm.sleep(1)
-
-
-#======== Sensor Thread ======
-
-def update_seaPressure(info):
-    global wthr_pressure
-    seaPress = info['SeaPressure']
-    if seaPress != wthr_pressure:
-        if USE_PI_SENSE_HAT:
-            sense4.set_sea_pressure(wthr_pressure)
-        else:    
-            sense3.set_sea_pressure(wthr_pressure)
-        print('Update mpl1315 sea pressure : %d' %wthr_pressure)
-
-def read_sensors_info():
-    print('*read_sensors_info*')
-    repo.info['sens1'] = sense1.get_sensor_info()
-    repo.info['sens2'] = sense2.get_sensor_info()    
-    repo.info['sens3'] = sense3.get_sensor_info()        
-    repo.info['sens4'] = sense4.get_sensor_info()
-    if USE_PI_SENSE_HAT:
-        update_seaPressure(repo.info['sens4'])
-    else:
-        update_seaPressure(repo.info['sens3'])
-    repo.info['web'] = wthr.get_small_info()    
-    repo.save_info_binary()
+latest = None  #last values loaded from repository
 
 def get_sensors_info():
-    global gui
+    sensors = latest['sensors']
     if gui.sense_id==1:
         if USE_PI_SENSE_HAT:
-            return repo.info['sens4']
+            return sensors['sens4']
         else:
-            return repo.info['sens1']
+            return sensors['sens1']
     elif gui.sense_id==2:
-        return repo.info['sens2']
+        return sensors['sens2']
     elif gui.sense_id==3:
         if USE_PI_SENSE_HAT:
-            return repo.info['sens4']
+            return sensors['sens4']
         else:
-            return repo.info['sens3']
+            return sensors['sens3']
     else:
-        return repo.info['sens1']
+        return sensors['sens1']
 
 #run in Tk thread, sense_id may change while reading
 def update_sensor_gui():
-    gui.update_sensor(get_sensors_info())
+    if latest:
+        gui.update_sensor(get_sensors_info())
 
-def sensor_thread(tmout):
-    global gui,exit,sense_need_update
-    sense_tm_cnt=0
-    try:
-        read_sensors_info()
-        if exit:
-            return
-        gui.post(update_sensor_gui)
-    except (RuntimeError, tk.TclError):
-        return
-    except Exception:
-        pass
-    while True:          
-        if exit:
-            break
-        sense_tm_cnt += 1        
-        if sense_tm_cnt>tmout:
-            try:
-                read_sensors_info()
-                if exit:
-                   break             
-                gui.post(update_sensor_gui)
-            except (RuntimeError, tk.TclError):
-                break
-            except Exception:
-                pass
-            sense_tm_cnt=0
+def update_weather_gui(info,count):
+    global wthr_count
+    wthr_count=count
+    gui.update_weather(info)
+
+def repo_thread():
+    global latest,sense_need_update
+    last_mtime=0
+    last_weather_time=0
+    while not exit:
+        mtime=repo.latest_mtime()
+        if mtime and mtime!=last_mtime:
+            info=repo.load_latest()
+            if info:
+                last_mtime=mtime
+                latest=info
+                if info['weather'] and info['weather_time']!=last_weather_time:
+                    last_weather_time=info['weather_time']
+                    gui.post(update_weather_gui,info['weather'],info['weather_count'])
+                sense_need_update=True
         if sense_need_update:
-            try:
-                gui.post(update_sensor_gui)
-            except (RuntimeError, tk.TclError):
-                break
-            except Exception:
-                pass
             sense_need_update=False
+            gui.post(update_sensor_gui)
         tm.sleep(1)
 
 
@@ -1014,12 +938,9 @@ tm_thrd.start()
 # start lanIp thread
 cpu_thrd=thrd.Thread(target=cpuInfo_thread, daemon=True)
 cpu_thrd.start()
-# start wheather thread
-wether_thrd=thrd.Thread(target=weather_thread, args=(120,), daemon=True) # sec update
-wether_thrd.start()
-# start sensor thread
-sensor_thrd=thrd.Thread(target=sensor_thread, args=(60,), daemon=True) # sec update
-sensor_thrd.start()
+# start repository thread (values from sensor_server)
+repo_thrd=thrd.Thread(target=repo_thread, daemon=True)
+repo_thrd.start()
 
 try:
     gui.run()
@@ -1034,8 +955,7 @@ finally:
     cansel_threads()
     tm_thrd.join(timeout=1)
     cpu_thrd.join(timeout=1)
-    wether_thrd.join(timeout=1)
-    sensor_thrd.join(timeout=1)
+    repo_thrd.join(timeout=1)
 
 screensaver_disable(False)
 print("End...")
