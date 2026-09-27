@@ -1,5 +1,5 @@
 ## sensor_server: poll weather site and sensors, update repository
-## runs as a daemon (see sensor_server.service), raspi_play only reads the repository
+## runs as a daemon (see sensor_server.service), raspi_play only displays and does not save
 
 import time as tm
 import threading as thrd
@@ -20,10 +20,6 @@ USE_PI_SENSE_HAT = repo.USE_PI_SENSE_HAT
 stop_event = thrd.Event()
 
 wthr_pressure = 1013   # for set sea pressure (altitude), last good web value
-weather_info = None    # last good weather info
-weather_time = 0       # epoch of last good weather info
-weather_count = 0      # weather updates since start
-weather_error = ''     # last weather error, '' if last poll was ok
 
 
 def log(msg):
@@ -32,19 +28,14 @@ def log(msg):
 
 #======== Weather ========
 def poll_weather():
-    global wthr_pressure, weather_info, weather_time, weather_count, weather_error
+    global wthr_pressure
     try:
         info = wthr.get_weather_info()
     except Exception as e:
         info = {'Error': str(e)}
     if info['Error'] != '':
-        weather_error = info['Error']
-        log('weather error: ' + weather_error)
+        log('weather error: ' + info['Error'])
         return
-    weather_error = ''
-    weather_info = dict(info)  # weather module reuses its dict, keep a copy
-    weather_time = tm.time()
-    weather_count += 1
     press = info['Pressure']
     # a failed request leaves Pressure at 0, never use it as sea pressure
     if isinstance(press, (int, float)) and press > 0:
@@ -73,16 +64,6 @@ def read_sensors():
     repo.info['web'] = dict(wthr.get_small_info())
 
 
-def save_all():
-    repo.save_info_binary()
-    repo.save_latest({'time': tm.time(),
-                      'sensors': {k: repo.info[k] for k in ('sens1', 'sens2', 'sens3', 'sens4')},
-                      'weather': weather_info,
-                      'weather_time': weather_time,
-                      'weather_count': weather_count,
-                      'weather_error': weather_error})
-
-
 #======== Main loop ========
 def run(sensor_period, weather_period, once=False):
     next_weather = 0
@@ -95,7 +76,7 @@ def run(sensor_period, weather_period, once=False):
         if now >= next_sensor:
             try:
                 read_sensors()
-                save_all()
+                repo.save_info_binary()
             except Exception as e:
                 log('sensor error: %s' % e)
             next_sensor = now + sensor_period
