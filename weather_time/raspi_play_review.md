@@ -1,6 +1,6 @@
 # raspi_play.py review
 
-Review of `weather_time/raspi_play.py` and the modules it imports. First written 2026-09-27 on branch `ai_work`; updated the same day for branch `claude_work` (commits 030da99, c0298fa, 0d23074).
+Review of `weather_time/raspi_play.py` and the modules it imports. First written 2026-09-27 on branch `ai_work`; updated the same day for branch `claude_work` (commits 030da99 to 3aa9de5).
 
 ## What it does
 
@@ -12,9 +12,14 @@ A Tkinter dashboard sized for a 320x240 Raspberry Pi LCD:
 - **Tap the clock:** opens the history graph (`simplegraph.py`) drawn from the binary log.
 - **Side keys 1/2/3** (on-screen, or GPIO 18/23/24 when `register_keys()` is enabled): 1 = test popup, 2 = options form (`optionmenu.py`, placeholder tabs), 3 = exit.
 - Polls the sensors every 60 s and the weather every 120 s for display, and pushes the web pressure into the barometer as sea-level reference. It works on its own; it no longer writes the repository.
+- **On Windows** (no daemon) it starts `sensor_server.run` in a background thread, so the repository is still updated, and stops it on exit.
 - Disables the X screensaver/DPMS while running.
 
-**sensor_server.py** (new) is a daemon that does the logging: it polls the weather site (120 s) and the sensors (60 s), sets the sea pressure, and appends a record to `weather_time/repository/sensor-YYYY-MM.bin`. It runs as a systemd service (`sensor_server.service`), stops cleanly on SIGTERM/Ctrl+C, and accepts `--sensor-period`, `--weather-period` and `--once`.
+**sensor_server.py** (new) does the logging: it polls the weather site (120 s) and the sensors (60 s), sets the sea pressure, and appends a record to `weather_time/repository/sensor-YYYY-MM.bin`. Every weather poll logs the web temperature and humidity (`web temper: 20.9 C, humid: 71 %`).
+
+- **From a terminal** (`python3 sensor_server.py`) it shows a menu while polling continues in a thread: `1. exit` stops cleanly (Ctrl+C or Ctrl+D too), `2. graph` opens the `simplegraph.py` window and returns to the menu when it closes. Without a display it prints "cannot open graph window" and keeps running.
+- **As a daemon** it runs as a systemd service (`sensor_server.service`, started with `--no-cli`) and stops cleanly on SIGTERM.
+- Options: `--sensor-period`, `--weather-period`, `--once` (single poll and exit), `--no-cli`.
 
 Install on the Pi (in `/home/gkyr/Work/Python_test1/weather_time`):
 
@@ -35,8 +40,10 @@ journalctl -u sensor_server -f
 | Weather thread (120 s) | raspi_play.py:809-850 |
 | Sensor thread (60 s) + sea-pressure sync, display only | raspi_play.py:853-931 |
 | CPU/IP/battery thread (5 s) | raspi_play.py:934-971 |
-| Main: start threads, mainloop, cleanup | raspi_play.py:1006-1041 |
-| Logging daemon | sensor_server.py, sensor_server.service |
+| Main: start threads (plus sensor_server thread on Windows), mainloop, cleanup | raspi_play.py:1006-1050 |
+| Logging: weather poll + web log, sensors, poll loop | sensor_server.py:32-89 |
+| Menu (exit / graph) and startup options | sensor_server.py:92-148 |
+| systemd unit | sensor_server.service |
 | Weather API client | weather.py |
 | Sensor drivers | aht10sense.py, si7021sense.py, mpl3115sense.py, pihatsense.py |
 | Binary log save/load | repository.py |
@@ -58,7 +65,7 @@ All worker threads hand GUI updates to `Gui.post()`; the Tk main loop runs them 
 ### Still open
 
 1. **API keys and a password are public.** `weather.py:4,13,22` holds an OpenWeatherMap key, a Meteosource key and an account password in a comment, and `github.com/gkyrits/Python_test1` is public. Rotate both keys and change the password, then load keys from an untracked config file or environment variable. Removing them from the file does not remove them from git history.
-2. **Two processes read the same sensors.** raspi_play and sensor_server both poll I2C. The MPL3115 read is a multi-step sequence with 1 s pauses, so simultaneous reads could occasionally interleave and give a wrong value. The Sense HAT is less affected.
+2. **Two readers of the same sensors.** raspi_play and sensor_server both poll I2C (and on Windows both call the weather site, two requests every 2 minutes, fine for the free plan). The MPL3115 read is a multi-step sequence with 1 s pauses, so simultaneous reads could occasionally interleave and give a wrong value. The Sense HAT is less affected.
 3. **Duplicate keys in `icon_map_day`** (raspi_play.py:81): 600 and 612 appear more than once, so the last value (24) wins. Any code missing from the map (e.g. Meteosource `Id=0`) raises `KeyError` mid-update; `.get(id, default)` would avoid that.
 4. **Graph only looks inside the current month's file** (repository.py:149), so shortly after the 1st of a month the 24 h graph is mostly empty. `simplegraph.draw_form` also has a deliberate `tm.sleep(1)` on the GUI thread (simplegraph.py:495).
 
