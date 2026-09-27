@@ -1020,6 +1020,12 @@ wether_thrd.start()
 # start sensor thread
 sensor_thrd=thrd.Thread(target=sensor_thread, args=(60,), daemon=True) # sec update
 sensor_thrd.start()
+# no sensor_server daemon on Windows, run it in a thread to update the repository
+srv_thrd=None
+if sys.platform.startswith('win'):
+    import sensor_server as srv
+    srv_thrd=thrd.Thread(target=srv.run, args=(srv.SENSOR_PERIOD,srv.WEATHER_PERIOD), daemon=True)
+    srv_thrd.start()
 
 try:
     gui.run()
@@ -1036,6 +1042,9 @@ finally:
     cpu_thrd.join(timeout=1)
     wether_thrd.join(timeout=1)
     sensor_thrd.join(timeout=1)
+    if srv_thrd:
+        srv.stop_event.set()
+        srv_thrd.join(timeout=2)
 
 screensaver_disable(False)
 print("End...")
