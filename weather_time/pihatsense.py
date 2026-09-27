@@ -6,6 +6,8 @@ sea_pressure = 1015.0
 
 def __estimate_altitude(pressure, seaPressure):
     # Simple barometric formula to estimate altitude
+    if seaPressure <= 0:
+        seaPressure = 1013.25  # standard sea level pressure
     return 44330.0 * (1.0 - (pressure / seaPressure) ** (1/5.255))
 
 

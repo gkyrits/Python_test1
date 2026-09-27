@@ -16,6 +16,8 @@ import optionmenu as optmenu
 import subprocess as proc
 import sys
 import os
+import queue
+import datetime as dt
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -62,26 +64,17 @@ def get_weekDay(wday):
         return weekLst_gr[wday]      
 
 def get_windDir(deg):
-    if deg<=22 or deg>337:
-        return "B"
-    elif deg<=67 and deg>22:
-        return "ΒΔ"
-    elif deg<=112 and deg>67:
-        return "Δ"
-    elif deg<=157 and deg>112:
-        return "NΔ"
-    elif deg<=202 and deg>157:
-        return "N"
-    elif deg<=247 and deg>202:
-        return "NA"
-    elif deg<=292 and deg>247:
-        return "A"
-    elif deg<=337 and deg>292:
-        return "BA"
-    else:
+    # meteorological degrees: direction the wind blows from, 0=N, 90=E
+    try:
+        idx = int(((float(deg) + 22.5) % 360) // 45)
+    except (TypeError, ValueError):
         return "?"
-    
-          
+    if lang==EN:
+        return ["N","NE","E","SE","S","SW","W","NW"][idx]
+    else:
+        return ["Β","ΒΑ","Α","ΝΑ","Ν","ΝΔ","Δ","ΒΔ"][idx]
+
+
 icon_map_day = {200:14,201:14,202:14,210:15,211:15,212:15,221:15,230:14,231:14,232:14,
                 300:12,301:12,310:12,302:10,311:10,312:10,313:10,314:10,321:10,
                 500:12,501:10,520:11,502:10,503:11,521:11,504:25,522:25,531:25,511:20,
@@ -97,25 +90,20 @@ def bind_tree(widget, event, callback):
         bind_tree(child, event, callback)
 
 
+def forecast_days(info):
+        days=[]
+        for item in info['List']:
+            if item['Date'] not in days:
+                days.append(item['Date'])
+        return days
+
 def forecast_find_day(info,day):
-        info_range = [0,0]
-        item_cnt=info['Items']        
-        if day>0:
-            bay_cnt=0
-            for x in range(item_cnt):
-                 if (info['List'][x]['Hour']=='00'):
-                     bay_cnt += 1
-                     if bay_cnt==day:
-                        info_range[0]=x
-                        break                         
-        for x in range(info_range[0]+1,item_cnt):
-            if (info['List'][x]['Hour']=='00'):
-                info_range[1]=x
-                break
-        if(info_range[1]==0):
-            info_range[1]=item_cnt-1
-        return info_range         
-    
+        #return [first,last) item index of the day-th date in the list
+        days=forecast_days(info)
+        day=max(0,min(day,len(days)-1))
+        idx=[x for x,item in enumerate(info['List']) if item['Date']==days[day]]
+        return [idx[0],idx[-1]+1]
+
 #======== Gui Class =========
 class Gui:
      def __init__(self):
@@ -132,8 +120,11 @@ class Gui:
         self.wthrFrm_on=True
         self.frcst_tmout=None
         self.smlimg = [None,None,None,None,None,None,None,None]
+        self.frcst_loading=False
+        self.gui_queue = queue.Queue()
         self.root.protocol("WM_DELETE_WINDOW", self.btn_exit)
         self.init_clock_window()
+        self.__process_queue()
 
      def __str__(self):
         """ description """
@@ -167,21 +158,39 @@ class Gui:
      def key1_press(self):
         print('Key1 press!')     
         #self.__info_window('Key1 press!')
-        self.root.after(10,self.__info_window,'Key1 press!')
+        self.post(self.__info_window,'Key1 press!')
         #self.root.after(10,self.radio_play)
 
      def key2_press(self):
         print('Key2 press!')
         #self.__info_window('Key2 press!')
         #self.root.after(10,self.__info_window,'Key2 press!')
-        self.root.after(10,self.option_window)
+        self.post(self.option_window)
 
      def key3_press(self):
         print('Key3 press! - Exit')
         #self.btn_exit()
-        self.root.after(10,self.btn_exit)
+        self.post(self.btn_exit)
 
-    #-----------------------------    
+    #-----------------------------
+     #thread safe: queue func to run in the Tk main thread
+     def post(self,func,*args):
+        self.gui_queue.put((func,args))
+
+     def __process_queue(self):
+        #reschedule first, a posted func may block in a modal window
+        if not exit:
+            self.root.after(100,self.__process_queue)
+        while True:
+            try:
+                func,args = self.gui_queue.get_nowait()
+            except queue.Empty:
+                break
+            try:
+                func(*args)
+            except Exception as e:
+                print('gui update fail:',e)
+
      def run(self):
         self.root.mainloop()
 
@@ -210,10 +219,9 @@ class Gui:
          tk.Label(frm,text=info, bg=bg_col, font='bold').pack(side=tk.TOP)
          tk.Button(frm,text="Ok", command=win.destroy).place(relx=0.5, rely=0.6, relheight=0.4, relwidth=0.5, anchor=tk.CENTER)
          frm.pack(padx=5, pady=5, fill=tk.BOTH, expand=tk.YES)
-         tmout=thrd.Timer(10, lambda :win.destroy())
-         tmout.start()
-         self.__set_modal(win)         
-         tmout.cancel()   
+         tmout=self.root.after(10000, win.destroy)
+         self.__set_modal(win)
+         self.root.after_cancel(tmout)
          infoWin=False
 
      def __wait_window(self,info):        
@@ -614,12 +622,13 @@ class Gui:
         date=tm.localtime(epoch_time)
         wday=date.tm_wday
         daytxt=get_weekDay(wday)+tm.strftime(' %d-%m-%Y',date)
-        if day==0:
+        rel_day=(dt.date(date.tm_year,date.tm_mon,date.tm_mday)-dt.date.today()).days
+        if rel_day==0:
             daytxt= today_lst[lang]+' '+daytxt
-        elif day==1:
+        elif rel_day==1:
             daytxt= tomorrow_lst[lang]+' '+daytxt
         else:
-            daytxt='(+'+str(day)+') '+daytxt
+            daytxt='(+'+str(rel_day)+') '+daytxt
         tk.Label(parent, text=daytxt, bg=prnt_bg, fg=pressCol, font="Arial 8 bold").grid(row=0, columnspan=9)
         tk.Label(parent, text='Hr',     bg=prnt_bg, font="Arial 8").grid(row=1, sticky=tk.W)
         #tk.Label(parent, text='Icon',     bg=prnt_bg, font="Arial 8").grid(row=2, sticky=tk.W)
@@ -658,8 +667,9 @@ class Gui:
         print('Next '+str(forw))
         if forw:
             self.frcst_day += 1
-            if self.frcst_day > 5:
-                self.frcst_day=5
+            last_day=len(forecast_days(self.frcst_info))-1
+            if self.frcst_day > last_day:
+                self.frcst_day=last_day
         else:
             self.frcst_day -= 1
             if self.frcst_day < 0:
@@ -688,20 +698,12 @@ class Gui:
 
      def weatherPanel_change(self):
         if self.wthrFrm_on:
-           print('get forcast info') 
-           self.frcst_info = wthr.get_forecast_info()
-           if self.frcst_info['Error'] != '':
+           if self.frcst_loading:
                return
-           self.sensePanel_visible(False)
-           self.wthrFrm.pack_forget()
-           self.wthrFrm_on=False
-           #get current hour
-           hour =  tm.localtime(tm.time()).tm_hour
-           if hour < 20:
-               self.frcst_day=0
-           else:
-               self.frcst_day=1
-           self.forecast_panel(self.weatherFrm,self.frcst_info)
+           print('get forcast info')
+           self.frcst_loading=True
+           #fetch in a thread so the GUI (clock) does not freeze
+           thrd.Thread(target=self.__fetch_forecast, daemon=True).start()
         else:
            if self.frcst_tmout != None:
                self.root.after_cancel(self.frcst_tmout)
@@ -712,6 +714,30 @@ class Gui:
            self.wthrFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)
            self.wthrFrm_on=True
      
+     def __fetch_forecast(self):
+        try:
+            info = wthr.get_forecast_info()
+        except Exception as e:
+            info = {'Error':str(e)}
+        self.post(self.__show_forecast,info)
+
+     def __show_forecast(self,info):
+        self.frcst_loading=False
+        if info['Error'] != '' or not info['List'] or not self.wthrFrm_on:
+            return
+        self.frcst_info = info
+        self.sensePanel_visible(False)
+        self.wthrFrm.pack_forget()
+        self.wthrFrm_on=False
+        #show today, or tomorrow after 20:00
+        show_date = dt.date.today()
+        if tm.localtime(tm.time()).tm_hour >= 20:
+            show_date += dt.timedelta(days=1)
+        days = forecast_days(info)
+        show_date = show_date.strftime('%Y-%m-%d')
+        self.frcst_day = days.index(show_date) if show_date in days else 0
+        self.forecast_panel(self.weatherFrm,self.frcst_info)
+
      #-----------------------------------------------------------------------------
      #-----------------------------------------------------------------------------
      def init_clock_window(self):
@@ -776,19 +802,26 @@ def time_thread():
           tm.sleep(1)
           if exit:
                break
-          update_guiDateTime(gui)
+          gui.post(update_guiDateTime,gui)
 
 
 #======== Weather Thread ======
+def set_wthr_pressure(info):
+     global wthr_pressure
+     #keep last good value, a failed request leaves Pressure at 0
+     press = info['Pressure']
+     if info['Error']=='' and isinstance(press,(int,float)) and press>0:
+          wthr_pressure = info['Pressure']
+
 def weather_thread(tmout):
      global gui,exit,wthr_count,wthr_pressure
      tm_cnt=0
      wthr_count=1
      try:
           info = wthr.get_weather_info()
-          wthr_pressure = info['Pressure'] 
+          set_wthr_pressure(info)
           if not exit:
-               gui.update_weather(info)
+               gui.post(gui.update_weather,info)
      except (RuntimeError, tk.TclError):
           return
      except Exception:
@@ -801,10 +834,10 @@ def weather_thread(tmout):
             wthr_count += 1
             try:
                 info = wthr.get_weather_info()
-                wthr_pressure = info['Pressure']
+                set_wthr_pressure(info)
                 if exit:
-                   break            
-                gui.update_weather(info)
+                   break
+                gui.post(gui.update_weather,info)
             except (RuntimeError, tk.TclError):
                 break
             except Exception:
@@ -855,6 +888,10 @@ def get_sensors_info():
     else:
         return repo.info['sens1']
 
+#run in Tk thread, sense_id may change while reading
+def update_sensor_gui():
+    gui.update_sensor(get_sensors_info())
+
 def sensor_thread(tmout):
     global gui,exit,sense_need_update
     sense_tm_cnt=0
@@ -862,8 +899,7 @@ def sensor_thread(tmout):
         read_sensors_info()
         if exit:
             return
-        info = get_sensors_info()
-        gui.update_sensor(info)
+        gui.post(update_sensor_gui)
     except (RuntimeError, tk.TclError):
         return
     except Exception:
@@ -877,8 +913,7 @@ def sensor_thread(tmout):
                 read_sensors_info()
                 if exit:
                    break             
-                info = get_sensors_info()           
-                gui.update_sensor(info)
+                gui.post(update_sensor_gui)
             except (RuntimeError, tk.TclError):
                 break
             except Exception:
@@ -886,8 +921,7 @@ def sensor_thread(tmout):
             sense_tm_cnt=0
         if sense_need_update:
             try:
-                info = get_sensors_info()
-                gui.update_sensor(info)
+                gui.post(update_sensor_gui)
             except (RuntimeError, tk.TclError):
                 break
             except Exception:
@@ -914,20 +948,20 @@ def cpuInfo_thread():
               cpu_temp=cpu.get_cpuTemp()
               if exit:
                    break          
-              gui.update_cpu(cpu_usage,cpu_temp)
-              gui.update_ethIp(ip.get_ip_address("eth0"))
+              gui.post(gui.update_cpu,cpu_usage,cpu_temp)
+              gui.post(gui.update_ethIp,ip.get_ip_address("eth0"))
               if exit:
                    break 
-              gui.update_wanIp(ip.get_ip_address("wlan0"))
+              gui.post(gui.update_wanIp,ip.get_ip_address("wlan0"))
               if exit:
                    break
               if battery.exist():
                    bat_info=batt.get_baterry_info(battery)
                    if exit:         
                        break
-                   gui.update_battery(bat_info['Percent'],bat_info['Current'])
+                   gui.post(gui.update_battery,bat_info['Percent'],bat_info['Current'])
               else:
-                   gui.update_battery(0,0)
+                   gui.post(gui.update_battery,0,0)
           except (RuntimeError, tk.TclError):
               break
           except Exception:

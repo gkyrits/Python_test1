@@ -1,4 +1,5 @@
 import requests
+import time
 
 #user:gkyr@yahoo.gr  pass:gkyr1234
 #loc Nea Smyrni from google map
@@ -14,6 +15,8 @@ open_param = {'appid': OPEN_API_KEY,
               'lat': LAT,'lon': LON,'units': 'metric','lang':'el'}
 open_weather_url  = 'https://api.openweathermap.org/data/2.5/weather'
 open_forecast_url = "https://api.openweathermap.org/data/2.5/forecast"
+
+REQUEST_TIMEOUT = 10  # sec, avoid hanging forever on a stalled connection
 
 #---meteosource
 METEO_API_KEY = '8r3xztnjqi6uj9vqu11dg6wxnzoowpts066hr9s1'
@@ -34,8 +37,8 @@ def get_meteo_weather_info(lat, lon):
     open_param['lat']=lat
     open_param['lon']=lon
     try:
-        data_place = requests.get(meteo_place_url, meteo_param).json()
-        data_point = requests.get(meteo_point_url, meteo_param).json()
+        data_place = requests.get(meteo_place_url, meteo_param, timeout=REQUEST_TIMEOUT).json()
+        data_point = requests.get(meteo_point_url, meteo_param, timeout=REQUEST_TIMEOUT).json()
     except:
         info['Error']='request exception'    
         return info
@@ -60,7 +63,7 @@ def get_open_weather_info(lat, lon):
     open_param['lat']=lat
     open_param['lon']=lon
     try:
-        data = requests.get(open_weather_url, open_param).json()
+        data = requests.get(open_weather_url, open_param, timeout=REQUEST_TIMEOUT).json()
     except:
         info['Error']='request exception'    
         return info
@@ -87,7 +90,7 @@ def get_open_forecast_info(lat, lon):
     open_param['lat']=lat
     open_param['lon']=lon
     try:
-        data = requests.get(open_forecast_url, open_param).json()
+        data = requests.get(open_forecast_url, open_param, timeout=REQUEST_TIMEOUT).json()
     except:
         forecast_inf['Error']='request exception'    
         return forecast_inf
@@ -99,9 +102,10 @@ def get_open_forecast_info(lat, lon):
     forecast_inf['Items']=items_cnt
     forecast_inf['List']=[]
     for x in range(items_cnt):
-        datetime = data['list'][x]['dt_txt']
-        forecast_item['Date']=datetime.split(' ')[0]
-        forecast_item['Hour']=datetime.split(' ')[1].split(':')[0]
+        #dt_txt is UTC, use epoch 'dt' to get local date/hour
+        local_tm = time.localtime(data['list'][x]['dt'])
+        forecast_item['Date']=time.strftime('%Y-%m-%d', local_tm)
+        forecast_item['Hour']=time.strftime('%H', local_tm)
         forecast_item['Temper']=float(data['list'][x]['main']['temp'])
         forecast_item['Humidity']=data['list'][x]['main']['humidity']
         forecast_item['Pressure']=data['list'][x]['main']['pressure']
