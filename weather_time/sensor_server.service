@@ -15,7 +15,7 @@ After=network-online.target
 Type=simple
 User=gkyr
 WorkingDirectory=/home/gkyr/Work/Python_test1/weather_time
-ExecStart=/usr/bin/python3 -u sensor_server.py
+ExecStart=/usr/bin/python3 -u sensor_server.py --no-cli
 Restart=on-failure
 RestartSec=10
 
