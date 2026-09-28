@@ -11,14 +11,27 @@ def __estimate_altitude(pressure, seaPressure):
     return 44330.0 * (1.0 - (pressure / seaPressure) ** (1/5.255))
 
 
+sense = None  # SenseHat object, created once
+
+
 def __read_sensehat():
-    from sense_hat import SenseHat
-    sense = SenseHat()
+    global sense
+    if sense is None:
+        from sense_hat import SenseHat
+        sense = SenseHat()
     info['Temperature'] = sense.get_temperature()
     info['Humidity'] = sense.get_humidity()
     info['Pressure_Temper'] = sense.get_temperature_from_pressure()
-    info['Pressure'] = sense.get_pressure()
-    info['Altitude'] = __estimate_altitude(info['Pressure'], sea_pressure)
+    pressure = sense.get_pressure()
+    if pressure <= 0:
+        # pressure sensor returns 0 until it has a first sample, retry once
+        time.sleep(0.5)
+        pressure = sense.get_pressure()
+    info['Pressure'] = pressure
+    if pressure > 0:
+        info['Altitude'] = __estimate_altitude(pressure, sea_pressure)
+    else:
+        info['Altitude'] = 0.0  # no reading, formula would give 44330 m
     info['SeaPressure'] = sea_pressure
 
 

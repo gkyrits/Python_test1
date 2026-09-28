@@ -68,6 +68,14 @@ def save_info():
 
 
 RECID = 0xEE
+
+# value*scale as int, clamped so a bad sensor reading can't break the record
+def __short(val, scale=10):
+    return max(-32768, min(32767, int(val * scale)))
+
+def __byte(val):
+    return max(0, min(255, int(val))).to_bytes(1, 'big')
+
 # save info with timestamp to file in a binary using struct
 def save_info_binary():
     try:
@@ -75,41 +83,28 @@ def save_info_binary():
         file_path = os.path.join(DIR, FILE + '-' + __get_year_month() + '.bin')
         time_str = time.strftime('%d %H %M %S', time.localtime())
         time_parts = time_str.split(' ')
+        #build the whole record first, so a failure never writes half a record
+        rec = struct.pack('ccccc', RECID.to_bytes(1, 'big'),
+                          __byte(time_parts[0]), __byte(time_parts[1]),
+                          __byte(time_parts[2]), __byte(time_parts[3]))
+        #sensor1
+        sens1 = info['sens4'] if USE_PI_SENSE_HAT else info['sens1']
+        rec += struct.pack('hc', __short(sens1['Temperature']), __byte(sens1['Humidity']))
+        #sensor2
+        rec += struct.pack('hc', __short(info['sens2']['Temperature']), __byte(info['sens2']['Humidity']))
+        #sensor3
+        if USE_PI_SENSE_HAT:
+            sens3 = info['sens4']
+            temp = sens3['Pressure_Temper']
+        else:
+            sens3 = info['sens3']
+            temp = sens3['Temperature']
+        rec += struct.pack('hhhh', __short(temp), __short(sens3['Pressure']),
+                           __short(sens3['Altitude']), __short(sens3['SeaPressure']))
+        #web
+        rec += struct.pack('hc', __short(info['web']['Temperature']), __byte(info['web']['Humidity']))
         with open(file_path, 'ab') as f:
-            f.write(struct.pack('ccccc', RECID.to_bytes(1, 'big'), 
-                                int(time_parts[0]).to_bytes(1, 'big'), 
-                                int(time_parts[1]).to_bytes(1, 'big'), 
-                                int(time_parts[2]).to_bytes(1, 'big'), 
-                                int(time_parts[3]).to_bytes(1, 'big')))
-            #save sensor1
-            if USE_PI_SENSE_HAT:
-                temp = int(info['sens4']['Temperature'] * 10)
-                hum = int(info['sens4']['Humidity'])
-            else:
-                temp = int(info['sens1']['Temperature'] * 10)
-                hum = int(info['sens1']['Humidity'])                    
-            f.write(struct.pack('hc', temp, hum.to_bytes(1, 'big')))
-            #save sensor2
-            temp = int(info['sens2']['Temperature'] * 10)
-            hum = int(info['sens2']['Humidity'])
-            f.write(struct.pack('hc', temp, hum.to_bytes(1, 'big')))
-            #save sensor3
-            if USE_PI_SENSE_HAT:
-                temp = int(info['sens4']['Pressure_Temper'] * 10)
-                press = int(info['sens4']['Pressure'] * 10)
-                alt = int(info['sens4']['Altitude'] * 10)
-                sea = int(info['sens4']['SeaPressure'] * 10)
-            else:
-                temp = int(info['sens3']['Temperature'] * 10)
-                press = int(info['sens3']['Pressure'] * 10)
-                alt = int(info['sens3']['Altitude'] * 10)
-                sea = int(info['sens3']['SeaPressure'] * 10)                
-            f.write(struct.pack('hhhh', temp, press, alt, sea))
-            #save web
-            temp = int(info['web']['Temperature'] * 10)
-            hum = int(info['web']['Humidity'])
-            f.write(struct.pack('hc', temp, hum.to_bytes(1, 'big')))
-            f.close()
+            f.write(rec)
     except Exception as e:
         print('Fail to save info to file:', e)
 
