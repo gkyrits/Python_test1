@@ -1,0 +1,7 @@
+#!/bin/bash
+
+cd /home/gkyr/Work/Python_test1
+python test_tkgraph.py
+
+
+

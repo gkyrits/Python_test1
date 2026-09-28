@@ -130,7 +130,7 @@ def btn_exit():
 
 def get_matplot_canvas(canvfrm):    
     plt.rcParams.update({'font.size': 6})
-    fig = plt.Figure(figsize=(0.1, 0.1), dpi=100) #px, py = w*dpi, h*dpi  # pixels
+    fig = plt.Figure() #px, py = w*dpi, h*dpi  # pixels
     #fig = plt.Figure(tight_layout=False)
     axes[0] = fig.add_subplot()
     axes[1] = axes[0].twinx()

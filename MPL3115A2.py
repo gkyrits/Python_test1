@@ -75,7 +75,7 @@ def set_sea_level(sea_press):
 	data = list(sea_level.to_bytes(2,byteorder='big'))
 	bus.write_i2c_block_data(0x60,0x14,data)
 
-set_sea_level(1022)
+#set_sea_level(1022)
 while True:
     read_mpl3115()
     print("")

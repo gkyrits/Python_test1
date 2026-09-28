@@ -21,6 +21,6 @@ def play_colors():
 
 while True:
     play_colors()
-    bz.beep(0.01,0,1)
+    #bz.beep(0.01,0,1)
 
 

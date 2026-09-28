@@ -1,0 +1,6 @@
+#!/bin/bash
+
+cd /home/gkyr/Work/Python_test1/weather_time
+python raspi_play.py
+
+
