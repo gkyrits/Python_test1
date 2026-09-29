@@ -40,6 +40,19 @@ def set_sea_pressure(seaPress):
     sea_pressure = seaPress
 
 
+def exist():
+    global sense
+    if sense is None:
+        try:
+            from sense_hat import SenseHat
+            sense = SenseHat()
+            return True
+        except:            
+            return False
+    else:
+        return True
+
+
 def get_sensor_info():
     try:
         __read_sensehat()
