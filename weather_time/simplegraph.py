@@ -492,7 +492,7 @@ def draw_form(win,waitWin=None):
     sens_temp_var = tk.BooleanVar(value=sens_temp_val)
     sens_humid_var = tk.BooleanVar(value=sens_humid_val)
     #get data from repository
-    tm.sleep(1)  #add a delay for sumulating data retrieval
+    #tm.sleep(1)  #add a delay for sumulating data retrieval
     get_initdata()
     if waitWin:
         waitWin.destroy()
