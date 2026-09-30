@@ -1,9 +1,10 @@
 import tkinter as tk
 import Pmw as tk2
+import options as opt
 
 
-LCD_SIZE = '320x240'
-FULL_SCREEN = 1
+LCD_SIZE = opt.LCD_SIZE
+FULL_SCREEN = opt.FULL_SCREEN
 
 win_col = 'DarkSeaGreen1'
 win_col2 = "light yellow"

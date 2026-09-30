@@ -1,9 +1,10 @@
 import tkinter as tk
 import time as tm
 import repository as repo
+import options as opt
 
-LCD_SIZE = '320x240'
-FULL_SCREEN = 1
+LCD_SIZE = opt.LCD_SIZE
+FULL_SCREEN = opt.FULL_SCREEN
 
 CURRENT_PLOT = 1
 backhours = 48
@@ -424,7 +425,10 @@ def canvas_click(event):
     global replot_needed,backhours_changed,backepoch
     print('click at:',event.x,event.y)
     if backhours_changed:
+        waitWin = opt.wait_msg('Please wait...')
+        #tm.sleep(2)  # add a delay for simulating data retrieval
         get_initdata()
+        waitWin.destroy()
         draw_plots(canvas)
         backhours_changed = False
         return
@@ -492,7 +496,7 @@ def draw_form(win,waitWin=None):
     sens_temp_var = tk.BooleanVar(value=sens_temp_val)
     sens_humid_var = tk.BooleanVar(value=sens_humid_val)
     #get data from repository
-    #tm.sleep(1)  #add a delay for sumulating data retrieval
+    #tm.sleep(2)  #add a delay for sumulating data retrieval
     get_initdata()
     if waitWin:
         waitWin.destroy()
@@ -546,7 +550,6 @@ def draw_form(win,waitWin=None):
     canvas.bind("<Configure>", canvas_resize)
     canvas.bind("<Button-1>",  canvas_click)
     topfrm.pack(side=tk.TOP, padx=2, pady=2, fill=tk.BOTH, expand=tk.YES)
-   
 
 #################################################################
 

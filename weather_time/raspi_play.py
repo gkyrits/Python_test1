@@ -12,7 +12,8 @@ import pihatsense as sense4
 #import matplotgraph as plot
 import simplegraph as plot
 import repository as repo
-import optionmenu as optmenu
+import optionform as optform
+import options as opt
 import subprocess as proc
 import sys
 import os
@@ -21,8 +22,8 @@ import datetime as dt
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-LCD_SIZE = "320x240"
-FULL_SCREEN = 1
+LCD_SIZE = opt.LCD_SIZE
+FULL_SCREEN = opt.FULL_SCREEN
 
 exit = False
 infoWin = False
@@ -32,9 +33,7 @@ sense_need_update=False
 
 USE_PI_SENSE_HAT = repo.USE_PI_SENSE_HAT
 
-EN=0
-GR=1
-lang=GR
+lang = opt.LANG
 
 monthLst = ['January','February','March','April','May','June','July','August','September','October','November','December']
 monthLst_gr=['Ιανουάριος','Φεβρουάριος','Μάρτιος','Απρίλιος','Μάιος','Ιούνιος','Ιούλιος','Αύγουστος','Σεπτέμβριος','Οκτώβριος','Νοέμβριος','Δεκέμβριος']
@@ -52,13 +51,13 @@ wind_lst = ['Wind','Άνεμος']
 
 
 def get_month(date):    
-    if lang==EN:
+    if lang==opt.EN:
         return monthLst[date-1]
     else:
         return monthLst_gr[date-1]
 
 def get_weekDay(wday):
-    if lang==EN:
+    if lang==opt.EN:
         return weekLst[wday]
     else:
         return weekLst_gr[wday]      
@@ -69,7 +68,7 @@ def get_windDir(deg):
         idx = int(((float(deg) + 22.5) % 360) // 45)
     except (TypeError, ValueError):
         return "?"
-    if lang==EN:
+    if lang==opt.EN:
         return ["N","NE","E","SE","S","SW","W","NW"][idx]
     else:
         return ["Β","ΒΑ","Α","ΝΑ","Ν","ΝΔ","Δ","ΒΔ"][idx]
@@ -142,7 +141,7 @@ class Gui:
      def clockPanel_dblClick(self,e):
         #print('Clock click! :%s' % e.widget)
         #self.__info_window('Clock click!')
-        waitWin = self.__wait_window('Wait Load Graph ..')
+        waitWin = opt.wait_msg('Wait Load Graph ..')
         self.graph_window(waitWin)
 
      def sensePanel_dblClick(self,e):
@@ -200,19 +199,13 @@ class Gui:
         win.wait_window()
         win.grab_release()        
 
-     def __center_form(self, win, width, height):
-        display_width, display_height = map(int, LCD_SIZE.split('x', 1))
-        x_pos = (display_width - width) // 2
-        y_pos = (display_height - height) // 2
-        win.geometry(f'{width}x{height}+{x_pos}+{y_pos}')
-
      def __info_window(self,info):
          global infoWin
          if infoWin:
             return
          infoWin=True
          win=tk.Toplevel(bg="green")
-         self.__center_form(win, 220, 80)
+         opt.center_form(win, 220, 80)
          win.overrideredirect(1)
          bg_col="yellow green"
          frm=tk.Frame(win, bg=bg_col, relief=tk.GROOVE, borderwidth=2)
@@ -223,18 +216,6 @@ class Gui:
          self.__set_modal(win)
          self.root.after_cancel(tmout)
          infoWin=False
-
-     def __wait_window(self,info):        
-         waitWin=tk.Toplevel(bg="green")
-         self.__center_form(waitWin, 220, 80)
-         waitWin.overrideredirect(1)
-         bg_col="yellow green"
-         frm=tk.Frame(waitWin, bg=bg_col, relief=tk.GROOVE, borderwidth=2)
-         tk.Label(frm,text=info, bg=bg_col, font='bold').pack(side=tk.TOP)
-         frm.pack(padx=5, pady=5, fill=tk.BOTH, expand=tk.YES)
-         waitWin.lift()
-         waitWin.update() #force paint now, update_idletasks() alone won't draw it on Windows
-         return waitWin
          
      def radio_play(self):
          rel_radio_path='/../radioPlayer'
@@ -261,7 +242,7 @@ class Gui:
         win.geometry(LCD_SIZE+'+0+0')
         if FULL_SCREEN:
             win.overrideredirect(1)
-        optmenu.draw_form(win)  
+        optform.draw_form(win)  
 
      def update_clock(self,time):
         time_part = time.split(":")
