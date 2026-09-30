@@ -2,6 +2,7 @@
 
 #import smbus
 import time
+import options as opt
 
 info = {'Temperature':0.0, 'Humidity':0}
 
@@ -25,12 +26,12 @@ def __read_ATH10():
     temp = ((data[3] & 0x0F) << 16) | (data[4] << 8) | data[5]
     ctemp = ((temp*200) / 1048576) - 50
     #print(u'Temperature  : {0:.1f}°C'.format(ctemp))
-    info['Temperature']=ctemp
+    info['Temperature']=ctemp + opt.AHT10_TEMP_OFFSET
     tmp = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
     #print(tmp)
     chumid = int(tmp * 100 / 1048576)
     #print(u'Humidity %RH : {0:.1f}%'.format(chumid))
-    info['Humidity']=chumid
+    info['Humidity']=chumid + opt.AHT10_HUMID_OFFSET
 
 def get_sensor_info():
     try:

@@ -2,6 +2,7 @@
 
 #import smbus
 import time
+import options as opt
 
 info = {'Temperature':0.0, 'Pressure':0.0, 'Altitude':0.0, 'SeaPressure':0}
 
@@ -62,9 +63,9 @@ def __read_mpl3115():
     #print("Pressure    : %.1f hPa" %pressure)
     #print("Altitude    : %.1f m" %altitude)
 	#print("Temperature in Fahrenheit  : %.2f F" %fTemp)
-    info['Temperature']=cTemp
-    info['Pressure']=pressure
-    info['Altitude']=altitude
+    info['Temperature']=cTemp + opt.MPL3115_TEMP_OFFSET
+    info['Pressure']=pressure + opt.MPL3115_PRESS_OFFSET
+    info['Altitude']=altitude + opt.MPL3115_ALTIT_OFFSET
     info['SeaPressure']=sea_press
 
 def __set_mpl3115_seaPress(seaPress):

@@ -1,4 +1,5 @@
 import time
+import options as opt
 
 info = {'Temperature':0.0, 'Humidity':0, 'Pressure_Temper':0.0, 'Pressure':0.0, 'Altitude':0.0, 'SeaPressure':0}
 sea_pressure = 1015.0
@@ -19,19 +20,20 @@ def __read_sensehat():
     if sense is None:
         from sense_hat import SenseHat
         sense = SenseHat()
-    info['Temperature'] = sense.get_temperature()
-    info['Humidity'] = sense.get_humidity()
-    info['Pressure_Temper'] = sense.get_temperature_from_pressure()
+    info['Temperature'] = sense.get_temperature() + opt.SENSEHAT_TEMP_OFFSET
+    info['Humidity'] = sense.get_humidity() + opt.SENSEHAT_HUMID_OFFSET
+    info['Pressure_Temper'] = sense.get_temperature_from_pressure() + opt.SENSEHAT_PRESS_TEMP_OFFSET
     pressure = sense.get_pressure()
     if pressure <= 0:
         # pressure sensor returns 0 until it has a first sample, retry once
         time.sleep(0.5)
         pressure = sense.get_pressure()
-    info['Pressure'] = pressure
     if pressure > 0:
+        pressure += opt.SENSEHAT_PRESS_OFFSET
         info['Altitude'] = __estimate_altitude(pressure, sea_pressure)
     else:
         info['Altitude'] = 0.0  # no reading, formula would give 44330 m
+    info['Pressure'] = pressure
     info['SeaPressure'] = sea_pressure
 
 

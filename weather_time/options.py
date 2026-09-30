@@ -8,6 +8,19 @@ EN=0
 GR=1
 LANG=GR
 
+# sensor calibration offsets, added to every reading (web values have none)
+AHT10_TEMP_OFFSET  = 0.0   # °C
+AHT10_HUMID_OFFSET = 0.0   # %
+SI7021_TEMP_OFFSET  = 0.0  # °C
+SI7021_HUMID_OFFSET = 0.0  # %
+MPL3115_TEMP_OFFSET  = 0.0   # °C
+MPL3115_PRESS_OFFSET = 0.0   # hPa
+MPL3115_ALTIT_OFFSET = 0.0   # m
+SENSEHAT_TEMP_OFFSET       = 0.0  # °C (humidity sensor temperature)
+SENSEHAT_HUMID_OFFSET      = 0.0  # %
+SENSEHAT_PRESS_TEMP_OFFSET = 0.0  # °C (pressure sensor temperature)
+SENSEHAT_PRESS_OFFSET      = 0.0  # hPa, altitude is calculated from the corrected pressure
+
 def center_form(win, width, height):
     display_width, display_height = map(int, LCD_SIZE.split('x', 1))
     x_pos = (display_width - width) // 2
