@@ -9,6 +9,7 @@ FULL_SCREEN = opt.FULL_SCREEN
 win_col = 'DarkSeaGreen1'
 win_col2 = "light yellow"
 tab_col = "light steel blue"
+tab_sel_col = "#dfe7f1"  # selected tab, lighter than tab_col
 
 win_font=('Arial', 7)
 win_fontB=('Arial', 7, 'bold')
@@ -33,6 +34,13 @@ def draw_form(win):
         nb.tab(page_name).configure(font=win_fontB, background=tab_col)
         nb.page(page_name).configure(background=win_col2)
     nb.component('hull').configure(background=win_col)
+    #lighter color on the selected tab
+    def tab_select(page_name):
+        for name in tabs:
+            col = tab_sel_col if name == page_name else tab_col
+            nb.tab(name).configure(background=col, activebackground=col)
+    nb.configure(raisecommand=tab_select)
+    tab_select(nb.getcurselection())
     test_page(p1)
     test_page(p2)
     test_page(p3)
