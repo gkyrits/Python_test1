@@ -959,16 +959,16 @@ def cansel_threads():
 def register_keys():
     try:
         from gpiozero import Button
+        global key1,key2,key3
+        key1 = Button(18)
+        key2 = Button(23)
+        key3 = Button(24)
+        key1.when_released = gui.key1_press
+        key2.when_released = gui.key2_press
+        key3.when_released = gui.key3_press
     except:
         print('Fail register Keys')
-        return
-    global key1,key2,key3
-    key1 = Button(18)
-    key2 = Button(23)
-    key3 = Button(24)
-    key1.when_released = gui.key1_press
-    key2.when_released = gui.key2_press
-    key3.when_released = gui.key3_press
+        return        
 
 
 #======== Sreen Saver ========
