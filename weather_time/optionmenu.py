@@ -3,7 +3,7 @@ import Pmw as tk2
 
 
 LCD_SIZE = '320x240'
-FULL_SCREEN = 0
+FULL_SCREEN = 1
 
 win_col = 'DarkSeaGreen1'
 win_col2 = "light yellow"

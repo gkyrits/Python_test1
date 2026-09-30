@@ -22,7 +22,7 @@ import datetime as dt
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 LCD_SIZE = "320x240"
-FULL_SCREEN = 0
+FULL_SCREEN = 1
 
 exit = False
 infoWin = False
@@ -1007,7 +1007,7 @@ def screensaver_disable(disable):
 screensaver_disable(True)
 gui = Gui()
 # register Keys
-#register_keys()
+register_keys()
 # start time thread
 tm_thrd=thrd.Thread(target=time_thread, daemon=True)
 tm_thrd.start()

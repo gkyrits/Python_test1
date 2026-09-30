@@ -3,7 +3,7 @@ import time as tm
 import repository as repo
 
 LCD_SIZE = '320x240'
-FULL_SCREEN = 0
+FULL_SCREEN = 1
 
 CURRENT_PLOT = 1
 backhours = 48
