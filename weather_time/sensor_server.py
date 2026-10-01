@@ -13,6 +13,7 @@ import si7021sense as sense2
 import mpl3115sense as sense3
 import pihatsense as sense4
 import repository as repo
+import options as opt
 
 SENSOR_PERIOD  = 60   # sec, read sensors and save a record
 WEATHER_PERIOD = 120  # sec, poll weather site
@@ -55,15 +56,21 @@ def update_seaPressure(info):
         log('update sea pressure : %d' % wthr_pressure)
 
 
+# read only the enabled sensors (options SENSEx_EN)
+# sensor 1 = Sense HAT or AHT10, sensor 2 = SI7021, sensor 3 = Sense HAT or MPL3115
 def read_sensors():
-    repo.info['sens1'] = dict(sense1.get_sensor_info())
-    repo.info['sens2'] = dict(sense2.get_sensor_info())
-    repo.info['sens3'] = dict(sense3.get_sensor_info())
-    repo.info['sens4'] = dict(sense4.get_sensor_info())
     if USE_PI_SENSE_HAT:
-        update_seaPressure(repo.info['sens4'])
+        if opt.SENSE1_EN or opt.SENSE3_EN:
+            repo.info['sens4'] = dict(sense4.get_sensor_info())
     else:
-        update_seaPressure(repo.info['sens3'])
+        if opt.SENSE1_EN:
+            repo.info['sens1'] = dict(sense1.get_sensor_info())
+        if opt.SENSE3_EN:
+            repo.info['sens3'] = dict(sense3.get_sensor_info())
+    if opt.SENSE2_EN:
+        repo.info['sens2'] = dict(sense2.get_sensor_info())
+    if opt.SENSE3_EN:
+        update_seaPressure(repo.info['sens4'] if USE_PI_SENSE_HAT else repo.info['sens3'])
     repo.info['web'] = dict(wthr.get_small_info())
 
 

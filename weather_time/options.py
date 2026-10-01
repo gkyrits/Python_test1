@@ -8,6 +8,11 @@ EN=0
 GR=1
 LANG=GR
 
+# enable(1)/disable(0) room sensors: not read, not shown, not saved/read in repository
+SENSE1_EN = 1   # sensor 1: Sense HAT or AHT10 temperature/humidity
+SENSE2_EN = 1   # sensor 2: SI7021 temperature/humidity
+SENSE3_EN = 1   # sensor 3: Sense HAT or MPL3115 pressure/altitude
+
 # sensor calibration offsets, added to every reading (web values have none)
 AHT10_TEMP_OFFSET  = 0.0   # °C
 AHT10_HUMID_OFFSET = 0.0   # %

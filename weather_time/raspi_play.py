@@ -466,42 +466,30 @@ class Gui:
         self.SensorFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES) 
         
 
-     def sensePanel_change(self):
+     def sensePanel_nextShow(self):
+        #cycle: enabled sensors (options SENSEx_EN) then the cpu/ip panel (id 0)
+        global sense_need_update
+        order=[sid for sid,en in ((1,opt.SENSE1_EN),(2,opt.SENSE2_EN),(3,opt.SENSE3_EN)) if en]+[0]
+        if self.sense_id in order:
+            new_id=order[(order.index(self.sense_id)+1) % len(order)]
+        else:
+            new_id=order[0]  #first show (sense_id -1)
+        if new_id==self.sense_id:
+            return  #no sensor enabled, keep the cpu/ip panel
         if self.IPInfoFrm != None:
             self.IPInfoFrm.pack_forget()
             self.IPInfoFrm=None
-            self.senseInfo_panel(self.pnlSenseInfo)
-            bind_tree(self.SensorFrm,'<Button-1>',self.sensePanel_dblClick)            
-        else:
-            if self.SensorFrm !=None:
-                self.SensorFrm.pack_forget()
-                self.SensorFrm=None  
+        if self.SensorFrm != None:
+            self.SensorFrm.pack_forget()
+            self.SensorFrm=None
+        self.sense_id=new_id
+        if new_id==0:
             self.ipInfo_panel(self.pnlSenseInfo)
             bind_tree(self.IPInfoFrm,'<Button-1>',self.sensePanel_dblClick)
-
-
-     def sensePanel_nextShow(self):
-        global sense_need_update
-        if self.sense_id < 0:
-            self.sense_id=1            
+        else:
             self.senseInfo_panel(self.pnlSenseInfo)
+            bind_tree(self.SensorFrm,'<Button-1>',self.sensePanel_dblClick)
             sense_need_update=True
-        elif self.sense_id == 0:
-            self.sense_id=1            
-            self.sensePanel_change()
-            sense_need_update=True
-        elif self.sense_id == 1:
-            self.sense_id=2
-            sense_need_update=True
-        elif self.sense_id == 2:
-            self.sense_id=3
-            self.SensorFrm.pack_forget()
-            self.senseInfo_panel(self.pnlSenseInfo)
-            bind_tree(self.SensorFrm,'<Button-1>',self.sensePanel_dblClick)            
-            sense_need_update=True
-        elif self.sense_id == 3:
-            self.sense_id=0
-            self.sensePanel_change()  
 
 
      def sensePanel_visible(self,visible):        
@@ -841,16 +829,21 @@ def update_seaPressure(info):
             sense3.set_sea_pressure(wthr_pressure)
         print('Update mpl1315 sea pressure : %d' %wthr_pressure)
 
+# read only the enabled sensors (options SENSEx_EN)
 def read_sensors_info():
     print('*read_sensors_info*')
-    sensor_info['sens1'] = sense1.get_sensor_info()
-    sensor_info['sens2'] = sense2.get_sensor_info()
-    sensor_info['sens3'] = sense3.get_sensor_info()
-    sensor_info['sens4'] = sense4.get_sensor_info()
     if USE_PI_SENSE_HAT:
-        update_seaPressure(sensor_info['sens4'])
+        if opt.SENSE1_EN or opt.SENSE3_EN:
+            sensor_info['sens4'] = sense4.get_sensor_info()
     else:
-        update_seaPressure(sensor_info['sens3'])
+        if opt.SENSE1_EN:
+            sensor_info['sens1'] = sense1.get_sensor_info()
+        if opt.SENSE3_EN:
+            sensor_info['sens3'] = sense3.get_sensor_info()
+    if opt.SENSE2_EN:
+        sensor_info['sens2'] = sense2.get_sensor_info()
+    if opt.SENSE3_EN:
+        update_seaPressure(sensor_info['sens4'] if USE_PI_SENSE_HAT else sensor_info['sens3'])
 
 def get_sensors_info():
     global gui
@@ -871,7 +864,8 @@ def get_sensors_info():
 
 #run in Tk thread, sense_id may change while reading
 def update_sensor_gui():
-    gui.update_sensor(get_sensors_info())
+    if gui.senseinfo_active():
+        gui.update_sensor(get_sensors_info())
 
 def sensor_thread(tmout):
     global gui,exit,sense_need_update

@@ -2,6 +2,7 @@ import struct
 import time
 import os
 import pihatsense
+import options as opt
 
 FILE = 'sensor'  # file name to save info
 # directory to save info, next to this module so every process (sensor_server,
@@ -88,20 +89,30 @@ def save_info_binary():
         rec = struct.pack('ccccc', RECID.to_bytes(1, 'big'),
                           __byte(time_parts[0]), __byte(time_parts[1]),
                           __byte(time_parts[2]), __byte(time_parts[3]))
+        #record layout is fixed, a disabled sensor (options SENSEx_EN=0) is saved as zeros
         #sensor1
-        sens1 = info['sens4'] if USE_PI_SENSE_HAT else info['sens1']
-        rec += struct.pack('hc', __short(sens1['Temperature']), __byte(sens1['Humidity']))
-        #sensor2
-        rec += struct.pack('hc', __short(info['sens2']['Temperature']), __byte(info['sens2']['Humidity']))
-        #sensor3
-        if USE_PI_SENSE_HAT:
-            sens3 = info['sens4']
-            temp = sens3['Pressure_Temper']
+        if opt.SENSE1_EN:
+            sens1 = info['sens4'] if USE_PI_SENSE_HAT else info['sens1']
+            rec += struct.pack('hc', __short(sens1['Temperature']), __byte(sens1['Humidity']))
         else:
-            sens3 = info['sens3']
-            temp = sens3['Temperature']
-        rec += struct.pack('hhhh', __short(temp), __short(sens3['Pressure']),
-                           __short(sens3['Altitude']), __short(sens3['SeaPressure']))
+            rec += struct.pack('hc', 0, __byte(0))
+        #sensor2
+        if opt.SENSE2_EN:
+            rec += struct.pack('hc', __short(info['sens2']['Temperature']), __byte(info['sens2']['Humidity']))
+        else:
+            rec += struct.pack('hc', 0, __byte(0))
+        #sensor3
+        if opt.SENSE3_EN:
+            if USE_PI_SENSE_HAT:
+                sens3 = info['sens4']
+                temp = sens3['Pressure_Temper']
+            else:
+                sens3 = info['sens3']
+                temp = sens3['Temperature']
+            rec += struct.pack('hhhh', __short(temp), __short(sens3['Pressure']),
+                               __short(sens3['Altitude']), __short(sens3['SeaPressure']))
+        else:
+            rec += struct.pack('hhhh', 0, 0, 0, 0)
         #web
         rec += struct.pack('hc', __short(info['web']['Temperature']), __byte(info['web']['Humidity']))
         with open(file_path, 'ab') as f:
@@ -182,9 +193,20 @@ def load_info_binary(year=0, month=0, day=0, hour=-1, min=-1, backhours=24):
                 recordepoch = get_epoch(int(year_month_str.split('-')[0]), int(year_month_str.split('-')[1]), fday, int(ftime.split(':')[0]), int(ftime.split(':')[1]))
                 if(recordepoch < backepoch) or (recordepoch > startepoch):
                     continue
-                repo_info_list.append({'day': str(fday), 'time': ftime, 'info': {'sens1': {'Temperature': sens1_temp/10, 'Humidity': sens1_hum[0]}, 
-                                                                              'sens2': {'Temperature': sens2_temp/10, 'Humidity': sens2_hum[0]}, 
-                                                                              'sens3': {'Temperature': sens3_temp/10, 'Pressure': sens3_press/10, 'Altitude': sens3_alt/10, 'SeaPressure': sens3_sea/10}, 
+                #a disabled sensor (options SENSEx_EN=0) is returned as zeros
+                if opt.SENSE1_EN:
+                    sens1 = {'Temperature': sens1_temp/10, 'Humidity': sens1_hum[0]}
+                else:
+                    sens1 = {'Temperature': 0.0, 'Humidity': 0}
+                if opt.SENSE2_EN:
+                    sens2 = {'Temperature': sens2_temp/10, 'Humidity': sens2_hum[0]}
+                else:
+                    sens2 = {'Temperature': 0.0, 'Humidity': 0}
+                if opt.SENSE3_EN:
+                    sens3 = {'Temperature': sens3_temp/10, 'Pressure': sens3_press/10, 'Altitude': sens3_alt/10, 'SeaPressure': sens3_sea/10}
+                else:
+                    sens3 = {'Temperature': 0.0, 'Pressure': 0.0, 'Altitude': 0.0, 'SeaPressure': 0.0}
+                repo_info_list.append({'day': str(fday), 'time': ftime, 'info': {'sens1': sens1, 'sens2': sens2, 'sens3': sens3,
                                                                               'web': {'Temperature': web_temp/10, 'Humidity': web_hum[0]}}})
             return repo_info_list
     except Exception as e:

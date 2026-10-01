@@ -492,9 +492,10 @@ def draw_form(win,waitWin=None):
     global web_temp_var,web_humid_var,sens_press_var,sens_temp_var,sens_humid_var
     web_temp_var = tk.BooleanVar(value=web_temp_val)
     web_humid_var = tk.BooleanVar(value=web_humid_val)
-    sens_press_var = tk.BooleanVar(value=sens_press_val)
-    sens_temp_var = tk.BooleanVar(value=sens_temp_val)
-    sens_humid_var = tk.BooleanVar(value=sens_humid_val)
+    #a disabled sensor (options SENSEx_EN=0) is never plotted
+    sens_press_var = tk.BooleanVar(value=sens_press_val and opt.SENSE3_EN)
+    sens_temp_var = tk.BooleanVar(value=sens_temp_val and opt.SENSE1_EN)
+    sens_humid_var = tk.BooleanVar(value=sens_humid_val and opt.SENSE1_EN)
     #get data from repository
     #tm.sleep(2)  #add a delay for sumulating data retrieval
     get_initdata()
@@ -511,12 +512,16 @@ def draw_form(win,waitWin=None):
     tk.Checkbutton(webFrmTools, text='H', bg='light blue', font=win_font, width=1, variable=web_humid_var, command=plotCbx_change).pack(side=tk.LEFT)
     webFrmTools.pack(side=tk.LEFT, padx=2)
     #sensFrmTools
-    sensFrmTools = tk.Frame(toolsfrm, relief=tk.GROOVE, borderwidth=2 , bg=win_col)
-    tk.Label(sensFrmTools, text='S:', font=win_font, width=1).pack(side=tk.LEFT)
-    tk.Checkbutton(sensFrmTools, text='T', bg='light pink', font=win_font, width=1, variable=sens_temp_var, command=plotCbx_change).pack(side=tk.LEFT)
-    tk.Checkbutton(sensFrmTools, text='H', bg='light blue', font=win_font, width=1, variable=sens_humid_var, command=plotCbx_change).pack(side=tk.LEFT)
-    tk.Checkbutton(sensFrmTools, text='P', bg='light green', font=win_font, width=1, variable=sens_press_var, command=plotCbx_change).pack(side=tk.LEFT)
-    sensFrmTools.pack(side=tk.LEFT, padx=6)     
+    #only buttons of enabled sensors: T/H from sensor 1, P from sensor 3
+    if opt.SENSE1_EN or opt.SENSE3_EN:
+        sensFrmTools = tk.Frame(toolsfrm, relief=tk.GROOVE, borderwidth=2 , bg=win_col)
+        tk.Label(sensFrmTools, text='S:', font=win_font, width=1).pack(side=tk.LEFT)
+        if opt.SENSE1_EN:
+            tk.Checkbutton(sensFrmTools, text='T', bg='light pink', font=win_font, width=1, variable=sens_temp_var, command=plotCbx_change).pack(side=tk.LEFT)
+            tk.Checkbutton(sensFrmTools, text='H', bg='light blue', font=win_font, width=1, variable=sens_humid_var, command=plotCbx_change).pack(side=tk.LEFT)
+        if opt.SENSE3_EN:
+            tk.Checkbutton(sensFrmTools, text='P', bg='light green', font=win_font, width=1, variable=sens_press_var, command=plotCbx_change).pack(side=tk.LEFT)
+        sensFrmTools.pack(side=tk.LEFT, padx=6)     
     #exit button
     tk.Button(toolsfrm, text='Back', font=but_font, command=lambda:btn_exit(win)).pack(side=tk.RIGHT, padx=2)
     toolsfrm.pack(side=tk.BOTTOM, padx=2, pady=2, fill=tk.X) 
