@@ -59,6 +59,7 @@ def update_seaPressure(info):
 # read only the enabled sensors (options SENSEx_EN)
 # sensor 1 = Sense HAT or AHT10, sensor 2 = SI7021, sensor 3 = Sense HAT or MPL3115
 def read_sensors():
+    opt.reload_if_changed()  # options form may have saved new settings
     if USE_PI_SENSE_HAT:
         if opt.SENSE1_EN or opt.SENSE3_EN:
             repo.info['sens4'] = dict(sense4.get_sensor_info())

@@ -103,6 +103,7 @@ def sensors_page(win):
             setattr(opt, name, val)
         for name, var in en_vars:
             setattr(opt, name, var.get())
+        opt.save()
         return True
     return apply
 

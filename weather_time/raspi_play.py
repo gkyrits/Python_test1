@@ -832,6 +832,7 @@ def update_seaPressure(info):
 # read only the enabled sensors (options SENSEx_EN)
 def read_sensors_info():
     print('*read_sensors_info*')
+    opt.reload_if_changed()  # options.json may be changed by an other program
     if USE_PI_SENSE_HAT:
         if opt.SENSE1_EN or opt.SENSE3_EN:
             sensor_info['sens4'] = sense4.get_sensor_info()
