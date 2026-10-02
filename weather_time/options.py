@@ -80,15 +80,27 @@ def reload_if_changed():
     if mtime != settings_mtime:
         load()
 
-# full screen window (when FULL_SCREEN)
-# on Linux (Pi) ask the window manager, an overrideredirect window gets no key events there
+# LCD size window without frame (when FULL_SCREEN)
 def full_screen(win):
-    if not FULL_SCREEN:
-        return
-    if sys.platform.startswith('linux'):
-        win.attributes('-fullscreen', True)
-    else:
+    if FULL_SCREEN:
         win.overrideredirect(1)
+
+
+# a frameless (overrideredirect) window gets no key events from the window
+# manager on Linux (Pi), so grab the keyboard while a form that needs keys is
+# open; the grab ends when the window is closed
+def grab_keyboard(win):
+    if not (FULL_SCREEN and sys.platform.startswith('linux')):
+        return
+    def grab(tries):
+        try:
+            win.grab_set_global()
+        except tk.TclError as e:
+            if tries > 0 and win.winfo_exists():
+                win.after(100, grab, tries-1)  # not viewable yet, try again
+            else:
+                print('Fail grab keyboard:', e)
+    win.after(100, grab, 20)
 
 
 def center_form(win, width, height):

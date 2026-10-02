@@ -62,6 +62,7 @@ def draw_form(win):
     test_page(p3)
     nb.pack(padx=3, pady=0, fill=tk.BOTH, expand=1)      
     frm1.pack(side=tk.TOP,fill=tk.BOTH, expand=1)
+    opt.grab_keyboard(win)  #key events for the offset entries
 
 
 def test_page(win):
