@@ -29,6 +29,8 @@ offset_items = (('Sense HAT', (('T', 'SENSEHAT_TEMP_OFFSET'), ('H', 'SENSEHAT_HU
 
 def draw_form(win):
     win.config(bg=win_col)
+    #keys straight to the entries, without the X input method popup box
+    win.tk.call('tk', 'useinputmethods', '-displayof', win, 0)
     #add buttons_frm ======
     apply_funcs=[]  #page functions that store the edited values, False if a value is wrong
     def ok():
@@ -87,6 +89,9 @@ def sensors_page(win):
             ent = tk.Entry(win, width=5, font=win_font, borderwidth=1, highlightthickness=0)
             ent.insert(0, '{:g}'.format(getattr(opt, name)))
             ent.grid(row=row, column=2+2*col, sticky=tk.W, padx=(1, 2), pady=1)
+            #full screen windows (overrideredirect) get no keyboard focus from the
+            #window manager on the Pi, take it when the entry is touched
+            ent.bind('<Button-1>', lambda e: e.widget.focus_force())
             entries.append((name, ent))
 
     def apply():
