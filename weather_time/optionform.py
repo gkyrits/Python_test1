@@ -89,8 +89,7 @@ def sensors_page(win):
             ent = tk.Entry(win, width=5, font=win_font, borderwidth=1, highlightthickness=0)
             ent.insert(0, '{:g}'.format(getattr(opt, name)))
             ent.grid(row=row, column=2+2*col, sticky=tk.W, padx=(1, 2), pady=1)
-            #full screen windows (overrideredirect) get no keyboard focus from the
-            #window manager on the Pi, take it when the entry is touched
+            #take the keyboard focus when the entry is touched
             ent.bind('<Button-1>', lambda e: e.widget.focus_force())
             entries.append((name, ent))
 
@@ -116,8 +115,7 @@ if __name__ == '__main__':
     root = tk.Tk()
     root.title('Option Menu')
     root.geometry(LCD_SIZE+'+0+0')
-    if FULL_SCREEN:
-        root.overrideredirect(1)    
+    opt.full_screen(root)    
     
     draw_form(root)
     root.mainloop()

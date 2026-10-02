@@ -109,8 +109,7 @@ class Gui:
         self.root = tk.Tk()
         self.root.title("raspi play v0.1")
         self.root.geometry(LCD_SIZE+'+0+0')
-        if(FULL_SCREEN):
-              self.root.overrideredirect(1)
+        opt.full_screen(self.root)
         self.root.config(cursor='cross')
         self.nightTime=False
         self.IPInfoFrm=None
@@ -233,15 +232,13 @@ class Gui:
          waitWin.update()
          win=tk.Toplevel()
          win.geometry(LCD_SIZE+'+0+0')
-         if FULL_SCREEN:
-            win.overrideredirect(1)         
+         opt.full_screen(win)
          plot.draw_form(win,waitWin)         
 
      def option_window(self):
         win=tk.Toplevel()
         win.geometry(LCD_SIZE+'+0+0')
-        if FULL_SCREEN:
-            win.overrideredirect(1)
+        opt.full_screen(win)
         optform.draw_form(win)  
 
      def update_clock(self,time):

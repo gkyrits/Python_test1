@@ -1,5 +1,6 @@
 import tkinter as tk
 import os
+import sys
 import json
 
 
@@ -78,6 +79,17 @@ def reload_if_changed():
         return
     if mtime != settings_mtime:
         load()
+
+# full screen window (when FULL_SCREEN)
+# on Linux (Pi) ask the window manager, an overrideredirect window gets no key events there
+def full_screen(win):
+    if not FULL_SCREEN:
+        return
+    if sys.platform.startswith('linux'):
+        win.attributes('-fullscreen', True)
+    else:
+        win.overrideredirect(1)
+
 
 def center_form(win, width, height):
     display_width, display_height = map(int, LCD_SIZE.split('x', 1))

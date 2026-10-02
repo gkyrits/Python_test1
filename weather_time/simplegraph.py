@@ -562,8 +562,7 @@ if __name__ == '__main__':
     root = tk.Tk()
     root.title('Test Graph')
     root.geometry(LCD_SIZE+'+0+0')
-    if FULL_SCREEN:
-        root.overrideredirect(1)    
+    opt.full_screen(root)    
     root.config(bg=win_col)
     draw_form(root)
     root.mainloop()
