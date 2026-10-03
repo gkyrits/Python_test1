@@ -62,7 +62,9 @@ def clear_data():
 
 
 def parce_info(year,month,backepoch,info):
-    recordepoch = repo.get_epoch(year, month, int(info['day']), int(info['time'].split(':')[0]), int(info['time'].split(':')[1]))
+    recordepoch = info.get('epoch')  #records of an earlier month file carry their own epoch
+    if recordepoch is None:
+        recordepoch = repo.get_epoch(year, month, int(info['day']), int(info['time'].split(':')[0]), int(info['time'].split(':')[1]))
     sens1 = info['info']['sens1']
     sens2 = info['info']['sens2']
     sens3 = info['info']['sens3']
@@ -73,12 +75,17 @@ def parce_info(year,month,backepoch,info):
     rec_sens_press = sens3['Pressure']
     rec_sens_temp = sens1['Temperature']
     rec_sens_humid = sens1['Humidity']
+    #all zeros is no reading (sensor disabled or failed): None, filled in fill_missing()
+    if rec_sens_temp == 0 and rec_sens_humid == 0:
+        rec_sens_temp = rec_sens_humid = None
+    if rec_sens_press == 0:
+        rec_sens_press = None
     #check if data is in range
     if rec_web_temp < -20 or rec_web_temp > 50:
         return
     if rec_web_humid < 0 or rec_web_humid > 100:
         return
-    if rec_sens_press != 0:
+    if rec_sens_press is not None:
         if rec_sens_press < 900 or rec_sens_press > 1100:
             return
     #check if data is not more diff from previous data
@@ -93,17 +100,17 @@ def parce_info(year,month,backepoch,info):
             rec_web_humid = last_web_humid
             #return
         last_web_press = sens_press_data[-1]
-        if last_web_press != 0 and abs(last_web_press - rec_sens_press) > 5:
+        if last_web_press and rec_sens_press is not None and abs(last_web_press - rec_sens_press) > 5:
             rec_sens_press = last_web_press
             #return
-        if sens_temp_data[-1] != 0 and abs(sens_temp_data[-1] - rec_sens_temp) > 5:
+        if sens_temp_data[-1] and rec_sens_temp is not None and abs(sens_temp_data[-1] - rec_sens_temp) > 5:
             rec_sens_temp = sens_temp_data[-1]
             #return
-        if sens_humid_data[-1] != 0 and abs(sens_humid_data[-1] - rec_sens_humid) > 5:
+        if sens_humid_data[-1] and rec_sens_humid is not None and abs(sens_humid_data[-1] - rec_sens_humid) > 5:
             rec_sens_humid = sens_humid_data[-1]
             #return   
     #not add if all data is zero
-    if rec_web_temp == 0 and rec_web_humid == 0 and rec_sens_press == 0 and rec_sens_temp == 0 and rec_sens_humid == 0:
+    if rec_web_temp == 0 and rec_web_humid == 0 and rec_sens_press is None and rec_sens_temp is None:
         return
     #add data to lists
     time_data.append(rec_time)
@@ -112,6 +119,16 @@ def parce_info(year,month,backepoch,info):
     sens_press_data.append(rec_sens_press)
     sens_temp_data.append(rec_sens_temp)
     sens_humid_data.append(rec_sens_humid)
+
+
+#replace None (no reading) with the previous value, the leading ones with the first reading (0 if none)
+def fill_missing(data):
+    last = next((val for val in data if val is not None), 0)
+    for i, val in enumerate(data):
+        if val is None:
+            data[i] = last
+        else:
+            last = val
 
 
 def get_initdata():
@@ -135,6 +152,8 @@ def get_initdata():
     if info_list:
         for info in info_list:
             parce_info(year,month,backepoch,info)
+    for data in (sens_press_data, sens_temp_data, sens_humid_data):
+        fill_missing(data)
     if len(time_data)>0 :
         web_temp_rng[0] = min(web_temp_data)
         web_temp_rng[1] = max(web_temp_data)
@@ -426,9 +445,10 @@ def canvas_click(event):
     print('click at:',event.x,event.y)
     if backhours_changed:
         waitWin = opt.wait_msg('Please wait...')
-        #tm.sleep(2)  # add a delay for simulating data retrieval
-        get_initdata()
-        waitWin.destroy()
+        try:
+            get_initdata()
+        finally:
+            waitWin.destroy()
         draw_plots(canvas)
         backhours_changed = False
         return

@@ -35,7 +35,7 @@ def __read_SI7021():
     #print ("Humidity %%RH : %.1f%%" %humidity)	
 	#print ("Temperature Fahrenheit: %.2f°F" %fTemp)    
     info['Temperature']=cTemp + opt.SI7021_TEMP_OFFSET
-    info['Humidity']=int(humidity) + opt.SI7021_HUMID_OFFSET
+    info['Humidity']=max(0, min(100, int(humidity) + opt.SI7021_HUMID_OFFSET))
 
 def get_sensor_info():
     try:

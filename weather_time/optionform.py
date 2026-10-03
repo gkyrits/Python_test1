@@ -33,12 +33,20 @@ def draw_form(win):
     win.tk.call('tk', 'useinputmethods', '-displayof', win, 0)
     #add buttons_frm ======
     apply_funcs=[]  #page functions that store the edited values, False if a value is wrong
+    #release the keyboard grab first, so an error can never leave the screen without input
+    def close():
+        win.grab_release()
+        win.destroy()
     def ok():
-        if all([func() for func in apply_funcs]):
-            win.destroy()
+        try:
+            if not all([func() for func in apply_funcs]):
+                return
+        except Exception as e:
+            print('Fail apply options:', e)
+        close()
     frm2=tk.Frame(win, bg=win_col)
     tk.Button(frm2, text="Ok", font=but_font, height=1, pady=0, command=ok).pack(side=tk.LEFT, pady=0, padx=5)
-    tk.Button(frm2, text="Cancel", font=but_font, height=1, pady=0, command=win.destroy).pack(side=tk.LEFT, pady=0, padx=5)
+    tk.Button(frm2, text="Cancel", font=but_font, height=1, pady=0, command=close).pack(side=tk.LEFT, pady=0, padx=5)
     frm2.pack(side=tk.BOTTOM, anchor=tk.E, pady=1)
     #add main_frm ======
     frm1=tk.Frame(win, bg=win_col)

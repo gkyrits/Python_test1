@@ -21,7 +21,7 @@ def __read_sensehat():
         from sense_hat import SenseHat
         sense = SenseHat()
     info['Temperature'] = sense.get_temperature() + opt.SENSEHAT_TEMP_OFFSET
-    info['Humidity'] = sense.get_humidity() + opt.SENSEHAT_HUMID_OFFSET
+    info['Humidity'] = max(0, min(100, sense.get_humidity() + opt.SENSEHAT_HUMID_OFFSET))
     info['Pressure_Temper'] = sense.get_temperature_from_pressure() + opt.SENSEHAT_PRESS_TEMP_OFFSET
     pressure = sense.get_pressure()
     if pressure <= 0:

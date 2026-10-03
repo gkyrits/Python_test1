@@ -31,7 +31,7 @@ def __read_ATH10():
     #print(tmp)
     chumid = int(tmp * 100 / 1048576)
     #print(u'Humidity %RH : {0:.1f}%'.format(chumid))
-    info['Humidity']=chumid + opt.AHT10_HUMID_OFFSET
+    info['Humidity']=max(0, min(100, chumid + opt.AHT10_HUMID_OFFSET))
 
 def get_sensor_info():
     try:

@@ -12,7 +12,6 @@ import pihatsense as sense4
 #import matplotgraph as plot
 import simplegraph as plot
 import repository as repo
-import optionform as optform
 import options as opt
 import subprocess as proc
 import sys
@@ -77,10 +76,11 @@ def get_windDir(deg):
 icon_map_day = {200:14,201:14,202:14,210:15,211:15,212:15,221:15,230:14,231:14,232:14,
                 300:12,301:12,310:12,302:10,311:10,312:10,313:10,314:10,321:10,
                 500:12,501:10,520:11,502:10,503:11,521:11,504:25,522:25,531:25,511:20,
-                611:20,612:20,613:20,615:20,616:20,600:18,612:20,601:24,600:24,612:24,620:18,602:16,621:17,622:17,
+                611:20,613:20,615:20,616:20,601:24,600:24,612:24,620:18,602:16,621:17,622:17,
                 701:9,711:9,721:9,731:9,741:9,751:9,761:9,762:9,771:9,781:14,
                 800:2,801:3,802:4,803:6,804:7}
 icon_night_map = {15:33,13:32,19:35,24:34,3:27,4:28,6:30,2:26}
+ICON_UNKNOWN = 1  # weather id not in icon_map_day (e.g. Meteosource Id=0)
 
 
 def bind_tree(widget, event, callback):
@@ -218,7 +218,7 @@ class Gui:
          
      def radio_play(self):
          rel_radio_path='/../radioPlayer'
-         path = os.getcwd()+rel_radio_path
+         path = BASE_DIR+rel_radio_path
          sys.path.insert(0,path)
          try:
             from radioplayer import radio_player
@@ -236,10 +236,25 @@ class Gui:
          plot.draw_form(win,waitWin)         
 
      def option_window(self):
+        try:
+            import optionform as optform  #needs Pmw, import here so only key 2 fails without it
+        except ImportError as e:
+            print('fail open options form:', e)
+            return
         win=tk.Toplevel()
         win.geometry(LCD_SIZE+'+0+0')
         opt.full_screen(win)
-        optform.draw_form(win)  
+        optform.draw_form(win)
+        #a sensor on screen that was just disabled: show the next one
+        def closed(event):
+            if event.widget is win:
+                self.root.after_idle(self.sensePanel_checkEnabled)
+        win.bind('<Destroy>', closed)
+
+     def sensePanel_checkEnabled(self):
+        enabled={1:opt.SENSE1_EN, 2:opt.SENSE2_EN, 3:opt.SENSE3_EN}
+        if self.sense_id in enabled and not enabled[self.sense_id]:
+            self.sensePanel_nextShow()
 
      def update_clock(self,time):
         time_part = time.split(":")
@@ -295,7 +310,7 @@ class Gui:
                self.wthr_windDir.config(text=get_windDir(info['WindDeg']))
                self.wthr_id.config(text='{}-{}'.format(info['Id'],info['Clouds']))
                self.wthr_count.config(text=wthr_count)
-               icon_num=icon_map_day[info['Id']]
+               icon_num=icon_map_day.get(info['Id'],ICON_UNKNOWN)
                if self.nightTime :
                   if icon_num in icon_night_map.keys():
                      icon_num=icon_night_map[icon_num]
@@ -430,12 +445,12 @@ class Gui:
         altitCol="blue1" 
         sense_txt='SENSOR '+str(self.sense_id)
         if self.sense_id==3:
-            rows=6
+            rows=7
         else:
-            rows=4    
+            rows=5    
         self.SensorFrm = tk.Frame(parent, bg=sense_bg)
         #---SensorFrm        
-        for row in range(rows): # 4 rows
+        for row in range(rows):
             self.SensorFrm.rowconfigure(row, weight=1) #resize grid height
         self.room_sensor = tk.Label(self.SensorFrm,text=sense_txt, bg=sense_bg, fg="blue", font="Arial 7")
         self.room_sensor.grid(row=0)
@@ -606,7 +621,7 @@ class Gui:
             col=idx-info_rng[0]
             hour = info['List'][idx]['Hour']+':'
             tk.Label(parent, text=hour,  bg=prnt_bg, font="Arial 8").grid(row=1, column=col+1)
-            icon_num=icon_map_day[info['List'][idx]['Id']]
+            icon_num=icon_map_day.get(info['List'][idx]['Id'],ICON_UNKNOWN)
             if (hour>='20:') or (hour<='06:'):
                 if icon_num in icon_night_map.keys():
                     icon_num=icon_night_map[icon_num]

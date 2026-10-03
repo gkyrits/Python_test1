@@ -5,7 +5,7 @@ import json
 
 
 LCD_SIZE = '320x240'
-FULL_SCREEN = 1
+FULL_SCREEN = 0 if sys.platform.startswith('win') else 1  # normal window for testing on Windows
 
 EN=0
 GR=1
@@ -42,12 +42,14 @@ settings_mtime = 0  # modification time of the loaded settings file
 
 
 def save():
+    global settings_mtime
     data = {name: globals()[name] for name in SAVED_NAMES}
     tmp_file = SETTINGS_FILE + '.tmp'
     try:
         with open(tmp_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2)
         os.replace(tmp_file, SETTINGS_FILE)  # never leave a half written file
+        settings_mtime = os.path.getmtime(SETTINGS_FILE)  # no reload of our own save
     except Exception as e:
         print('Fail to save options:', e)
 
