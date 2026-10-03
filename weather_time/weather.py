@@ -1,5 +1,6 @@
 import requests
 import time
+import options as opt
 
 #user:gkyr@yahoo.gr  pass:gkyr1234
 #loc Nea Smyrni from google map
@@ -13,6 +14,7 @@ LON     = '23.70925'
 OPEN_API_KEY = 'cc60f5942123b44409393d80500ce975'
 open_param = {'appid': OPEN_API_KEY,
               'lat': LAT,'lon': LON,'units': 'metric','lang':'el'}
+OPEN_LANG = {opt.EN: 'en', opt.GR: 'el'}  # options LANG -> openweather lang code
 open_weather_url  = 'https://api.openweathermap.org/data/2.5/weather'
 open_forecast_url = "https://api.openweathermap.org/data/2.5/forecast"
 
@@ -60,6 +62,7 @@ def get_meteo_weather_info(lat, lon):
 
 
 def get_open_weather_info(lat, lon):
+    open_param['lang']=OPEN_LANG.get(opt.LANG, 'en')
     open_param['lat']=lat
     open_param['lon']=lon
     try:
@@ -87,6 +90,7 @@ def get_open_weather_info(lat, lon):
 
 
 def get_open_forecast_info(lat, lon):
+    open_param['lang']=OPEN_LANG.get(opt.LANG, 'en')
     open_param['lat']=lat
     open_param['lon']=lon
     try:
