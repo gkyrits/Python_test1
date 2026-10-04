@@ -11,9 +11,16 @@ EN=0
 GR=1
 LANG=GR
 
+# weather locations {id: {name, lat, lon}}, LOCATION is the id of the selected one
 locations = {
     1: {"name": "Nea Smyrni", "lat": 37.93820, "lon": 23.70925}
 }
+LOCATION = 1
+
+# selected location (lat, lon), the first one if LOCATION is not in locations
+def get_location():
+    loc = locations.get(LOCATION) or next(iter(locations.values()))
+    return loc['lat'], loc['lon']
 
 # enable(1)/disable(0) room sensors: not read, not shown, not saved/read in repository
 SENSE1_EN = 1   # sensor 1: Sense HAT or AHT10 temperature/humidity
@@ -36,7 +43,8 @@ SENSEHAT_PRESS_OFFSET      = 0.0  # hPa, altitude is calculated from the correct
 # values above are defaults, the ones edited in the options form are saved in
 # options.json (next to this file) and loaded on start
 SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'options.json')
-SAVED_NAMES = ('SENSE1_EN', 'SENSE2_EN', 'SENSE3_EN',
+SAVED_NAMES = ('LANG', 'LOCATION', 'locations',
+               'SENSE1_EN', 'SENSE2_EN', 'SENSE3_EN',
                'AHT10_TEMP_OFFSET', 'AHT10_HUMID_OFFSET',
                'SI7021_TEMP_OFFSET', 'SI7021_HUMID_OFFSET',
                'MPL3115_TEMP_OFFSET', 'MPL3115_PRESS_OFFSET', 'MPL3115_ALTIT_OFFSET',
@@ -72,9 +80,21 @@ def load():
     for name in SAVED_NAMES:
         if name in data:
             try:
-                globals()[name] = type(globals()[name])(data[name])  # keep int/float type
-            except (TypeError, ValueError):
+                if name == 'locations':
+                    globals()[name] = __load_locations(data[name])
+                else:
+                    globals()[name] = type(globals()[name])(data[name])  # keep int/float type
+            except (TypeError, ValueError, KeyError, AttributeError):
                 print('Bad option value %s: %s' % (name, data[name]))
+
+
+# json keeps dict keys as strings, back to int ids; error if a location is wrong or none
+def __load_locations(data):
+    locs = {int(key): {'name': str(loc['name']), 'lat': float(loc['lat']), 'lon': float(loc['lon'])}
+            for key, loc in data.items()}
+    if not locs:
+        raise ValueError('no locations')
+    return locs
 
 
 # load again if the file changed (saved by an other program, or edited by hand)

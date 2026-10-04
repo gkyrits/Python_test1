@@ -5,10 +5,15 @@ import options as opt
 #user:gkyr@yahoo.gr  pass:gkyr1234
 #loc Nea Smyrni from google map
 #37.938209123871076, 23.709251306382026
+#nea smirni
+#37.938787,23.709245
+#patra
+#38.256496,21.743460
+#thesaloniki
+#40.626959,22.948434
 
-#loc Nea Smyrni
-LAT     = opt.locations[1]["lat"]
-LON     = opt.locations[1]["lon"]
+#loc from options (selected in the options form), read again on every request
+LAT, LON = opt.get_location()
 
 #---openweather
 OPEN_API_KEY = 'cc60f5942123b44409393d80500ce975'
@@ -36,8 +41,8 @@ forecast_inf  = {'Items':0, 'Error':'', 'List':[]}
 
 
 def get_meteo_weather_info(lat, lon):    
-    open_param['lat']=lat
-    open_param['lon']=lon
+    meteo_param['lat']=lat
+    meteo_param['lon']=lon
     try:
         data_place = requests.get(meteo_place_url, meteo_param, timeout=REQUEST_TIMEOUT).json()
         data_point = requests.get(meteo_point_url, meteo_param, timeout=REQUEST_TIMEOUT).json()
@@ -121,7 +126,10 @@ def get_open_forecast_info(lat, lon):
     return forecast_inf
 
 
-def get_weather_info(lat=LAT, lon=LON, source='open'):
+# lat, lon None: the location selected in options
+def get_weather_info(lat=None, lon=None, source='open'):
+    if lat is None or lon is None:
+        lat, lon = opt.get_location()
     if source=='open':
         return get_open_weather_info(lat,lon)
     else:
@@ -130,7 +138,9 @@ def get_weather_info(lat=LAT, lon=LON, source='open'):
 def get_small_info():
     return small_info
 
-def get_forecast_info(lat=LAT, lon=LON, source='open'):
+def get_forecast_info(lat=None, lon=None, source='open'):
+    if lat is None or lon is None:
+        lat, lon = opt.get_location()
     return get_open_forecast_info(lat,lon)
 
 
