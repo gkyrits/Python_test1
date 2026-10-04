@@ -79,7 +79,7 @@ def get_open_weather_info(lat, lon):
         info['Error']=data['message']
         return info
     info['Error']=''
-    info['Place']=data['name']+' '+data['sys']['country']
+    info['Place']=data['name'] #+' '+data['sys']['country']
     info['Descript']=data['weather'][0]['description']
     info['Temper']=data['main']['temp']
     info['Like']=data['main']['feels_like']
