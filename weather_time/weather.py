@@ -7,8 +7,8 @@ import options as opt
 #37.938209123871076, 23.709251306382026
 
 #loc Nea Smyrni
-LAT     = '37.93820'
-LON     = '23.70925'
+LAT     = opt.locations[1]["lat"]
+LON     = opt.locations[1]["lon"]
 
 #---openweather
 OPEN_API_KEY = 'cc60f5942123b44409393d80500ce975'

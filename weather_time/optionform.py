@@ -15,7 +15,7 @@ win_font=('Arial', 7)
 win_fontB=('Arial', 7, 'bold')
 but_font=('Arial', 8, 'bold')
 
-tabs = ('Sensors', 'Menu2', 'Menu3')
+tabs = ('Sensors', 'Options', 'Menu3')
 
 # Sensors tab: (options name, text) of the enable switches
 sense_en_items = (('SENSE1_EN', 'S1'), ('SENSE2_EN', 'S2'), ('SENSE3_EN', 'S3'))
@@ -66,7 +66,7 @@ def draw_form(win):
     nb.configure(raisecommand=tab_select)
     tab_select(nb.getcurselection())
     apply_funcs.append(sensors_page(p1))
-    test_page(p2)
+    options_page(p2)
     test_page(p3)
     nb.pack(padx=3, pady=0, fill=tk.BOTH, expand=1)      
     frm1.pack(side=tk.TOP,fill=tk.BOTH, expand=1)
@@ -76,6 +76,9 @@ def draw_form(win):
 def test_page(win):
     tk.Label(win, text="This is a test page", font=win_font, bg=win_col2, pady=0, borderwidth=0, highlightthickness=0).pack(side=tk.TOP, anchor=tk.W)
     tk.Label(win, text="Text bla bla bla", font=win_font, bg=win_col2, pady=0, borderwidth=0, highlightthickness=0).pack(side=tk.TOP, anchor=tk.W)
+
+def options_page(win):
+    pass
 
 #edit sensors enable & offsets of options module, return a function that applies them
 def sensors_page(win):

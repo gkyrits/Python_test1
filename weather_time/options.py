@@ -11,6 +11,10 @@ EN=0
 GR=1
 LANG=GR
 
+locations = {
+    1: {"name": "Nea Smyrni", "lat": 37.93820, "lon": 23.70925}
+}
+
 # enable(1)/disable(0) room sensors: not read, not shown, not saved/read in repository
 SENSE1_EN = 1   # sensor 1: Sense HAT or AHT10 temperature/humidity
 SENSE2_EN = 1   # sensor 2: SI7021 temperature/humidity
