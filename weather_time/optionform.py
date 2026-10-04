@@ -182,26 +182,31 @@ def options_page(win):
 def sensors_page(win):
     lbl = dict(font=win_font, bg=win_col2, padx=0, pady=0, borderwidth=0, highlightthickness=0)
     lblB = dict(lbl, font=win_fontB)
-    #enable switches, one row
-    tk.Label(win, text='Enable', **lblB).grid(row=0, column=0, sticky=tk.W)
+    frm_opt = dict(bg=win_col2, relief=tk.GROOVE, borderwidth=2)
+    #--enable frame, switches in one row
+    en_frm = tk.Frame(win, **frm_opt)
+    tk.Label(en_frm, text='Enable', **lblB).grid(row=0, column=0, sticky=tk.W, padx=2)
     en_vars = []
     for i, (name, text) in enumerate(sense_en_items):
         var = tk.IntVar(value=getattr(opt, name))
-        tk.Checkbutton(win, text=text, variable=var, activebackground=win_col2, **lbl).grid(row=0, column=1+2*i, columnspan=2, sticky=tk.W)
+        tk.Checkbutton(en_frm, text=text, variable=var, activebackground=win_col2, **lbl).grid(row=0, column=1+i, sticky=tk.W, padx=4)
         en_vars.append((name, var))
-    #offsets, one row per device
-    tk.Label(win, text='Offset', **lblB).grid(row=1, column=0, sticky=tk.W)
+    en_frm.pack(side=tk.TOP, fill=tk.X, padx=2, pady=2)
+    #--offset frame, one row per device
+    off_frm = tk.Frame(win, **frm_opt)
+    tk.Label(off_frm, text='Offset', **lblB).grid(row=0, column=0, sticky=tk.W, padx=2)
     entries = []
-    for row, (device, items) in enumerate(offset_items, start=2):
-        tk.Label(win, text=device, **lbl).grid(row=row, column=0, sticky=tk.W, padx=4)
+    for row, (device, items) in enumerate(offset_items, start=1):
+        tk.Label(off_frm, text=device, **lbl).grid(row=row, column=0, sticky=tk.W, padx=4)
         for col, (text, name) in enumerate(items):
-            tk.Label(win, text=text, **lbl).grid(row=row, column=1+2*col, sticky=tk.E, padx=2)
-            ent = tk.Entry(win, width=5, font=win_font, borderwidth=1, highlightthickness=0)
+            tk.Label(off_frm, text=text, **lbl).grid(row=row, column=1+2*col, sticky=tk.E, padx=2)
+            ent = tk.Entry(off_frm, width=5, font=win_font, borderwidth=1, highlightthickness=0)
             ent.insert(0, '{:g}'.format(getattr(opt, name)))
             ent.grid(row=row, column=2+2*col, sticky=tk.W, padx=(1, 2), pady=1)
             #take the keyboard focus when the entry is touched
             ent.bind('<Button-1>', lambda e: e.widget.focus_force())
             entries.append((name, ent))
+    off_frm.pack(side=tk.TOP, fill=tk.X, padx=2, pady=2)
 
     def apply():
         values = {}
