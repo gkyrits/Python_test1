@@ -33,15 +33,18 @@ def draw_form(win):
     #keys straight to the entries, without the X input method popup box
     win.tk.call('tk', 'useinputmethods', '-displayof', win, 0)
     #add buttons_frm ======
-    apply_funcs=[]  #page functions that store the edited values, False if a value is wrong
+    apply_funcs=[]  #page check functions: a function that stores the values, None if a value is wrong
     #release the keyboard grab first, so an error can never leave the screen without input
     def close():
         win.grab_release()
         win.destroy()
     def ok():
         try:
-            if not all([func() for func in apply_funcs]):
-                return
+            stores = [func() for func in apply_funcs]  #check every page, wrong values turn pink
+            if None in stores:
+                return  #nothing changed in options, Cancel leaves them as they were
+            for store in stores:
+                store()
             opt.save()  #once, after every page stored its values
         except Exception as e:
             print('Fail apply options:', e)
@@ -175,16 +178,18 @@ def options_page(win):
     frm2.pack(side=tk.TOP, fill=tk.X, padx=2, pady=2)
     show(sel[0])
 
+    #check the entries, return a function that stores the page in options (None if a value is wrong)
     def apply():
-        if not store():
-            return False
-        opt.LANG = lang_var.get()
-        opt.locations = locs
-        opt.LOCATION = sel[0]
-        return True
+        if not store():  #into the edited copy only
+            return None
+        def save_page():
+            opt.LANG = lang_var.get()
+            opt.locations = locs
+            opt.LOCATION = sel[0]
+        return save_page
     return apply
 
-#edit sensors enable & offsets of options module, return a function that applies them
+#edit sensors enable & offsets of options module, return the check function (see draw_form ok)
 def sensors_page(win):
     lbl = dict(font=win_font, bg=win_col2, padx=0, pady=0, borderwidth=0, highlightthickness=0)
     lblB = dict(lbl, font=win_fontB)
@@ -223,12 +228,13 @@ def sensors_page(win):
             except ValueError:
                 ent.config(bg='pink')  #not a number, keep the form open
         if len(values) != len(entries):
-            return False
-        for name, val in values.items():
-            setattr(opt, name, val)
-        for name, var in en_vars:
-            setattr(opt, name, var.get())
-        return True
+            return None
+        def save_page():
+            for name, val in values.items():
+                setattr(opt, name, val)
+            for name, var in en_vars:
+                setattr(opt, name, var.get())
+        return save_page
     return apply
 
 if __name__ == '__main__':
