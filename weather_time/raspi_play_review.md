@@ -1,6 +1,6 @@
 # raspi_play.py review
 
-Review of `weather_time/raspi_play.py` and the modules it uses. First written 2026-09-27 on branch `ai_work`; last updated 2026-10-03 for branch `claude_work` at commit 55da182 (review fixes, after the options form, sensor enable switches and calibration offsets).
+Review of `weather_time/raspi_play.py` and the modules it uses. First written 2026-09-27 on branch `ai_work`; last updated 2026-10-04 for branch `claude_work` at commit 548e55c (Options tab with language and weather locations, settings applied without restart, place in the weather panel).
 
 ## What it does
 
@@ -8,16 +8,20 @@ A Tkinter dashboard sized for a 320x240 Raspberry Pi LCD:
 
 - **Top panel:** big clock (HH:MM + seconds) and date (day, weekday, month, year) in Greek or English.
 - **Bottom-left panel:** tap to cycle through the enabled room sensor views (SENSOR 1 = Sense HAT or AHT10 temperature/humidity, SENSOR 2 = SI7021, SENSOR 3 = Sense HAT or MPL3115 pressure/altitude) and the IP/CPU/battery view (LAN and Wi-Fi IP, CPU usage and temperature, INA219 battery % and current). Disabled sensors are skipped.
-- **Bottom-right panel:** current weather from OpenWeatherMap (description, temp, feels-like, humidity, pressure, wind, icon with a night variant). Tap it to swap to a 3-hourly forecast table for one day; tap the first/last icon to go back/forward a day; it returns to normal after 30 s.
+- **Bottom-right panel:** current weather from OpenWeatherMap for the selected location (description, temp, place name under it, feels-like, humidity, pressure, wind, icon with a night variant). Tap it to swap to a 3-hourly forecast table for one day; tap the first/last icon to go back/forward a day; it returns to normal after 30 s.
 - **Tap the clock:** opens the history graph (`simplegraph.py`) drawn from the binary log (also from the previous month's file when the time range starts there), with a "Wait Load Graph" message while it loads. A sensor with no reading (disabled or failed, logged as zeros) repeats its previous value instead of plotting 0.
-- **Keys 1/2/3** (on-screen, and GPIO 18/23/24 on the Pi): 1 = test popup, 2 = options form (`optionform.py`, needs Pmw, imported only when the form opens), 3 = exit. The form's **Sensors** tab has the S1/S2/S3 enable switches and a calibration offset per sensor value; Ok checks every offset is a number (bad ones turn pink), applies them and saves `options.json`. Ok and Cancel release the keyboard grab before closing; if the shown sensor was just disabled, the panel moves to the next one. The other two tabs are still placeholders.
+- **Keys 1/2/3** (on-screen, and GPIO 18/23/24 on the Pi): 1 = test popup, 2 = options form (`optionform.py`, needs Pmw, imported only when the form opens), 3 = exit. The form has two working tabs, each in groove frames with 7 pt fonts:
+  - **Sensors:** an Enable frame (S1/S2/S3 switches) and an Offset frame (a calibration offset per sensor value).
+  - **Options:** a Language frame (EN/GR checkbuttons, one choice) and a Location frame (combobox of saved locations, Name/Lat/Lon entries, Add and Del). Add with a new name creates a location; with an existing name (case ignored) it only updates that location's lat/lon. Del keeps at least one.
+  - Ok checks every value in all tabs first (bad ones turn pink, the form stays open and nothing changes), then stores all tabs and saves `options.json` once. Ok and Cancel release the keyboard grab before closing. The third tab is still a placeholder.
+  - **Applied without restart** (`Gui.options_changed()`): a disabled sensor on screen moves to the next one; a new language relabels the weather and sensor panels (month/weekday on the next clock tick, the forecast table when next shown); a new language or location makes the weather thread fetch at once (`wthr_refresh`).
 - Polls the sensors every 60 s and the weather every 120 s for display, and pushes the web pressure into the barometer as sea-level reference. It works on its own; it does not write the repository.
 - **On Windows** (no daemon) it also runs `sensor_server` in a background thread so the repository is still updated, and stops it on exit.
 - Disables the X screensaver/DPMS while running.
 
-**Settings** shared by the screens live in `options.py`: `LCD_SIZE`, `FULL_SCREEN` (1 on the Pi, 0 on Windows for a normal window), `LANG` (EN/GR), the `SENSE1/2/3_EN` switches and the per-sensor offsets, plus `center_form()`, `wait_msg()`, `full_screen()` (frameless window) and `grab_keyboard()` (a frameless window gets no keys from the window manager on the Pi, so the options form grabs the keyboard while open).
+**Settings** shared by the screens live in `options.py`: `LCD_SIZE`, `FULL_SCREEN` (1 on the Pi, 0 on Windows for a normal window), `LANG` (EN/GR), the weather `locations` (`{id: {name, lat, lon}}`) with the selected `LOCATION` and `get_location()`, the `SENSE1/2/3_EN` switches and the per-sensor offsets, plus `center_form()`, `wait_msg()`, `full_screen()` (frameless window) and `grab_keyboard()` (a frameless window gets no keys from the window manager on the Pi, so the options form grabs the keyboard while open).
 
-**Saved settings:** the enable switches and offsets are saved to `weather_time/options.json` (git-ignored, written via a temp file) and loaded at import. raspi_play and sensor_server call `opt.reload_if_changed()` before each sensor read, so a change made in the form reaches sensor_server within one sensor period. Offsets are added inside each sensor driver, so they are already in the logged values; for the Sense HAT the altitude is computed from the corrected pressure. Humidity is clamped to 0-100 % after the offset.
+**Saved settings:** the language, the locations and the selected one, the enable switches and the offsets are saved to `weather_time/options.json` (git-ignored, written via a temp file) and loaded at import. raspi_play and sensor_server call `opt.reload_if_changed()` before each sensor read, so a change made in the form reaches sensor_server within one sensor period. JSON keeps the location ids as strings; `load()` turns them back into ints and checks every location. weather.py reads the selected location on every request (`get_weather_info()`/`get_forecast_info()` with no lat/lon), and sends `LANG` as the OpenWeatherMap language. Offsets are added inside each sensor driver, so they are already in the logged values; for the Sense HAT the altitude is computed from the corrected pressure. Humidity is clamped to 0-100 % after the offset.
 
 **Disabled sensors** are not read, not shown and saved as zeros (the record layout stays fixed). `load_info_binary()` returns the stored values whatever the current switches, and the graph treats an all-zero sensor block as no reading. The graph hides the T/H buttons when sensor 1 is off and P when sensor 3 is off.
 
@@ -43,22 +47,22 @@ journalctl -u sensor_server -f
 
 | Piece | Where |
 |---|---|
-| Helpers: month/weekday names, wind direction, forecast day split | raspi_play.py:52-104 |
-| `Gui` class: panels, click handlers, update_* setters, `post()` queue to the Tk thread | raspi_play.py:107-764 |
-| Clock thread (1 s) | raspi_play.py:766-787 |
-| Weather thread (120 s) | raspi_play.py:789-828 |
-| Sensor thread (60 s), enabled sensors only, + sea-pressure sync, display only | raspi_play.py:830-919 |
-| CPU/IP/battery thread (5 s) | raspi_play.py:921-959 |
-| GPIO keys | raspi_play.py:965-979 |
-| Main: start threads (plus sensor_server thread on Windows), mainloop, cleanup | raspi_play.py:994-1038 |
-| Shared settings, options.json save/load, popups, full screen, keyboard grab | options.py |
+| Helpers: month/weekday names, wind direction, forecast day split | raspi_play.py:53-105 |
+| `Gui` class: panels, click handlers, update_* setters, `post()` queue to the Tk thread, `options_changed()` | raspi_play.py:108-792 |
+| Clock thread (1 s) | raspi_play.py:794-815 |
+| Weather thread (120 s) | raspi_play.py:817-857 |
+| Sensor thread (60 s), enabled sensors only, + sea-pressure sync, display only | raspi_play.py:859-948 |
+| CPU/IP/battery thread (5 s) | raspi_play.py:950-988 |
+| GPIO keys | raspi_play.py:994-1008 |
+| Main: start threads (plus sensor_server thread on Windows), mainloop, cleanup | raspi_play.py:1023-1067 |
+| Shared settings, locations + `get_location()`, options.json save/load, popups, full screen, keyboard grab | options.py |
 | Logging: weather poll + web log, enabled sensors, poll loop | sensor_server.py:33-97 |
 | Menu (exit / graph) and startup options | sensor_server.py:100-156 |
 | systemd unit | sensor_server.service |
 | Weather API client | weather.py |
 | Sensor drivers | aht10sense.py, si7021sense.py, mpl3115sense.py, pihatsense.py |
 | Binary log save/load (across month files), Sense HAT detection | repository.py |
-| Graph screen / options form (Sensors tab) | simplegraph.py / optionform.py |
+| Graph screen / options form (Sensors and Options tabs) | simplegraph.py / optionform.py |
 
 All worker threads (and the GPIO key callbacks) hand GUI updates to `Gui.post()`; the Tk main loop runs them every 100 ms.
 
@@ -84,12 +88,20 @@ All worker threads (and the GPIO key callbacks) hand GUI updates to `Gui.post()`
 16. **Offsets could push humidity past 0-100 %.** Clamped in the AHT10, SI7021 and Sense HAT drivers.
 17. **Smaller items.** `FULL_SCREEN` is 0 on Windows; `options.save()` updates `settings_mtime`; the graph's "Please wait" popup closes on error (`try/finally`); `load_info()` uses `ast.literal_eval`; `radio_play` uses `BASE_DIR`; `senseInfo_panel` configures all the grid rows it uses.
 
+18. **Meteosource used the fixed location.** `get_meteo_weather_info()` wrote lat/lon into `open_param`; it now sets `meteo_param`.
+19. **JSON turned location ids into strings.** `options.load()` makes them ints again, so `locations[LOCATION]` still works after a reload.
+20. **Cancel after a failed Ok kept half the changes.** Each tab's check now returns a store function (or None if a value is wrong) and changes nothing; Ok stores the tabs only when all are valid, so Cancel leaves `options` as it was.
+
 ### Still open
 
-1. **API keys and a password are public.** `weather.py:5,14,23` holds an OpenWeatherMap key, a Meteosource key and an account password in a comment, and `github.com/gkyrits/Python_test1` is public. Rotate both keys and change the password, then load keys from an untracked config file or environment variable. Removing them from the file does not remove them from git history.
+1. **API keys and a password are public.** `weather.py:5,19,29` holds an OpenWeatherMap key, a Meteosource key and an account password in a comment, and `github.com/gkyrits/Python_test1` is public. Rotate both keys and change the password, then load keys from an untracked config file or environment variable. Removing them from the file does not remove them from git history.
 2. **Two readers of the same sensors.** raspi_play and sensor_server both poll I2C. The MPL3115 read is a multi-step sequence with 1 s pauses, so simultaneous reads could occasionally interleave and give a wrong value. The Sense HAT is less affected. On Windows both also call the weather site (two requests every 2 minutes, fine for the free plan).
 
 ## Smaller improvements
+
+- Editing a location's name to the name of another one (instead of using Add) gives two locations with the same name in the combobox.
+- A long place name in the weather panel (row 2, `columnspan=2`) widens the first two grid columns and pushes the icon right. Truncating the text (or a fixed `width`) would keep the layout.
+- The location combobox drop-down opens while the options form holds a global keyboard grab. ttk restores the form's grab when the drop-down closes, so it should be fine, but it is worth checking on the Pi.
 
 - Offsets are baked into the logged values, so changing an offset later does not correct older records. That is fine as long as it is expected; a note in the form or the README would help.
 - The MPL3115 altitude offset is independent of its pressure offset, while the Sense HAT altitude follows its corrected pressure. Two ways to calibrate the same thing; dropping `MPL3115_ALTIT_OFFSET` and recomputing would match the Sense HAT.
