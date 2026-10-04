@@ -27,6 +27,7 @@ FULL_SCREEN = opt.FULL_SCREEN
 exit = False
 infoWin = False
 wthr_count = 0
+wthr_refresh = False  # weather thread: fetch now (location/language changed)
 wthr_pressure = 1013  #for set MPL3115 sea pressure
 sense_need_update=False
 
@@ -245,16 +246,37 @@ class Gui:
         win.geometry(LCD_SIZE+'+0+0')
         opt.full_screen(win)
         optform.draw_form(win)
-        #a sensor on screen that was just disabled: show the next one
+        #apply the new settings when the form closes
+        old_loc=opt.get_location()
         def closed(event):
             if event.widget is win:
-                self.root.after_idle(self.sensePanel_checkEnabled)
+                self.root.after_idle(self.options_changed,old_loc)
         win.bind('<Destroy>', closed)
 
-     def sensePanel_checkEnabled(self):
+     #settings of the options form, applied without restart
+     def options_changed(self,old_loc):
+        global lang,wthr_refresh
         enabled={1:opt.SENSE1_EN, 2:opt.SENSE2_EN, 3:opt.SENSE3_EN}
         if self.sense_id in enabled and not enabled[self.sense_id]:
-            self.sensePanel_nextShow()
+            self.sensePanel_nextShow()  #the sensor on screen was disabled
+        if opt.LANG!=lang:
+            lang=opt.LANG
+            for lbl,txt_lst in self.wthr_lang_lbls:
+                lbl.config(text=txt_lst[lang])
+            self.sensePanel_redraw()
+            wthr_refresh=True  #weather description in the new language
+        if opt.get_location()!=old_loc:
+            wthr_refresh=True
+
+     #build the shown sensor panel again (texts in the new language)
+     def sensePanel_redraw(self):
+        global sense_need_update
+        if self.SensorFrm is None:
+            return
+        self.SensorFrm.destroy()
+        self.senseInfo_panel(self.pnlSenseInfo)
+        bind_tree(self.SensorFrm,'<Button-1>',self.sensePanel_dblClick)
+        sense_need_update=True
 
      def update_clock(self,time):
         time_part = time.split(":")
@@ -558,10 +580,12 @@ class Gui:
         self.wthr_image=tk.Label(self.wthrFrm, image=self.img,  bg=wthr_bg, anchor=tk.W)
         self.wthr_image.grid(row=1, column=2,  columnspan=2, rowspan=3, sticky=tk.W)
 
-        tk.Label(self.wthrFrm, text=feel_lst[lang],  bg=wthr_bg, font="Arial 8").grid(row=2, sticky=tk.W)
-        tk.Label(self.wthrFrm, text=humidity_lst[lang],    bg=wthr_bg, font="Arial 8").grid(row=3, sticky=tk.W)
-        tk.Label(self.wthrFrm, text=pressure_lst[lang],    bg=wthr_bg, font="Arial 8").grid(row=4, sticky=tk.W)
-        tk.Label(self.wthrFrm, text=wind_lst[lang],        bg=wthr_bg, font="Arial 8").grid(row=5, sticky=tk.W)
+        #(label, texts per language), changed by options_changed()
+        self.wthr_lang_lbls=[]
+        for row,txt_lst in ((2,feel_lst),(3,humidity_lst),(4,pressure_lst),(5,wind_lst)):
+            lbl=tk.Label(self.wthrFrm, text=txt_lst[lang], bg=wthr_bg, font="Arial 8")
+            lbl.grid(row=row, sticky=tk.W)
+            self.wthr_lang_lbls.append((lbl,txt_lst))
 
         self.wthr_like=tk.Label(self.wthrFrm, text="23°C",  fg=infoCol, bg=wthr_bg, font="Arial 8 bold")
         self.wthr_like.grid(row=2, column=1, sticky=tk.W)
@@ -795,7 +819,7 @@ def set_wthr_pressure(info):
           wthr_pressure = info['Pressure']
 
 def weather_thread(tmout):
-     global gui,exit,wthr_count,wthr_pressure
+     global gui,exit,wthr_count,wthr_pressure,wthr_refresh
      tm_cnt=0
      wthr_count=1
      try:
@@ -811,7 +835,8 @@ def weather_thread(tmout):
           if exit:
                break
           tm_cnt += 1
-          if tm_cnt>tmout:
+          if tm_cnt>tmout or wthr_refresh:
+            wthr_refresh=False
             wthr_count += 1
             try:
                 info = wthr.get_weather_info()
