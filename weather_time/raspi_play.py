@@ -325,6 +325,7 @@ class Gui:
           if info['Error']=='':               
                self.wthr_temper.config(text='{:.1f}'.format(info['Temper']))
                self.wthr_descript.config(text=info['Descript'])
+               self.wthr_place.config(text=info['Place'])
                self.wthr_like.config(text='{:.1f}°C'.format(info['Like']))
                self.wthr_humid.config(text='{} %'.format(info['Humidity']))
                self.wthr_press.config(text='{} hPa'.format(info['Pressure']))
@@ -565,7 +566,7 @@ class Gui:
         infoCol="blue" 
         self.img = tk.PhotoImage(file=os.path.join(BASE_DIR,'icons','13.png'))        
         self.wthrFrm=tk.Frame(parent,bg=wthr_bg)
-        for row in range(6): # 6 rows
+        for row in range(7): # 7 rows
             self.wthrFrm.rowconfigure(row, weight=1) #resize grid height
 
         self.wthr_descript=tk.Label(self.wthrFrm, text="Clear Sky", fg="blue", bg=wthr_bg, font="Arial 10 bold", anchor=tk.W)
@@ -576,32 +577,34 @@ class Gui:
         self.wthr_temper.pack(side=tk.LEFT)
         tk.Label(temperFrm, text="°C", fg=temperCol,  bg=wthr_bg, font="Arial 12 bold").pack(side=tk.TOP)
         temperFrm.grid(row=1, columnspan=2, sticky=tk.W)
+        self.wthr_place=tk.Label(self.wthrFrm, text="", fg="dark green", bg=wthr_bg, font="Arial 8 bold", anchor=tk.W)
+        self.wthr_place.grid(row=2, columnspan=2, sticky=tk.W)
 
         self.wthr_image=tk.Label(self.wthrFrm, image=self.img,  bg=wthr_bg, anchor=tk.W)
         self.wthr_image.grid(row=1, column=2,  columnspan=2, rowspan=3, sticky=tk.W)
 
         #(label, texts per language), changed by options_changed()
         self.wthr_lang_lbls=[]
-        for row,txt_lst in ((2,feel_lst),(3,humidity_lst),(4,pressure_lst),(5,wind_lst)):
+        for row,txt_lst in ((3,feel_lst),(4,humidity_lst),(5,pressure_lst),(6,wind_lst)):
             lbl=tk.Label(self.wthrFrm, text=txt_lst[lang], bg=wthr_bg, font="Arial 8")
             lbl.grid(row=row, sticky=tk.W)
             self.wthr_lang_lbls.append((lbl,txt_lst))
 
         self.wthr_like=tk.Label(self.wthrFrm, text="23°C",  fg=infoCol, bg=wthr_bg, font="Arial 8 bold")
-        self.wthr_like.grid(row=2, column=1, sticky=tk.W)
+        self.wthr_like.grid(row=3, column=1, sticky=tk.W)
         self.wthr_humid=tk.Label(self.wthrFrm, text="36%",  bg=wthr_bg, fg=humidCol, font="Arial 9 bold")
-        self.wthr_humid.grid(row=3, column=1, sticky=tk.W)
+        self.wthr_humid.grid(row=4, column=1, sticky=tk.W)
         self.wthr_press=tk.Label(self.wthrFrm, text="1024 hPa",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
-        self.wthr_press.grid(row=4, column=1,  columnspan=2, sticky=tk.W)
+        self.wthr_press.grid(row=5, column=1,  columnspan=2, sticky=tk.W)
         self.wthr_wind=tk.Label(self.wthrFrm, text="2.7 m/s",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
-        self.wthr_wind.grid(row=5, column=1,  sticky=tk.W)
+        self.wthr_wind.grid(row=6, column=1,  sticky=tk.W)
         self.wthr_windDir=tk.Label(self.wthrFrm, text="NA",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
-        self.wthr_windDir.grid(row=5, column=2,  sticky=tk.W)        
+        self.wthr_windDir.grid(row=6, column=2,  sticky=tk.W)        
 
         self.wthr_count=tk.Label(self.wthrFrm, text="4",  bg=wthr_bg, font="Arial 8 bold")
-        self.wthr_count.grid(row=5, column=3,  sticky=tk.E) 
+        self.wthr_count.grid(row=6, column=3,  sticky=tk.E) 
         self.wthr_id=tk.Label(self.wthrFrm, text="800",  bg=wthr_bg, font="Arial 6 bold")
-        self.wthr_id.grid(row=4, column=3,  sticky=tk.E)
+        self.wthr_id.grid(row=5, column=3,  sticky=tk.E)
 
         self.wthrFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)
 
