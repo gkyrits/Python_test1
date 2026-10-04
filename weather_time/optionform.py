@@ -155,8 +155,14 @@ def options_page(win):
         loc = read_entries()
         if loc is None:
             return
-        key = max(locs) + 1
-        locs[key] = loc
+        #a name that exists (case ignored) only updates the lat/lon of that location
+        same = [k for k in ids() if locs[k]['name'].casefold() == loc['name'].casefold()]
+        if same:
+            key = same[0]
+            locs[key].update(lat=loc['lat'], lon=loc['lon'])
+        else:
+            key = max(locs) + 1
+            locs[key] = loc
         show(key)
     def delete():
         if len(locs) > 1:
