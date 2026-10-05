@@ -16,6 +16,7 @@ locations = {
     1: {"name": "Nea Smyrni", "lat": 37.93820, "lon": 23.70925}
 }
 LOCATION = 1
+SHOW_PLACE = 1  # show the place name in the weather panel of raspi_play
 
 # selected location (lat, lon), the first one if LOCATION is not in locations
 def get_location():
@@ -43,7 +44,7 @@ SENSEHAT_PRESS_OFFSET      = 0.0  # hPa, altitude is calculated from the correct
 # values above are defaults, the ones edited in the options form are saved in
 # options.json (next to this file) and loaded on start
 SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'options.json')
-SAVED_NAMES = ('LANG', 'LOCATION', 'locations',
+SAVED_NAMES = ('LANG', 'LOCATION', 'locations', 'SHOW_PLACE',
                'SENSE1_EN', 'SENSE2_EN', 'SENSE3_EN',
                'AHT10_TEMP_OFFSET', 'AHT10_HUMID_OFFSET',
                'SI7021_TEMP_OFFSET', 'SI7021_HUMID_OFFSET',

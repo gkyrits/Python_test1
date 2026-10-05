@@ -102,13 +102,15 @@ def options_page(win):
     frm2 = tk.Frame(win, **frm_opt)
     locs = {key: dict(loc) for key, loc in opt.locations.items()}  #edited copy, stored on Ok
     sel = [opt.LOCATION if opt.LOCATION in locs else next(iter(locs))]  #selected id
-    tk.Label(frm2, text='Location', **lblB).grid(row=0, column=0, sticky=tk.W, padx=2)
+    place_var = tk.IntVar(value=opt.SHOW_PLACE)
+    tk.Checkbutton(frm2, text='Show Place', variable=place_var, activebackground=win_col2, **lbl).grid(row=0, column=0, columnspan=2, sticky=tk.W, padx=2)
+    tk.Label(frm2, text='Location', **lblB).grid(row=1, column=0, sticky=tk.W, padx=2)
     win.option_add('*TCombobox*Listbox.font', win_font)  #drop down list font
     combo = ttk.Combobox(frm2, state='readonly', width=18, font=win_font)
-    combo.grid(row=0, column=1, columnspan=4, sticky=tk.W, padx=2, pady=1)
+    combo.grid(row=1, column=1, columnspan=4, sticky=tk.W, padx=2, pady=1)
     ents = {}
     for name, text, width in (('name', 'Name', 14), ('lat', 'Lat', 8), ('lon', 'Lon', 8)):
-        row = 1 if name == 'name' else 2
+        row = 2 if name == 'name' else 3
         c = 0 if name in ('name', 'lat') else 2
         tk.Label(frm2, text=text, **lbl).grid(row=row, column=c, sticky=tk.E, padx=2)
         ent = tk.Entry(frm2, width=width, font=win_font, borderwidth=1, highlightthickness=0)
@@ -173,8 +175,8 @@ def options_page(win):
             del locs[sel[0]]
             show(ids()[min(pos, len(locs)-1)])
     combo.bind('<<ComboboxSelected>>', select)
-    tk.Button(frm2, text='Add', command=add, **btn).grid(row=3, column=1, sticky=tk.W, padx=2, pady=1)
-    tk.Button(frm2, text='Del', command=delete, **btn).grid(row=3, column=3, sticky=tk.W, padx=2, pady=1)
+    tk.Button(frm2, text='Add', command=add, **btn).grid(row=4, column=1, sticky=tk.W, padx=2, pady=1)
+    tk.Button(frm2, text='Del', command=delete, **btn).grid(row=4, column=3, sticky=tk.W, padx=2, pady=1)
     frm2.pack(side=tk.TOP, fill=tk.X, padx=2, pady=2)
     show(sel[0])
 
@@ -186,6 +188,7 @@ def options_page(win):
             opt.LANG = lang_var.get()
             opt.locations = locs
             opt.LOCATION = sel[0]
+            opt.SHOW_PLACE = place_var.get()
         return save_page
     return apply
 

@@ -267,6 +267,14 @@ class Gui:
             wthr_refresh=True  #weather description in the new language
         if opt.get_location()!=old_loc:
             wthr_refresh=True
+        self.wthr_place_show()
+
+     #place in the weather panel only with options SHOW_PLACE, hidden its row takes no space
+     def wthr_place_show(self):
+        if opt.SHOW_PLACE:
+            self.wthr_place.grid()
+        else:
+            self.wthr_place.grid_remove()  #keeps the grid options for grid()
 
      #build the shown sensor panel again (texts in the new language)
      def sensePanel_redraw(self):
@@ -569,6 +577,8 @@ class Gui:
         for row in range(7): # 7 rows
             self.wthrFrm.rowconfigure(row, weight=1) #resize grid height
         self.wthrFrm.rowconfigure(2, weight=0) #place row: no extra height, stays under the temperature
+        for row in range(3,7): #feels like, humidity, pressure, wind: same height
+            self.wthrFrm.rowconfigure(row, weight=1, uniform='wthr_info')
 
         self.wthr_descript=tk.Label(self.wthrFrm, text="Clear Sky", fg="blue", bg=wthr_bg, font="Arial 10 bold", anchor=tk.W)
         self.wthr_descript.grid(row=0, columnspan=4, sticky=tk.W)
@@ -580,9 +590,10 @@ class Gui:
         temperFrm.grid(row=1, columnspan=2, sticky=tk.SW)  #bottom of its row, close to the place
         self.wthr_place=tk.Label(self.wthrFrm, text="", fg="dark green", bg=wthr_bg, font="Arial 9 bold", anchor=tk.W, pady=0)
         self.wthr_place.grid(row=2, columnspan=2, sticky=tk.NW)  #top of its row, close to the temperature
+        self.wthr_place_show()
 
         self.wthr_image=tk.Label(self.wthrFrm, image=self.img,  bg=wthr_bg, anchor=tk.W)
-        self.wthr_image.grid(row=1, column=2,  columnspan=2, rowspan=3, sticky=tk.W)
+        self.wthr_image.grid(row=1, column=2,  columnspan=2, rowspan=4, sticky=tk.W)  #rows 1-4 (cols 2-3 free there), the icon needs no extra row height
 
         #(label, texts per language), changed by options_changed()
         self.wthr_lang_lbls=[]
