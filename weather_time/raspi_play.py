@@ -312,6 +312,11 @@ class Gui:
      def update_wanIp(self,IpAddr):
          self.wanIp.config(text=IpAddr)
 
+     def update_wifiName(self,ssid):
+         if len(ssid)>12:
+             ssid=ssid[:11]+'…'  #keep it in the 100 px panel
+         self.wifiName.config(text=ssid)
+
      def update_cpu(self,usage,temper):
          if usage != '':
             self.cpuUsage.config(text='{} %'.format(usage))
@@ -441,7 +446,11 @@ class Gui:
         lanInfoFrm.pack_propagate(False)
           #-----sub panel for Wan info
         wanInfoFrm=tk.Frame(self.IPInfoFrm,bg=datetm_bg, height=IPheight, width=IPwidth)  
-        tk.Label(wanInfoFrm,text="Wan:", bg=datetm_bg, fg=wanIPcol, font=lanLblFont).pack(side=tk.TOP, anchor=tk.W)
+        wanLblFrm=tk.Frame(wanInfoFrm,bg=datetm_bg)  #'Wan:' and the Wi-Fi name right of it
+        tk.Label(wanLblFrm,text="Wan:", bg=datetm_bg, fg=wanIPcol, font=lanLblFont, padx=0, borderwidth=0).pack(side=tk.LEFT, padx=(2,0))
+        self.wifiName = tk.Label(wanLblFrm,text="", bg=datetm_bg, fg="dark green", font=lanLblFont, padx=0, borderwidth=0)  #no gap after 'Wan:'
+        self.wifiName.pack(side=tk.LEFT, padx=(0,2))
+        wanLblFrm.pack(side=tk.TOP, anchor=tk.W)
         self.wanIp = tk.Label(wanInfoFrm,text="--.--.--.--", bg=datetm_bg, fg=wanIPcol, font=lanIpFont)
         self.wanIp.pack(side=tk.TOP, anchor=tk.W)
         wanInfoFrm.pack(side=tk.TOP, anchor=tk.W)   
@@ -981,6 +990,7 @@ def cpuInfo_thread():
               if exit:
                    break 
               gui.post(gui.update_wanIp,ip.get_ip_address("wlan0"))
+              gui.post(gui.update_wifiName,ip.get_wifi_name())
               if exit:
                    break
               if battery.exist():
