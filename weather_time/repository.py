@@ -1,11 +1,18 @@
 import struct
+import ast
 import time
 import os
+import pihatsense
+import options as opt
 
 FILE = 'sensor'  # file name to save info
-DIR  = 'repository'  # directory to save info
+# directory to save info, next to this module so every process (sensor_server,
+# raspi_play, graphs) uses the same one whatever the working directory
+DIR  = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'repository')
 
-info = {'sens1': {}, 'sens2': {}, 'sens3': {}, 'web': {}}
+USE_PI_SENSE_HAT = 1 if pihatsense.exist() else 0  # auto detect Sense HAT
+
+info = {'sens1': {}, 'sens2': {}, 'sens3': {}, 'sens4': {}, 'web': {}}
 
 # get year_month string
 def __get_year_month():
@@ -28,6 +35,7 @@ key_mapping = {
     'sens1' : 's1',
     'sens2' : 's2',
     'sens3' : 's3',
+    'sens4' : 's4',
     'web' : 'w',
     'Temperature': 'T',
     'Humidity': 'H',
@@ -63,6 +71,14 @@ def save_info():
 
 
 RECID = 0xEE
+
+# value*scale as int, clamped so a bad sensor reading can't break the record
+def __short(val, scale=10):
+    return max(-32768, min(32767, int(val * scale)))
+
+def __byte(val):
+    return max(0, min(255, int(val))).to_bytes(1, 'big')
+
 # save info with timestamp to file in a binary using struct
 def save_info_binary():
     try:
@@ -70,31 +86,38 @@ def save_info_binary():
         file_path = os.path.join(DIR, FILE + '-' + __get_year_month() + '.bin')
         time_str = time.strftime('%d %H %M %S', time.localtime())
         time_parts = time_str.split(' ')
+        #build the whole record first, so a failure never writes half a record
+        rec = struct.pack('ccccc', RECID.to_bytes(1, 'big'),
+                          __byte(time_parts[0]), __byte(time_parts[1]),
+                          __byte(time_parts[2]), __byte(time_parts[3]))
+        #record layout is fixed, a disabled sensor (options SENSEx_EN=0) is saved as zeros
+        #sensor1
+        if opt.SENSE1_EN:
+            sens1 = info['sens4'] if USE_PI_SENSE_HAT else info['sens1']
+            rec += struct.pack('hc', __short(sens1['Temperature']), __byte(sens1['Humidity']))
+        else:
+            rec += struct.pack('hc', 0, __byte(0))
+        #sensor2
+        if opt.SENSE2_EN:
+            rec += struct.pack('hc', __short(info['sens2']['Temperature']), __byte(info['sens2']['Humidity']))
+        else:
+            rec += struct.pack('hc', 0, __byte(0))
+        #sensor3
+        if opt.SENSE3_EN:
+            if USE_PI_SENSE_HAT:
+                sens3 = info['sens4']
+                temp = sens3['Pressure_Temper']
+            else:
+                sens3 = info['sens3']
+                temp = sens3['Temperature']
+            rec += struct.pack('hhhh', __short(temp), __short(sens3['Pressure']),
+                               __short(sens3['Altitude']), __short(sens3['SeaPressure']))
+        else:
+            rec += struct.pack('hhhh', 0, 0, 0, 0)
+        #web
+        rec += struct.pack('hc', __short(info['web']['Temperature']), __byte(info['web']['Humidity']))
         with open(file_path, 'ab') as f:
-            f.write(struct.pack('ccccc', RECID.to_bytes(1, 'big'), 
-                                int(time_parts[0]).to_bytes(1, 'big'), 
-                                int(time_parts[1]).to_bytes(1, 'big'), 
-                                int(time_parts[2]).to_bytes(1, 'big'), 
-                                int(time_parts[3]).to_bytes(1, 'big')))
-            #save sensor1
-            temp = int(info['sens1']['Temperature'] * 10)
-            hum = int(info['sens1']['Humidity'])
-            f.write(struct.pack('hc', temp, hum.to_bytes(1, 'big')))
-            #save sensor2
-            temp = int(info['sens2']['Temperature'] * 10)
-            hum = int(info['sens2']['Humidity'])
-            f.write(struct.pack('hc', temp, hum.to_bytes(1, 'big')))
-            #save sensor3
-            temp = int(info['sens3']['Temperature'] * 10)
-            press = int(info['sens3']['Pressure'] * 10)
-            alt = int(info['sens3']['Altitude'] * 10)
-            sea = int(info['sens3']['SeaPressure'] * 10)
-            f.write(struct.pack('hhhh', temp, press, alt, sea))
-            #save web
-            temp = int(info['web']['Temperature'] * 10)
-            hum = int(info['web']['Humidity'])
-            f.write(struct.pack('hc', temp, hum.to_bytes(1, 'big')))
-            f.close()
+            f.write(rec)
     except Exception as e:
         print('Fail to save info to file:', e)
 
@@ -123,7 +146,7 @@ def load_info():
             for line in lines:
                 line = line.strip()
                 day_str, time_str, info_str = line.split(' ', 2)
-                repo_info_list.append({'day': day_str, 'time': time_str, 'info': eval(info_str)})
+                repo_info_list.append({'day': day_str, 'time': time_str, 'info': ast.literal_eval(info_str)})
             return repo_info_list
     except Exception as e:
         print('Fail to load info from file:', e)
@@ -147,38 +170,51 @@ def load_info_binary(year=0, month=0, day=0, hour=-1, min=-1, backhours=24):
         hour = int(time.strftime('%H', time.localtime()))
     if min == -1:
         min = int(time.strftime('%M', time.localtime()))
-    startepoch = get_epoch(int(year_month_str.split('-')[0]), int(year_month_str.split('-')[1]), day, hour, min)
+    year, month = int(year_month_str.split('-')[0]), int(year_month_str.split('-')[1])
+    startepoch = get_epoch(year, month, day, hour, min)
     backepoch = startepoch - backhours * 3600
-    #start read records from file
+    #the back time can start in earlier month files (e.g. 24 h graph on the 1st)
+    months = [(year, month)]
+    while get_epoch(months[0][0], months[0][1], 1, 0, 0) > backepoch:
+        y, m = months[0]
+        months.insert(0, (y - 1, 12) if m == 1 else (y, m - 1))
     repo_info_list = []
+    for y, m in months:
+        __load_month_binary(y, m, backepoch, startepoch, repo_info_list)
+    return repo_info_list
+
+#append the records of one month file between backepoch and startepoch to repo_info_list
+#values are returned as saved, a disabled sensor (options SENSEx_EN=0) was saved as zeros
+def __load_month_binary(year, month, backepoch, startepoch, repo_info_list):
     try:
-        os.makedirs(DIR, exist_ok=True)
-        file_path = os.path.join(DIR, FILE + '-' + year_month_str + '.bin')
+        file_path = os.path.join(DIR, FILE + '-' + str(year) + '-' + str(month).zfill(2) + '.bin')
         print('file_path:', file_path)
-        with open(file_path, 'rb') as f:           
+        if not os.path.exists(file_path):
+            return
+        with open(file_path, 'rb') as f:
             while True:
                 rec_id = f.read(1)
                 if not rec_id:
-                    break                
+                    break
                 if rec_id[0] != RECID:
                     continue
                 fday = int.from_bytes(f.read(1), 'big')
                 ftime = ':'.join([str(int.from_bytes(f.read(1), 'big')) for i in range(3)])
-                sens1_temp, sens1_hum = struct.unpack('hc', f.read(3))                
+                sens1_temp, sens1_hum = struct.unpack('hc', f.read(3))
                 sens2_temp, sens2_hum = struct.unpack('hc', f.read(3))
                 sens3_temp, sens3_press, sens3_alt, sens3_sea = struct.unpack('hhhh', f.read(8))
                 web_temp, web_hum = struct.unpack('hc', f.read(3))
-                recordepoch = get_epoch(int(year_month_str.split('-')[0]), int(year_month_str.split('-')[1]), fday, int(ftime.split(':')[0]), int(ftime.split(':')[1]))
+                recordepoch = get_epoch(year, month, fday, int(ftime.split(':')[0]), int(ftime.split(':')[1]))
                 if(recordepoch < backepoch) or (recordepoch > startepoch):
                     continue
-                repo_info_list.append({'day': str(fday), 'time': ftime, 'info': {'sens1': {'Temperature': sens1_temp/10, 'Humidity': sens1_hum[0]}, 
-                                                                              'sens2': {'Temperature': sens2_temp/10, 'Humidity': sens2_hum[0]}, 
-                                                                              'sens3': {'Temperature': sens3_temp/10, 'Pressure': sens3_press/10, 'Altitude': sens3_alt/10, 'SeaPressure': sens3_sea/10}, 
-                                                                              'web': {'Temperature': web_temp/10, 'Humidity': web_hum[0]}}})
-            return repo_info_list
+                sens1 = {'Temperature': sens1_temp/10, 'Humidity': sens1_hum[0]}
+                sens2 = {'Temperature': sens2_temp/10, 'Humidity': sens2_hum[0]}
+                sens3 = {'Temperature': sens3_temp/10, 'Pressure': sens3_press/10, 'Altitude': sens3_alt/10, 'SeaPressure': sens3_sea/10}
+                repo_info_list.append({'day': str(fday), 'time': ftime, 'epoch': recordepoch,
+                                       'info': {'sens1': sens1, 'sens2': sens2, 'sens3': sens3,
+                                                'web': {'Temperature': web_temp/10, 'Humidity': web_hum[0]}}})
     except Exception as e:
         print('Fail to load info from file:', e)
-        return repo_info_list
 
 #test load_info_binary()
 def test_load_info_binary():

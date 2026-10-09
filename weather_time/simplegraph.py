@@ -1,9 +1,10 @@
 import tkinter as tk
 import time as tm
 import repository as repo
+import options as opt
 
-LCD_SIZE = '320x240'
-FULL_SCREEN = 1
+LCD_SIZE = opt.LCD_SIZE
+FULL_SCREEN = opt.FULL_SCREEN
 
 CURRENT_PLOT = 1
 backhours = 48
@@ -61,7 +62,9 @@ def clear_data():
 
 
 def parce_info(year,month,backepoch,info):
-    recordepoch = repo.get_epoch(year, month, int(info['day']), int(info['time'].split(':')[0]), int(info['time'].split(':')[1]))
+    recordepoch = info.get('epoch')  #records of an earlier month file carry their own epoch
+    if recordepoch is None:
+        recordepoch = repo.get_epoch(year, month, int(info['day']), int(info['time'].split(':')[0]), int(info['time'].split(':')[1]))
     sens1 = info['info']['sens1']
     sens2 = info['info']['sens2']
     sens3 = info['info']['sens3']
@@ -72,33 +75,43 @@ def parce_info(year,month,backepoch,info):
     rec_sens_press = sens3['Pressure']
     rec_sens_temp = sens1['Temperature']
     rec_sens_humid = sens1['Humidity']
+    #all zeros is no reading (sensor disabled or failed): None, filled in fill_missing()
+    if rec_sens_temp == 0 and rec_sens_humid == 0:
+        rec_sens_temp = rec_sens_humid = None
+    if rec_sens_press == 0:
+        rec_sens_press = None
     #check if data is in range
     if rec_web_temp < -20 or rec_web_temp > 50:
         return
     if rec_web_humid < 0 or rec_web_humid > 100:
         return
-    if rec_sens_press < 900 or rec_sens_press > 1100:
-        return
+    if rec_sens_press is not None:
+        if rec_sens_press < 900 or rec_sens_press > 1100:
+            return
     #check if data is not more diff from previous data
+    #(don't clamp against a 0 placeholder left by an earlier invalid/missing reading)
     if len(time_data) > 0:
         last_web_temp = web_temp_data[-1]
-        if abs(last_web_temp - rec_web_temp) > 10:
+        if last_web_temp != 0 and abs(last_web_temp - rec_web_temp) > 10:
             rec_web_temp = last_web_temp
             #return
         last_web_humid = web_humid_data[-1]
-        if abs(last_web_humid - rec_web_humid) > 10:
+        if last_web_humid != 0 and abs(last_web_humid - rec_web_humid) > 10:
             rec_web_humid = last_web_humid
             #return
         last_web_press = sens_press_data[-1]
-        if abs(last_web_press - rec_sens_press) > 5:
+        if last_web_press and rec_sens_press is not None and abs(last_web_press - rec_sens_press) > 5:
             rec_sens_press = last_web_press
             #return
-        if abs(sens_temp_data[-1] - rec_sens_temp) > 5:
+        if sens_temp_data[-1] and rec_sens_temp is not None and abs(sens_temp_data[-1] - rec_sens_temp) > 5:
             rec_sens_temp = sens_temp_data[-1]
             #return
-        if abs(sens_humid_data[-1] - rec_sens_humid) > 5:
+        if sens_humid_data[-1] and rec_sens_humid is not None and abs(sens_humid_data[-1] - rec_sens_humid) > 5:
             rec_sens_humid = sens_humid_data[-1]
-            #return    
+            #return   
+    #not add if all data is zero
+    if rec_web_temp == 0 and rec_web_humid == 0 and rec_sens_press is None and rec_sens_temp is None:
+        return
     #add data to lists
     time_data.append(rec_time)
     web_temp_data.append(rec_web_temp)
@@ -106,6 +119,16 @@ def parce_info(year,month,backepoch,info):
     sens_press_data.append(rec_sens_press)
     sens_temp_data.append(rec_sens_temp)
     sens_humid_data.append(rec_sens_humid)
+
+
+#replace None (no reading) with the previous value, the leading ones with the first reading (0 if none)
+def fill_missing(data):
+    last = next((val for val in data if val is not None), 0)
+    for i, val in enumerate(data):
+        if val is None:
+            data[i] = last
+        else:
+            last = val
 
 
 def get_initdata():
@@ -129,6 +152,8 @@ def get_initdata():
     if info_list:
         for info in info_list:
             parce_info(year,month,backepoch,info)
+    for data in (sens_press_data, sens_temp_data, sens_humid_data):
+        fill_missing(data)
     if len(time_data)>0 :
         web_temp_rng[0] = min(web_temp_data)
         web_temp_rng[1] = max(web_temp_data)
@@ -419,7 +444,11 @@ def canvas_click(event):
     global replot_needed,backhours_changed,backepoch
     print('click at:',event.x,event.y)
     if backhours_changed:
-        get_initdata()
+        waitWin = opt.wait_msg('Please wait...')
+        try:
+            get_initdata()
+        finally:
+            waitWin.destroy()
         draw_plots(canvas)
         backhours_changed = False
         return
@@ -478,16 +507,20 @@ def get_backhours_str():
         return str(backhours//24)+'d'    
 
 
-def draw_form(win):
+def draw_form(win,waitWin=None):
     global canvas,leftfrm,backhours_lbl
     global web_temp_var,web_humid_var,sens_press_var,sens_temp_var,sens_humid_var
     web_temp_var = tk.BooleanVar(value=web_temp_val)
     web_humid_var = tk.BooleanVar(value=web_humid_val)
-    sens_press_var = tk.BooleanVar(value=sens_press_val)
-    sens_temp_var = tk.BooleanVar(value=sens_temp_val)
-    sens_humid_var = tk.BooleanVar(value=sens_humid_val)
+    #a disabled sensor (options SENSEx_EN=0) is never plotted
+    sens_press_var = tk.BooleanVar(value=sens_press_val and opt.SENSE3_EN)
+    sens_temp_var = tk.BooleanVar(value=sens_temp_val and opt.SENSE1_EN)
+    sens_humid_var = tk.BooleanVar(value=sens_humid_val and opt.SENSE1_EN)
     #get data from repository
+    #tm.sleep(2)  #add a delay for sumulating data retrieval
     get_initdata()
+    if waitWin:
+        waitWin.destroy()
     #set background color to toplevel win
     win.config(bg=win_col)
     #tools Frame    
@@ -499,12 +532,16 @@ def draw_form(win):
     tk.Checkbutton(webFrmTools, text='H', bg='light blue', font=win_font, width=1, variable=web_humid_var, command=plotCbx_change).pack(side=tk.LEFT)
     webFrmTools.pack(side=tk.LEFT, padx=2)
     #sensFrmTools
-    sensFrmTools = tk.Frame(toolsfrm, relief=tk.GROOVE, borderwidth=2 , bg=win_col)
-    tk.Label(sensFrmTools, text='S:', font=win_font, width=1).pack(side=tk.LEFT)
-    tk.Checkbutton(sensFrmTools, text='T', bg='light pink', font=win_font, width=1, variable=sens_temp_var, command=plotCbx_change).pack(side=tk.LEFT)
-    tk.Checkbutton(sensFrmTools, text='H', bg='light blue', font=win_font, width=1, variable=sens_humid_var, command=plotCbx_change).pack(side=tk.LEFT)
-    tk.Checkbutton(sensFrmTools, text='P', bg='light green', font=win_font, width=1, variable=sens_press_var, command=plotCbx_change).pack(side=tk.LEFT)
-    sensFrmTools.pack(side=tk.LEFT, padx=6)     
+    #only buttons of enabled sensors: T/H from sensor 1, P from sensor 3
+    if opt.SENSE1_EN or opt.SENSE3_EN:
+        sensFrmTools = tk.Frame(toolsfrm, relief=tk.GROOVE, borderwidth=2 , bg=win_col)
+        tk.Label(sensFrmTools, text='S:', font=win_font, width=1).pack(side=tk.LEFT)
+        if opt.SENSE1_EN:
+            tk.Checkbutton(sensFrmTools, text='T', bg='light pink', font=win_font, width=1, variable=sens_temp_var, command=plotCbx_change).pack(side=tk.LEFT)
+            tk.Checkbutton(sensFrmTools, text='H', bg='light blue', font=win_font, width=1, variable=sens_humid_var, command=plotCbx_change).pack(side=tk.LEFT)
+        if opt.SENSE3_EN:
+            tk.Checkbutton(sensFrmTools, text='P', bg='light green', font=win_font, width=1, variable=sens_press_var, command=plotCbx_change).pack(side=tk.LEFT)
+        sensFrmTools.pack(side=tk.LEFT, padx=6)     
     #exit button
     tk.Button(toolsfrm, text='Back', font=but_font, command=lambda:btn_exit(win)).pack(side=tk.RIGHT, padx=2)
     toolsfrm.pack(side=tk.BOTTOM, padx=2, pady=2, fill=tk.X) 
@@ -538,7 +575,6 @@ def draw_form(win):
     canvas.bind("<Configure>", canvas_resize)
     canvas.bind("<Button-1>",  canvas_click)
     topfrm.pack(side=tk.TOP, padx=2, pady=2, fill=tk.BOTH, expand=tk.YES)
-   
 
 #################################################################
 
@@ -546,8 +582,7 @@ if __name__ == '__main__':
     root = tk.Tk()
     root.title('Test Graph')
     root.geometry(LCD_SIZE+'+0+0')
-    if FULL_SCREEN:
-        root.overrideredirect(1)    
+    opt.full_screen(root)    
     root.config(bg=win_col)
     draw_form(root)
     root.mainloop()

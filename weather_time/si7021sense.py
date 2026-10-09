@@ -2,6 +2,7 @@
 
 #import smbus
 import time
+import options as opt
 
 info = {'Temperature':0.0, 'Humidity':0}
 
@@ -33,8 +34,8 @@ def __read_SI7021():
     #print ("Temperature  : %.1f°C" %cTemp)
     #print ("Humidity %%RH : %.1f%%" %humidity)	
 	#print ("Temperature Fahrenheit: %.2f°F" %fTemp)    
-    info['Temperature']=cTemp
-    info['Humidity']=int(humidity)
+    info['Temperature']=cTemp + opt.SI7021_TEMP_OFFSET
+    info['Humidity']=max(0, min(100, int(humidity) + opt.SI7021_HUMID_OFFSET))
 
 def get_sensor_info():
     try:

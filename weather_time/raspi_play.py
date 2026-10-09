@@ -8,25 +8,32 @@ import battery as batt
 import aht10sense as sense1
 import si7021sense as sense2
 import mpl3115sense as sense3
+import pihatsense as sense4
 #import matplotgraph as plot
 import simplegraph as plot
 import repository as repo
+import options as opt
 import subprocess as proc
 import sys
 import os
+import queue
+import datetime as dt
 
-LCD_SIZE = "320x240"
-FULL_SCREEN = 0
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+LCD_SIZE = opt.LCD_SIZE
+FULL_SCREEN = opt.FULL_SCREEN
 
 exit = False
 infoWin = False
 wthr_count = 0
+wthr_refresh = False  # weather thread: fetch now (location/language changed)
 wthr_pressure = 1013  #for set MPL3115 sea pressure
 sense_need_update=False
 
-EN=0
-GR=1
-lang=GR
+USE_PI_SENSE_HAT = repo.USE_PI_SENSE_HAT
+
+lang = opt.LANG
 
 monthLst = ['January','February','March','April','May','June','July','August','September','October','November','December']
 monthLst_gr=['Ιανουάριος','Φεβρουάριος','Μάρτιος','Απρίλιος','Μάιος','Ιούνιος','Ιούλιος','Αύγουστος','Σεπτέμβριος','Οκτώβριος','Νοέμβριος','Δεκέμβριος']
@@ -44,45 +51,37 @@ wind_lst = ['Wind','Άνεμος']
 
 
 def get_month(date):    
-    if lang==EN:
+    if lang==opt.EN:
         return monthLst[date-1]
     else:
         return monthLst_gr[date-1]
 
 def get_weekDay(wday):
-    if lang==EN:
+    if lang==opt.EN:
         return weekLst[wday]
     else:
         return weekLst_gr[wday]      
 
 def get_windDir(deg):
-    if deg<=22 or deg>337:
-        return "B"
-    elif deg<=67 and deg>22:
-        return "ΒΔ"
-    elif deg<=112 and deg>67:
-        return "Δ"
-    elif deg<=157 and deg>112:
-        return "NΔ"
-    elif deg<=202 and deg>157:
-        return "N"
-    elif deg<=247 and deg>202:
-        return "NA"
-    elif deg<=292 and deg>247:
-        return "A"
-    elif deg<=337 and deg>292:
-        return "BA"
-    else:
+    # meteorological degrees: direction the wind blows from, 0=N, 90=E
+    try:
+        idx = int(((float(deg) + 22.5) % 360) // 45)
+    except (TypeError, ValueError):
         return "?"
-    
-          
+    if lang==opt.EN:
+        return ["N","NE","E","SE","S","SW","W","NW"][idx]
+    else:
+        return ["Β","ΒΑ","Α","ΝΑ","Ν","ΝΔ","Δ","ΒΔ"][idx]
+
+
 icon_map_day = {200:14,201:14,202:14,210:15,211:15,212:15,221:15,230:14,231:14,232:14,
                 300:12,301:12,310:12,302:10,311:10,312:10,313:10,314:10,321:10,
                 500:12,501:10,520:11,502:10,503:11,521:11,504:25,522:25,531:25,511:20,
-                611:20,612:20,613:20,615:20,616:20,600:18,612:20,601:24,600:24,612:24,620:18,602:16,621:17,622:17,
+                611:20,613:20,615:20,616:20,601:24,600:24,612:24,620:18,602:16,621:17,622:17,
                 701:9,711:9,721:9,731:9,741:9,751:9,761:9,762:9,771:9,781:14,
                 800:2,801:3,802:4,803:6,804:7}
 icon_night_map = {15:33,13:32,19:35,24:34,3:27,4:28,6:30,2:26}
+ICON_UNKNOWN = 1  # weather id not in icon_map_day (e.g. Meteosource Id=0)
 
 
 def bind_tree(widget, event, callback):
@@ -91,33 +90,27 @@ def bind_tree(widget, event, callback):
         bind_tree(child, event, callback)
 
 
+def forecast_days(info):
+        days=[]
+        for item in info['List']:
+            if item['Date'] not in days:
+                days.append(item['Date'])
+        return days
+
 def forecast_find_day(info,day):
-        info_range = [0,0]
-        item_cnt=info['Items']        
-        if day>0:
-            bay_cnt=0
-            for x in range(item_cnt):
-                 if (info['List'][x]['Hour']=='00'):
-                     bay_cnt += 1
-                     if bay_cnt==day:
-                        info_range[0]=x
-                        break                         
-        for x in range(info_range[0]+1,item_cnt):
-            if (info['List'][x]['Hour']=='00'):
-                info_range[1]=x
-                break
-        if(info_range[1]==0):
-            info_range[1]=item_cnt-1
-        return info_range         
-    
+        #return [first,last) item index of the day-th date in the list
+        days=forecast_days(info)
+        day=max(0,min(day,len(days)-1))
+        idx=[x for x,item in enumerate(info['List']) if item['Date']==days[day]]
+        return [idx[0],idx[-1]+1]
+
 #======== Gui Class =========
 class Gui:
      def __init__(self):
         self.root = tk.Tk()
         self.root.title("raspi play v0.1")
         self.root.geometry(LCD_SIZE+'+0+0')
-        if(FULL_SCREEN):
-              self.root.overrideredirect(1)
+        opt.full_screen(self.root)
         self.root.config(cursor='cross')
         self.nightTime=False
         self.IPInfoFrm=None
@@ -126,7 +119,11 @@ class Gui:
         self.wthrFrm_on=True
         self.frcst_tmout=None
         self.smlimg = [None,None,None,None,None,None,None,None]
+        self.frcst_loading=False
+        self.gui_queue = queue.Queue()
+        self.root.protocol("WM_DELETE_WINDOW", self.btn_exit)
         self.init_clock_window()
+        self.__process_queue()
 
      def __str__(self):
         """ description """
@@ -144,7 +141,8 @@ class Gui:
      def clockPanel_dblClick(self,e):
         #print('Clock click! :%s' % e.widget)
         #self.__info_window('Clock click!')
-        self.graph_window()
+        waitWin = opt.wait_msg('Wait Load Graph ..')
+        self.graph_window(waitWin)
 
      def sensePanel_dblClick(self,e):
         #print('Info click! :%s' % e.widget)
@@ -159,20 +157,39 @@ class Gui:
      def key1_press(self):
         print('Key1 press!')     
         #self.__info_window('Key1 press!')
-        #self.root.after(10,self.__info_window,'Key1 press!')
-        self.root.after(10,self.radio_play)
+        self.post(self.__info_window,'Key1 press!')
+        #self.root.after(10,self.radio_play)
 
      def key2_press(self):
         print('Key2 press!')
         #self.__info_window('Key2 press!')
-        self.root.after(10,self.__info_window,'Key2 press!')
+        #self.root.after(10,self.__info_window,'Key2 press!')
+        self.post(self.option_window)
 
      def key3_press(self):
         print('Key3 press! - Exit')
         #self.btn_exit()
-        self.root.after(10,self.btn_exit)
+        self.post(self.btn_exit)
 
-    #-----------------------------    
+    #-----------------------------
+     #thread safe: queue func to run in the Tk main thread
+     def post(self,func,*args):
+        self.gui_queue.put((func,args))
+
+     def __process_queue(self):
+        #reschedule first, a posted func may block in a modal window
+        if not exit:
+            self.root.after(100,self.__process_queue)
+        while True:
+            try:
+                func,args = self.gui_queue.get_nowait()
+            except queue.Empty:
+                break
+            try:
+                func(*args)
+            except Exception as e:
+                print('gui update fail:',e)
+
      def run(self):
         self.root.mainloop()
 
@@ -188,22 +205,21 @@ class Gui:
             return
          infoWin=True
          win=tk.Toplevel(bg="green")
-         win.geometry('220x80+50+80')
+         opt.center_form(win, 220, 80)
          win.overrideredirect(1)
          bg_col="yellow green"
          frm=tk.Frame(win, bg=bg_col, relief=tk.GROOVE, borderwidth=2)
          tk.Label(frm,text=info, bg=bg_col, font='bold').pack(side=tk.TOP)
          tk.Button(frm,text="Ok", command=win.destroy).place(relx=0.5, rely=0.6, relheight=0.4, relwidth=0.5, anchor=tk.CENTER)
          frm.pack(padx=5, pady=5, fill=tk.BOTH, expand=tk.YES)
-         tmout=thrd.Timer(10, lambda :win.destroy())
-         tmout.start()
-         self.__set_modal(win)         
-         tmout.cancel()   
+         tmout=self.root.after(10000, win.destroy)
+         self.__set_modal(win)
+         self.root.after_cancel(tmout)
          infoWin=False
          
      def radio_play(self):
          rel_radio_path='/../radioPlayer'
-         path = os.getcwd()+rel_radio_path
+         path = BASE_DIR+rel_radio_path
          sys.path.insert(0,path)
          try:
             from radioplayer import radio_player
@@ -213,12 +229,62 @@ class Gui:
             return   
          
 
-     def graph_window(self):
+     def graph_window(self,waitWin):
+         waitWin.update()
          win=tk.Toplevel()
          win.geometry(LCD_SIZE+'+0+0')
-         win.overrideredirect(1)
-         plot.draw_form(win)         
+         opt.full_screen(win)
+         plot.draw_form(win,waitWin)         
 
+     def option_window(self):
+        try:
+            import optionform as optform  #needs Pmw, import here so only key 2 fails without it
+        except ImportError as e:
+            print('fail open options form:', e)
+            return
+        win=tk.Toplevel()
+        win.geometry(LCD_SIZE+'+0+0')
+        opt.full_screen(win)
+        optform.draw_form(win)
+        #apply the new settings when the form closes
+        old_loc=opt.get_location()
+        def closed(event):
+            if event.widget is win:
+                self.root.after_idle(self.options_changed,old_loc)
+        win.bind('<Destroy>', closed)
+
+     #settings of the options form, applied without restart
+     def options_changed(self,old_loc):
+        global lang,wthr_refresh
+        enabled={1:opt.SENSE1_EN, 2:opt.SENSE2_EN, 3:opt.SENSE3_EN}
+        if self.sense_id in enabled and not enabled[self.sense_id]:
+            self.sensePanel_nextShow()  #the sensor on screen was disabled
+        if opt.LANG!=lang:
+            lang=opt.LANG
+            for lbl,txt_lst in self.wthr_lang_lbls:
+                lbl.config(text=txt_lst[lang])
+            self.sensePanel_redraw()
+            wthr_refresh=True  #weather description in the new language
+        if opt.get_location()!=old_loc:
+            wthr_refresh=True
+        self.wthr_place_show()
+
+     #place in the weather panel only with options SHOW_PLACE, hidden its row takes no space
+     def wthr_place_show(self):
+        if opt.SHOW_PLACE:
+            self.wthr_place.grid()
+        else:
+            self.wthr_place.grid_remove()  #keeps the grid options for grid()
+
+     #build the shown sensor panel again (texts in the new language)
+     def sensePanel_redraw(self):
+        global sense_need_update
+        if self.SensorFrm is None:
+            return
+        self.SensorFrm.destroy()
+        self.senseInfo_panel(self.pnlSenseInfo)
+        bind_tree(self.SensorFrm,'<Button-1>',self.sensePanel_dblClick)
+        sense_need_update=True
 
      def update_clock(self,time):
         time_part = time.split(":")
@@ -246,6 +312,11 @@ class Gui:
      def update_wanIp(self,IpAddr):
          self.wanIp.config(text=IpAddr)
 
+     def update_wifiName(self,ssid):
+         if len(ssid)>12:
+             ssid=ssid[:11]+'…'  #keep it in the 100 px panel
+         self.wifiName.config(text=ssid)
+
      def update_cpu(self,usage,temper):
          if usage != '':
             self.cpuUsage.config(text='{} %'.format(usage))
@@ -267,6 +338,7 @@ class Gui:
           if info['Error']=='':               
                self.wthr_temper.config(text='{:.1f}'.format(info['Temper']))
                self.wthr_descript.config(text=info['Descript'])
+               self.wthr_place.config(text=info['Place'])
                self.wthr_like.config(text='{:.1f}°C'.format(info['Like']))
                self.wthr_humid.config(text='{} %'.format(info['Humidity']))
                self.wthr_press.config(text='{} hPa'.format(info['Pressure']))
@@ -274,11 +346,11 @@ class Gui:
                self.wthr_windDir.config(text=get_windDir(info['WindDeg']))
                self.wthr_id.config(text='{}-{}'.format(info['Id'],info['Clouds']))
                self.wthr_count.config(text=wthr_count)
-               icon_num=icon_map_day[info['Id']]
+               icon_num=icon_map_day.get(info['Id'],ICON_UNKNOWN)
                if self.nightTime :
                   if icon_num in icon_night_map.keys():
                      icon_num=icon_night_map[icon_num]
-               icon_file='icons/'+str(icon_num)+'.png'
+               icon_file=os.path.join(BASE_DIR,'icons',str(icon_num)+'.png')
                self.img=tk.PhotoImage(file=icon_file)
                self.wthr_image.config(image=self.img)
 
@@ -290,8 +362,10 @@ class Gui:
         sense_txt='SENSOR '+str(self.sense_id)
         self.room_sensor.config(text=sense_txt)
         self.room_temper.config(text='{:.1f}'.format(info['Temperature']))
+        if (USE_PI_SENSE_HAT) and (self.sense_id==3):
+            self.room_temper.config(text='{:.1f}'.format(info['Pressure_Temper']))
         if (self.sense_id==1) or (self.sense_id==2):
-            self.room_humid.config(text='{} %'.format(info['Humidity']))
+            self.room_humid.config(text='{:.1f} %'.format(info['Humidity']))
         elif self.sense_id==3:
             self.room_press.config(text='{:.1f} hPa'.format(info['Pressure']))
             self.room_altit.config(text='{:.1f} m'.format(info['Altitude']))
@@ -300,7 +374,10 @@ class Gui:
      def btn_exit(self):
         global exit  
         exit=True
-        self.root.destroy()
+        try:
+            self.root.destroy()
+        except Exception:
+            pass
 
 
      def keys_panel(self,parent):
@@ -369,7 +446,11 @@ class Gui:
         lanInfoFrm.pack_propagate(False)
           #-----sub panel for Wan info
         wanInfoFrm=tk.Frame(self.IPInfoFrm,bg=datetm_bg, height=IPheight, width=IPwidth)  
-        tk.Label(wanInfoFrm,text="Wan:", bg=datetm_bg, fg=wanIPcol, font=lanLblFont).pack(side=tk.TOP, anchor=tk.W)
+        wanLblFrm=tk.Frame(wanInfoFrm,bg=datetm_bg)  #'Wan:' and the Wi-Fi name right of it
+        tk.Label(wanLblFrm,text="Wan:", bg=datetm_bg, fg=wanIPcol, font=lanLblFont, padx=0, borderwidth=0).pack(side=tk.LEFT, padx=(2,0))
+        self.wifiName = tk.Label(wanLblFrm,text="", bg=datetm_bg, fg="dark green", font=lanLblFont, padx=0, borderwidth=0)  #no gap after 'Wan:'
+        self.wifiName.pack(side=tk.LEFT, padx=(0,2))
+        wanLblFrm.pack(side=tk.TOP, anchor=tk.W)
         self.wanIp = tk.Label(wanInfoFrm,text="--.--.--.--", bg=datetm_bg, fg=wanIPcol, font=lanIpFont)
         self.wanIp.pack(side=tk.TOP, anchor=tk.W)
         wanInfoFrm.pack(side=tk.TOP, anchor=tk.W)   
@@ -404,12 +485,12 @@ class Gui:
         altitCol="blue1" 
         sense_txt='SENSOR '+str(self.sense_id)
         if self.sense_id==3:
-            rows=6
+            rows=7
         else:
-            rows=4    
+            rows=5    
         self.SensorFrm = tk.Frame(parent, bg=sense_bg)
         #---SensorFrm        
-        for row in range(rows): # 4 rows
+        for row in range(rows):
             self.SensorFrm.rowconfigure(row, weight=1) #resize grid height
         self.room_sensor = tk.Label(self.SensorFrm,text=sense_txt, bg=sense_bg, fg="blue", font="Arial 7")
         self.room_sensor.grid(row=0)
@@ -437,42 +518,30 @@ class Gui:
         self.SensorFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES) 
         
 
-     def sensePanel_change(self):
+     def sensePanel_nextShow(self):
+        #cycle: enabled sensors (options SENSEx_EN) then the cpu/ip panel (id 0)
+        global sense_need_update
+        order=[sid for sid,en in ((1,opt.SENSE1_EN),(2,opt.SENSE2_EN),(3,opt.SENSE3_EN)) if en]+[0]
+        if self.sense_id in order:
+            new_id=order[(order.index(self.sense_id)+1) % len(order)]
+        else:
+            new_id=order[0]  #first show (sense_id -1)
+        if new_id==self.sense_id:
+            return  #no sensor enabled, keep the cpu/ip panel
         if self.IPInfoFrm != None:
             self.IPInfoFrm.pack_forget()
             self.IPInfoFrm=None
-            self.senseInfo_panel(self.pnlSenseInfo)
-            bind_tree(self.SensorFrm,'<Button-1>',self.sensePanel_dblClick)            
-        else:
-            if self.SensorFrm !=None:
-                self.SensorFrm.pack_forget()
-                self.SensorFrm=None  
+        if self.SensorFrm != None:
+            self.SensorFrm.pack_forget()
+            self.SensorFrm=None
+        self.sense_id=new_id
+        if new_id==0:
             self.ipInfo_panel(self.pnlSenseInfo)
             bind_tree(self.IPInfoFrm,'<Button-1>',self.sensePanel_dblClick)
-
-
-     def sensePanel_nextShow(self):
-        global sense_need_update
-        if self.sense_id < 0:
-            self.sense_id=1            
+        else:
             self.senseInfo_panel(self.pnlSenseInfo)
+            bind_tree(self.SensorFrm,'<Button-1>',self.sensePanel_dblClick)
             sense_need_update=True
-        elif self.sense_id == 0:
-            self.sense_id=1            
-            self.sensePanel_change()
-            sense_need_update=True
-        elif self.sense_id == 1:
-            self.sense_id=2
-            sense_need_update=True
-        elif self.sense_id == 2:
-            self.sense_id=3
-            self.SensorFrm.pack_forget()
-            self.senseInfo_panel(self.pnlSenseInfo)
-            bind_tree(self.SensorFrm,'<Button-1>',self.sensePanel_dblClick)            
-            sense_need_update=True
-        elif self.sense_id == 3:
-            self.sense_id=0
-            self.sensePanel_change()  
 
 
      def sensePanel_visible(self,visible):        
@@ -512,43 +581,51 @@ class Gui:
         temperCol="red"  
         humidCol="red4"
         infoCol="blue" 
-        self.img = tk.PhotoImage(file='icons/13.png')        
+        self.img = tk.PhotoImage(file=os.path.join(BASE_DIR,'icons','13.png'))        
         self.wthrFrm=tk.Frame(parent,bg=wthr_bg)
-        for row in range(6): # 6 rows
+        for row in range(7): # 7 rows
             self.wthrFrm.rowconfigure(row, weight=1) #resize grid height
+        self.wthrFrm.rowconfigure(2, weight=0) #place row: no extra height, stays under the temperature
+        for row in range(3,7): #feels like, humidity, pressure, wind: same height
+            self.wthrFrm.rowconfigure(row, weight=1, uniform='wthr_info')
 
         self.wthr_descript=tk.Label(self.wthrFrm, text="Clear Sky", fg="blue", bg=wthr_bg, font="Arial 10 bold", anchor=tk.W)
         self.wthr_descript.grid(row=0, columnspan=4, sticky=tk.W)
         
         temperFrm=tk.Frame(self.wthrFrm,bg=wthr_bg)
-        self.wthr_temper=tk.Label(temperFrm, text="24", fg=temperCol,  bg=wthr_bg, font="Arial 20 bold")
+        self.wthr_temper=tk.Label(temperFrm, text="24", fg=temperCol,  bg=wthr_bg, font="Arial 20 bold", pady=0)
         self.wthr_temper.pack(side=tk.LEFT)
         tk.Label(temperFrm, text="°C", fg=temperCol,  bg=wthr_bg, font="Arial 12 bold").pack(side=tk.TOP)
-        temperFrm.grid(row=1, columnspan=2, sticky=tk.W)
+        temperFrm.grid(row=1, columnspan=2, sticky=tk.SW)  #bottom of its row, close to the place
+        self.wthr_place=tk.Label(self.wthrFrm, text="", fg="dark green", bg=wthr_bg, font="Arial 9 bold", anchor=tk.W, pady=0)
+        self.wthr_place.grid(row=2, columnspan=2, sticky=tk.NW)  #top of its row, close to the temperature
+        self.wthr_place_show()
 
         self.wthr_image=tk.Label(self.wthrFrm, image=self.img,  bg=wthr_bg, anchor=tk.W)
-        self.wthr_image.grid(row=1, column=2,  columnspan=2, rowspan=3, sticky=tk.W)
+        self.wthr_image.grid(row=1, column=2,  columnspan=2, rowspan=4, sticky=tk.W)  #rows 1-4 (cols 2-3 free there), the icon needs no extra row height
 
-        tk.Label(self.wthrFrm, text=feel_lst[lang],  bg=wthr_bg, font="Arial 8").grid(row=2, sticky=tk.W)
-        tk.Label(self.wthrFrm, text=humidity_lst[lang],    bg=wthr_bg, font="Arial 8").grid(row=3, sticky=tk.W)
-        tk.Label(self.wthrFrm, text=pressure_lst[lang],    bg=wthr_bg, font="Arial 8").grid(row=4, sticky=tk.W)
-        tk.Label(self.wthrFrm, text=wind_lst[lang],        bg=wthr_bg, font="Arial 8").grid(row=5, sticky=tk.W)
+        #(label, texts per language), changed by options_changed()
+        self.wthr_lang_lbls=[]
+        for row,txt_lst in ((3,feel_lst),(4,humidity_lst),(5,pressure_lst),(6,wind_lst)):
+            lbl=tk.Label(self.wthrFrm, text=txt_lst[lang], bg=wthr_bg, font="Arial 8")
+            lbl.grid(row=row, sticky=tk.W)
+            self.wthr_lang_lbls.append((lbl,txt_lst))
 
         self.wthr_like=tk.Label(self.wthrFrm, text="23°C",  fg=infoCol, bg=wthr_bg, font="Arial 8 bold")
-        self.wthr_like.grid(row=2, column=1, sticky=tk.W)
+        self.wthr_like.grid(row=3, column=1, sticky=tk.W)
         self.wthr_humid=tk.Label(self.wthrFrm, text="36%",  bg=wthr_bg, fg=humidCol, font="Arial 9 bold")
-        self.wthr_humid.grid(row=3, column=1, sticky=tk.W)
+        self.wthr_humid.grid(row=4, column=1, sticky=tk.W)
         self.wthr_press=tk.Label(self.wthrFrm, text="1024 hPa",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
-        self.wthr_press.grid(row=4, column=1,  columnspan=2, sticky=tk.W)
+        self.wthr_press.grid(row=5, column=1,  columnspan=2, sticky=tk.W)
         self.wthr_wind=tk.Label(self.wthrFrm, text="2.7 m/s",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
-        self.wthr_wind.grid(row=5, column=1,  sticky=tk.W)
+        self.wthr_wind.grid(row=6, column=1,  sticky=tk.W)
         self.wthr_windDir=tk.Label(self.wthrFrm, text="NA",  bg=wthr_bg, fg=infoCol, font="Arial 8 bold")
-        self.wthr_windDir.grid(row=5, column=2,  sticky=tk.W)        
+        self.wthr_windDir.grid(row=6, column=2,  sticky=tk.W)        
 
         self.wthr_count=tk.Label(self.wthrFrm, text="4",  bg=wthr_bg, font="Arial 8 bold")
-        self.wthr_count.grid(row=5, column=3,  sticky=tk.E) 
+        self.wthr_count.grid(row=6, column=3,  sticky=tk.E) 
         self.wthr_id=tk.Label(self.wthrFrm, text="800",  bg=wthr_bg, font="Arial 6 bold")
-        self.wthr_id.grid(row=4, column=3,  sticky=tk.E)
+        self.wthr_id.grid(row=5, column=3,  sticky=tk.E)
 
         self.wthrFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)
 
@@ -574,12 +651,13 @@ class Gui:
         date=tm.localtime(epoch_time)
         wday=date.tm_wday
         daytxt=get_weekDay(wday)+tm.strftime(' %d-%m-%Y',date)
-        if day==0:
+        rel_day=(dt.date(date.tm_year,date.tm_mon,date.tm_mday)-dt.date.today()).days
+        if rel_day==0:
             daytxt= today_lst[lang]+' '+daytxt
-        elif day==1:
+        elif rel_day==1:
             daytxt= tomorrow_lst[lang]+' '+daytxt
         else:
-            daytxt='(+'+str(day)+') '+daytxt
+            daytxt='(+'+str(rel_day)+') '+daytxt
         tk.Label(parent, text=daytxt, bg=prnt_bg, fg=pressCol, font="Arial 8 bold").grid(row=0, columnspan=9)
         tk.Label(parent, text='Hr',     bg=prnt_bg, font="Arial 8").grid(row=1, sticky=tk.W)
         #tk.Label(parent, text='Icon',     bg=prnt_bg, font="Arial 8").grid(row=2, sticky=tk.W)
@@ -591,11 +669,11 @@ class Gui:
             col=idx-info_rng[0]
             hour = info['List'][idx]['Hour']+':'
             tk.Label(parent, text=hour,  bg=prnt_bg, font="Arial 8").grid(row=1, column=col+1)
-            icon_num=icon_map_day[info['List'][idx]['Id']]
+            icon_num=icon_map_day.get(info['List'][idx]['Id'],ICON_UNKNOWN)
             if (hour>='20:') or (hour<='06:'):
                 if icon_num in icon_night_map.keys():
                     icon_num=icon_night_map[icon_num]
-            icon_file='small_icons/'+str(icon_num)+'.png'
+            icon_file=os.path.join(BASE_DIR,'small_icons',str(icon_num)+'.png')
             self.smlimg[col] = tk.PhotoImage(file=icon_file)
             imgLbl=tk.Label(parent, image=self.smlimg[col],  bg=prnt_bg)
             imgLbl.grid(row=2, column=col+1)
@@ -618,8 +696,9 @@ class Gui:
         print('Next '+str(forw))
         if forw:
             self.frcst_day += 1
-            if self.frcst_day > 5:
-                self.frcst_day=5
+            last_day=len(forecast_days(self.frcst_info))-1
+            if self.frcst_day > last_day:
+                self.frcst_day=last_day
         else:
             self.frcst_day -= 1
             if self.frcst_day < 0:
@@ -648,20 +727,12 @@ class Gui:
 
      def weatherPanel_change(self):
         if self.wthrFrm_on:
-           print('get forcast info') 
-           self.frcst_info = wthr.get_forecast_info()
-           if self.frcst_info['Error'] != '':
+           if self.frcst_loading:
                return
-           self.sensePanel_visible(False)
-           self.wthrFrm.pack_forget()
-           self.wthrFrm_on=False
-           #get current hour
-           hour =  tm.localtime(tm.time()).tm_hour
-           if hour < 20:
-               self.frcst_day=0
-           else:
-               self.frcst_day=1
-           self.forecast_panel(self.weatherFrm,self.frcst_info)
+           print('get forcast info')
+           self.frcst_loading=True
+           #fetch in a thread so the GUI (clock) does not freeze
+           thrd.Thread(target=self.__fetch_forecast, daemon=True).start()
         else:
            if self.frcst_tmout != None:
                self.root.after_cancel(self.frcst_tmout)
@@ -672,6 +743,30 @@ class Gui:
            self.wthrFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES)
            self.wthrFrm_on=True
      
+     def __fetch_forecast(self):
+        try:
+            info = wthr.get_forecast_info()
+        except Exception as e:
+            info = {'Error':str(e)}
+        self.post(self.__show_forecast,info)
+
+     def __show_forecast(self,info):
+        self.frcst_loading=False
+        if info['Error'] != '' or not info['List'] or not self.wthrFrm_on:
+            return
+        self.frcst_info = info
+        self.sensePanel_visible(False)
+        self.wthrFrm.pack_forget()
+        self.wthrFrm_on=False
+        #show today, or tomorrow after 20:00
+        show_date = dt.date.today()
+        if tm.localtime(tm.time()).tm_hour >= 20:
+            show_date += dt.timedelta(days=1)
+        days = forecast_days(info)
+        show_date = show_date.strftime('%Y-%m-%d')
+        self.frcst_day = days.index(show_date) if show_date in days else 0
+        self.forecast_panel(self.weatherFrm,self.frcst_info)
+
      #-----------------------------------------------------------------------------
      #-----------------------------------------------------------------------------
      def init_clock_window(self):
@@ -718,12 +813,17 @@ class Gui:
         
 #======== Time Thread ========
 def update_guiDateTime(clk: Gui):
-     time_inf = tm.localtime(tm.time())
-     #print(time_inf)
-     time = "{0:02d}:{1:02d}:{2:02d}".format(time_inf.tm_hour,time_inf.tm_min,time_inf.tm_sec)
-     clk.update_clock(time)
-     date = "{0:d}/{1:d}/{2:d}/{3:d}".format(time_inf.tm_mday,time_inf.tm_mon,time_inf.tm_year,time_inf.tm_wday)
-     clk.update_date(date)     
+     if exit:
+          return
+     try:
+          time_inf = tm.localtime(tm.time())
+          #print(time_inf)
+          time = "{0:02d}:{1:02d}:{2:02d}".format(time_inf.tm_hour,time_inf.tm_min,time_inf.tm_sec)
+          clk.update_clock(time)
+          date = "{0:d}/{1:d}/{2:d}/{3:d}".format(time_inf.tm_mday,time_inf.tm_mon,time_inf.tm_year,time_inf.tm_wday)
+          clk.update_date(date)
+     except (RuntimeError, tk.TclError):
+          pass
 
 def time_thread():
      global gui,exit
@@ -731,81 +831,138 @@ def time_thread():
           tm.sleep(1)
           if exit:
                break
-          update_guiDateTime(gui)
+          gui.post(update_guiDateTime,gui)
 
 
 #======== Weather Thread ======
+def set_wthr_pressure(info):
+     global wthr_pressure
+     #keep last good value, a failed request leaves Pressure at 0
+     press = info['Pressure']
+     if info['Error']=='' and isinstance(press,(int,float)) and press>0:
+          wthr_pressure = info['Pressure']
+
 def weather_thread(tmout):
-     global gui,exit,wthr_count,wthr_pressure
+     global gui,exit,wthr_count,wthr_pressure,wthr_refresh
      tm_cnt=0
      wthr_count=1
-     info = wthr.get_weather_info()
-     wthr_pressure = info['Pressure'] 
-     gui.update_weather(info)
+     try:
+          info = wthr.get_weather_info()
+          set_wthr_pressure(info)
+          if not exit:
+               gui.post(gui.update_weather,info)
+     except (RuntimeError, tk.TclError):
+          return
+     except Exception:
+          pass
      while True:          
           if exit:
                break
           tm_cnt += 1
-          if tm_cnt>tmout:
+          if tm_cnt>tmout or wthr_refresh:
+            wthr_refresh=False
             wthr_count += 1
-            info = wthr.get_weather_info()
-            wthr_pressure = info['Pressure']
-            if exit:
-               break            
-            gui.update_weather(info)            
+            try:
+                info = wthr.get_weather_info()
+                set_wthr_pressure(info)
+                if exit:
+                   break
+                gui.post(gui.update_weather,info)
+            except (RuntimeError, tk.TclError):
+                break
+            except Exception:
+                pass            
             tm_cnt=0
           tm.sleep(1)
 
 
 #======== Sensor Thread ======
+# only read for display, sensor_server saves records to the repository
+sensor_info = {'sens1': {}, 'sens2': {}, 'sens3': {}, 'sens4': {}}
 
-def update_mpl1315_seaPressure(info):
+def update_seaPressure(info):
     global wthr_pressure
     seaPress = info['SeaPressure']
     if seaPress != wthr_pressure:
-         sense3.set_sea_pressure(wthr_pressure)
-         print('Update mpl1315 sea pressure : %d' %wthr_pressure)
+        if USE_PI_SENSE_HAT:
+            sense4.set_sea_pressure(wthr_pressure)
+        else:    
+            sense3.set_sea_pressure(wthr_pressure)
+        print('Update mpl1315 sea pressure : %d' %wthr_pressure)
 
+# read only the enabled sensors (options SENSEx_EN)
 def read_sensors_info():
     print('*read_sensors_info*')
-    repo.info['sens1'] = sense1.get_sensor_info()
-    repo.info['sens2'] = sense2.get_sensor_info()
-    repo.info['sens3'] = sense3.get_sensor_info()    
-    update_mpl1315_seaPressure(repo.info['sens3'])
-    repo.info['web'] = wthr.get_small_info()
-    repo.save_info_binary()
+    opt.reload_if_changed()  # options.json may be changed by an other program
+    if USE_PI_SENSE_HAT:
+        if opt.SENSE1_EN or opt.SENSE3_EN:
+            sensor_info['sens4'] = sense4.get_sensor_info()
+    else:
+        if opt.SENSE1_EN:
+            sensor_info['sens1'] = sense1.get_sensor_info()
+        if opt.SENSE3_EN:
+            sensor_info['sens3'] = sense3.get_sensor_info()
+    if opt.SENSE2_EN:
+        sensor_info['sens2'] = sense2.get_sensor_info()
+    if opt.SENSE3_EN:
+        update_seaPressure(sensor_info['sens4'] if USE_PI_SENSE_HAT else sensor_info['sens3'])
 
 def get_sensors_info():
     global gui
     if gui.sense_id==1:
-        return repo.info['sens1']
+        if USE_PI_SENSE_HAT:
+            return sensor_info['sens4']
+        else:
+            return sensor_info['sens1']
     elif gui.sense_id==2:
-        return repo.info['sens2']
+        return sensor_info['sens2']
     elif gui.sense_id==3:
-        return repo.info['sens3']    
+        if USE_PI_SENSE_HAT:
+            return sensor_info['sens4']
+        else:
+            return sensor_info['sens3']
     else:
-        return repo.info['sens1']
+        return sensor_info['sens1']
+
+#run in Tk thread, sense_id may change while reading
+def update_sensor_gui():
+    if gui.senseinfo_active():
+        gui.update_sensor(get_sensors_info())
 
 def sensor_thread(tmout):
     global gui,exit,sense_need_update
     sense_tm_cnt=0
-    read_sensors_info()
-    info = get_sensors_info()
-    gui.update_sensor(info)
+    try:
+        read_sensors_info()
+        if exit:
+            return
+        gui.post(update_sensor_gui)
+    except (RuntimeError, tk.TclError):
+        return
+    except Exception:
+        pass
     while True:          
         if exit:
             break
         sense_tm_cnt += 1        
         if sense_tm_cnt>tmout:
-            read_sensors_info()
-            if exit:
-               break             
-            info = get_sensors_info()           
-            gui.update_sensor(info)
+            try:
+                read_sensors_info()
+                if exit:
+                   break             
+                gui.post(update_sensor_gui)
+            except (RuntimeError, tk.TclError):
+                break
+            except Exception:
+                pass
             sense_tm_cnt=0
         if sense_need_update:
-            info = get_sensors_info()
-            gui.update_sensor(info)
+            try:
+                gui.post(update_sensor_gui)
+            except (RuntimeError, tk.TclError):
+                break
+            except Exception:
+                pass
             sense_need_update=False
         tm.sleep(1)
 
@@ -817,30 +974,36 @@ def cpuInfo_thread():
      while True:          
           if exit:
                break
-          if not gui.cpuinfo_active():
-              tm.sleep(1)
-              continue
-          #print('get cpu info...')
-          cpu_usage=cpu.get_cpuUsage()
-          if exit:
-               break
-          cpu_temp=cpu.get_cpuTemp()
-          if exit:
-               break          
-          gui.update_cpu(cpu_usage,cpu_temp)
-          gui.update_ethIp(ip.get_ip_address("eth0"))
-          if exit:
-               break 
-          gui.update_wanIp(ip.get_ip_address("wlan0"))
-          if exit:
-               break
-          if battery.exist():
-               bat_info=batt.get_baterry_info(battery)
-               if exit:         
+          try:
+              if not gui.cpuinfo_active():
+                  tm.sleep(1)
+                  continue
+              #print('get cpu info...')
+              cpu_usage=cpu.get_cpuUsage()
+              if exit:
                    break
-               gui.update_battery(bat_info['Percent'],bat_info['Current'])
-          else:
-               gui.update_battery(0,0)    
+              cpu_temp=cpu.get_cpuTemp()
+              if exit:
+                   break          
+              gui.post(gui.update_cpu,cpu_usage,cpu_temp)
+              gui.post(gui.update_ethIp,ip.get_ip_address("eth0"))
+              if exit:
+                   break 
+              gui.post(gui.update_wanIp,ip.get_ip_address("wlan0"))
+              gui.post(gui.update_wifiName,ip.get_wifi_name())
+              if exit:
+                   break
+              if battery.exist():
+                   bat_info=batt.get_baterry_info(battery)
+                   if exit:         
+                       break
+                   gui.post(gui.update_battery,bat_info['Percent'],bat_info['Current'])
+              else:
+                   gui.post(gui.update_battery,0,0)
+          except (RuntimeError, tk.TclError):
+              break
+          except Exception:
+              pass    
           if exit:
                break          
           tm.sleep(5)
@@ -853,16 +1016,16 @@ def cansel_threads():
 def register_keys():
     try:
         from gpiozero import Button
+        global key1,key2,key3
+        key1 = Button(18)
+        key2 = Button(23)
+        key3 = Button(24)
+        key1.when_released = gui.key1_press
+        key2.when_released = gui.key2_press
+        key3.when_released = gui.key3_press
     except:
         print('Fail register Keys')
-        return
-    global key1,key2,key3
-    key1 = Button(18)
-    key2 = Button(23)
-    key3 = Button(24)
-    key1.when_released = gui.key1_press
-    key2.when_released = gui.key2_press
-    key3.when_released = gui.key3_press
+        return        
 
 
 #======== Sreen Saver ========
@@ -882,26 +1045,44 @@ def screensaver_disable(disable):
 screensaver_disable(True)
 gui = Gui()
 # register Keys
-#register_keys()
+register_keys()
 # start time thread
-tm_thrd=thrd.Thread(target=time_thread)
+tm_thrd=thrd.Thread(target=time_thread, daemon=True)
 tm_thrd.start()
 # start lanIp thread
-cpu_thrd=thrd.Thread(target=cpuInfo_thread)
+cpu_thrd=thrd.Thread(target=cpuInfo_thread, daemon=True)
 cpu_thrd.start()
 # start wheather thread
-wether_thrd=thrd.Thread(target=weather_thread, args=(120,)) # sec update
+wether_thrd=thrd.Thread(target=weather_thread, args=(120,), daemon=True) # sec update
 wether_thrd.start()
 # start sensor thread
-sensor_thrd=thrd.Thread(target=sensor_thread, args=(60,)) # sec update
+sensor_thrd=thrd.Thread(target=sensor_thread, args=(60,), daemon=True) # sec update
 sensor_thrd.start()
+# no sensor_server daemon on Windows, run it in a thread to update the repository
+srv_thrd=None
+if sys.platform.startswith('win'):
+    import sensor_server as srv
+    srv_thrd=thrd.Thread(target=srv.run, args=(srv.SENSOR_PERIOD,srv.WEATHER_PERIOD), daemon=True)
+    srv_thrd.start()
 
-gui.run()
-cansel_threads()
-tm_thrd.join()
-cpu_thrd.join()
-wether_thrd.join()
-sensor_thrd.join()
+try:
+    gui.run()
+except KeyboardInterrupt:
+    pass
+finally:
+    exit = True
+    try:
+        gui.root.destroy()
+    except Exception:
+        pass
+    cansel_threads()
+    tm_thrd.join(timeout=1)
+    cpu_thrd.join(timeout=1)
+    wether_thrd.join(timeout=1)
+    sensor_thrd.join(timeout=1)
+    if srv_thrd:
+        srv.stop_event.set()
+        srv_thrd.join(timeout=2)
 
 screensaver_disable(False)
 print("End...")

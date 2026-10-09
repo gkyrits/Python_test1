@@ -1,19 +1,29 @@
 import requests
+import time
+import options as opt
 
 #user:gkyr@yahoo.gr  pass:gkyr1234
 #loc Nea Smyrni from google map
 #37.938209123871076, 23.709251306382026
+#nea smirni
+#37.938787,23.709245
+#patra
+#38.256496,21.743460
+#thesaloniki
+#40.626959,22.948434
 
-#loc Nea Smyrni
-LAT     = '37.93820'
-LON     = '23.70925'
+#loc from options (selected in the options form), read again on every request
+LAT, LON = opt.get_location()
 
 #---openweather
 OPEN_API_KEY = 'cc60f5942123b44409393d80500ce975'
 open_param = {'appid': OPEN_API_KEY,
               'lat': LAT,'lon': LON,'units': 'metric','lang':'el'}
+OPEN_LANG = {opt.EN: 'en', opt.GR: 'el'}  # options LANG -> openweather lang code
 open_weather_url  = 'https://api.openweathermap.org/data/2.5/weather'
 open_forecast_url = "https://api.openweathermap.org/data/2.5/forecast"
+
+REQUEST_TIMEOUT = 10  # sec, avoid hanging forever on a stalled connection
 
 #---meteosource
 METEO_API_KEY = '8r3xztnjqi6uj9vqu11dg6wxnzoowpts066hr9s1'
@@ -31,11 +41,11 @@ forecast_inf  = {'Items':0, 'Error':'', 'List':[]}
 
 
 def get_meteo_weather_info(lat, lon):    
-    open_param['lat']=lat
-    open_param['lon']=lon
+    meteo_param['lat']=lat
+    meteo_param['lon']=lon
     try:
-        data_place = requests.get(meteo_place_url, meteo_param).json()
-        data_point = requests.get(meteo_point_url, meteo_param).json()
+        data_place = requests.get(meteo_place_url, meteo_param, timeout=REQUEST_TIMEOUT).json()
+        data_point = requests.get(meteo_point_url, meteo_param, timeout=REQUEST_TIMEOUT).json()
     except:
         info['Error']='request exception'    
         return info
@@ -57,10 +67,11 @@ def get_meteo_weather_info(lat, lon):
 
 
 def get_open_weather_info(lat, lon):
+    open_param['lang']=OPEN_LANG.get(opt.LANG, 'en')
     open_param['lat']=lat
     open_param['lon']=lon
     try:
-        data = requests.get(open_weather_url, open_param).json()
+        data = requests.get(open_weather_url, open_param, timeout=REQUEST_TIMEOUT).json()
     except:
         info['Error']='request exception'    
         return info
@@ -68,7 +79,7 @@ def get_open_weather_info(lat, lon):
         info['Error']=data['message']
         return info
     info['Error']=''
-    info['Place']=data['name']+' '+data['sys']['country']
+    info['Place']=data['name'] #+' '+data['sys']['country']
     info['Descript']=data['weather'][0]['description']
     info['Temper']=data['main']['temp']
     info['Like']=data['main']['feels_like']
@@ -84,10 +95,11 @@ def get_open_weather_info(lat, lon):
 
 
 def get_open_forecast_info(lat, lon):
+    open_param['lang']=OPEN_LANG.get(opt.LANG, 'en')
     open_param['lat']=lat
     open_param['lon']=lon
     try:
-        data = requests.get(open_forecast_url, open_param).json()
+        data = requests.get(open_forecast_url, open_param, timeout=REQUEST_TIMEOUT).json()
     except:
         forecast_inf['Error']='request exception'    
         return forecast_inf
@@ -99,9 +111,10 @@ def get_open_forecast_info(lat, lon):
     forecast_inf['Items']=items_cnt
     forecast_inf['List']=[]
     for x in range(items_cnt):
-        datetime = data['list'][x]['dt_txt']
-        forecast_item['Date']=datetime.split(' ')[0]
-        forecast_item['Hour']=datetime.split(' ')[1].split(':')[0]
+        #dt_txt is UTC, use epoch 'dt' to get local date/hour
+        local_tm = time.localtime(data['list'][x]['dt'])
+        forecast_item['Date']=time.strftime('%Y-%m-%d', local_tm)
+        forecast_item['Hour']=time.strftime('%H', local_tm)
         forecast_item['Temper']=float(data['list'][x]['main']['temp'])
         forecast_item['Humidity']=data['list'][x]['main']['humidity']
         forecast_item['Pressure']=data['list'][x]['main']['pressure']
@@ -113,7 +126,10 @@ def get_open_forecast_info(lat, lon):
     return forecast_inf
 
 
-def get_weather_info(lat=LAT, lon=LON, source='open'):
+# lat, lon None: the location selected in options
+def get_weather_info(lat=None, lon=None, source='open'):
+    if lat is None or lon is None:
+        lat, lon = opt.get_location()
     if source=='open':
         return get_open_weather_info(lat,lon)
     else:
@@ -122,7 +138,9 @@ def get_weather_info(lat=LAT, lon=LON, source='open'):
 def get_small_info():
     return small_info
 
-def get_forecast_info(lat=LAT, lon=LON, source='open'):
+def get_forecast_info(lat=None, lon=None, source='open'):
+    if lat is None or lon is None:
+        lat, lon = opt.get_location()
     return get_open_forecast_info(lat,lon)
 
 
