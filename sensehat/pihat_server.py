@@ -13,23 +13,15 @@ LED_LUM_HI	= 255
 LED_LUM_LOW	= 128
 sense=None
 p_thrd=None
-exit=False
+poll_exit=False
 
 White_col = [LED_LUM_HI, LED_LUM_HI, LED_LUM_HI]  # White
 Black_col = [0, 0, 0]  # Black
 O = Black_col
 X = White_col
 
-led_matrix = [
-O, O, O, O, O, O, O, O,  
-O, O, O, O, O, O, O, O,
-O, O, O, O, O, O, O, O,
-O, O, O, O, O, O, O, O,
-O, O, O, O, O, O, O, O,
-O, O, O, O, O, O, O, O,
-O, O, O, O, O, O, O, O,
-O, O, O, O, O, O, O, O
-]
+# each cell gets its own list so changing one cell never changes another
+led_matrix = [list(Black_col) for _ in range(64)]
 
 def init():
     global sense
@@ -59,6 +51,8 @@ def exist():
         return False
 
 def colors():
+    if sense is None:
+        return
     col_ar = (LED_LUM_HI,LED_LUM_LOW,0)
     idx=0
     x=0
@@ -94,23 +88,19 @@ def test_matrix():
         return
     matrix_size = len(led_matrix)    
     for x in range(0,matrix_size):
-        led_matrix[x]=Black_col
+        led_matrix[x]=list(Black_col)
     sense.set_pixels(led_matrix)
     tm.sleep(2)
     for x in range(0,matrix_size):
-        led_matrix[x]=White_col
+        led_matrix[x]=list(White_col)
     sense.set_pixels(led_matrix)  
 
 
 def clear_matrix(col):
-    if sense is None:
-        return
-    led_matrix[:] = [col.copy() for _ in led_matrix]
+    led_matrix[:] = [list(col) for _ in led_matrix]
 
 
 def set_matrix(x, y, col):
-    if sense is None:
-        return
     if not (0 <= x < 8 and 0 <= y < 8):
         raise ValueError("x and y must be between 0 and 7")
     if len(col) != 3:
@@ -119,6 +109,8 @@ def set_matrix(x, y, col):
 
 
 def intro():
+    if sense is None:
+        return
     test_matrix()
     tm.sleep(2)
     clear_matrix(Black_col)
@@ -130,8 +122,6 @@ def intro():
 
 
 def draw_rect(x, y, w, h, col):
-    if sense is None:
-        return
     if not (0 <= x < 8 and 0 <= y < 8):
         raise ValueError("x and y must be between 0 and 7")
     if not (1 <= abs(w) <= 8 and 1 <= abs(h) <= 8):
@@ -163,15 +153,14 @@ def draw_rect(x, y, w, h, col):
 
 
 def percent_bar(x, val, col):
-    if sense is None:
-        return
     if not 0 <= x < 8:
         raise ValueError("x must be between 0 and 7")
     if not 0 <= val <= 100:
         raise ValueError("val must be between 0 and 100")
     if len(col) != 3:
         raise ValueError("col must contain three RGB values")
-    top_y = int(7 - val * 7 / 100)
+    # 0% lights no LEDs, 100% lights all 8
+    top_y = 8 - round(val * 8 / 100)
     # Clear this column, then fill from the mapped row to the bottom.
     for y in range(8):
         set_matrix(x, y, Black_col)
@@ -180,6 +169,8 @@ def percent_bar(x, val, col):
 
 
 def intro2(delay): #delay in sec
+    if sense is None:
+        return
     clear_matrix(Black_col)
     draw_rect(3,3,2,2,White_col)
     sense.set_pixels(led_matrix)
@@ -201,15 +192,15 @@ def intro2(delay): #delay in sec
 
 
 def poll_thread():
-    global exit
     print('Start Poll Thread')
     battery = batt.INA219()
     while True:
-        if exit:
+        if poll_exit:
             break
         cpu_usage=cpu.get_cpuUsage()
-        percent_bar(2,cpu_usage,get_color(6))
-        sense.set_pixels(led_matrix)
+        if cpu_usage != '':  # '' when psutil is missing
+            percent_bar(2,cpu_usage,get_color(6))
+            sense.set_pixels(led_matrix)
         #print('CPU usage   : {}%'.format(cpu_usage))        
         if battery.exist():
             bat_info=batt.get_baterry_info(battery)            
@@ -222,21 +213,25 @@ def poll_thread():
 
 
 def start_server():
-    global p_thrd
+    global p_thrd,poll_exit
+    if sense is None:
+        return
     # start poll thread
     if p_thrd == None:
+        poll_exit = False
         p_thrd=thrd.Thread(target=poll_thread)
         p_thrd.start()    
         
 
 def stop_server():
-    global p_thrd,exit
-    if sense != None:
-        sense.clear()
-    exit = True
+    global p_thrd,poll_exit
+    poll_exit = True
+    # wait for the thread first, so it can't redraw after the clear
     if p_thrd != None:
         p_thrd.join()
         p_thrd = None
+    if sense != None:
+        sense.clear()
 
 
 def cli():
@@ -270,6 +265,10 @@ if __name__ == '__main__':
     print("Start PiHat")
     if not init():
         print("Fail Start. End.")
-        exit()
-    cli()
+        sys.exit(1)
+    try:
+        cli()
+    finally:
+        # also stop the poll thread on Ctrl+C or an error, or the process hangs
+        stop_server()
     print("End.")
