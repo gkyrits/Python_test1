@@ -1,8 +1,19 @@
 import time as tm
+import threading as thrd
+import os,sys
+
+#import lib
+libdir = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), 'lib')
+if os.path.exists(libdir):
+    sys.path.append(libdir)
+import cpuinfo as cpu
+import battery as batt
 
 LED_LUM_HI	= 255
 LED_LUM_LOW	= 128
 sense=None
+p_thrd=None
+exit=False
 
 White_col = [LED_LUM_HI, LED_LUM_HI, LED_LUM_HI]  # White
 Black_col = [0, 0, 0]  # Black
@@ -151,6 +162,23 @@ def draw_rect(x, y, w, h, col):
             set_matrix(x1, yi, col)
 
 
+def percent_bar(x, val, col):
+    if sense is None:
+        return
+    if not 0 <= x < 8:
+        raise ValueError("x must be between 0 and 7")
+    if not 0 <= val <= 100:
+        raise ValueError("val must be between 0 and 100")
+    if len(col) != 3:
+        raise ValueError("col must contain three RGB values")
+    top_y = int(7 - val * 7 / 100)
+    # Clear this column, then fill from the mapped row to the bottom.
+    for y in range(8):
+        set_matrix(x, y, Black_col)
+    for y in range(top_y, 8):
+        set_matrix(x, y, col)
+
+
 def intro2(delay): #delay in sec
     clear_matrix(Black_col)
     draw_rect(3,3,2,2,White_col)
@@ -172,16 +200,55 @@ def intro2(delay): #delay in sec
     sense.set_pixels(led_matrix)
 
 
+def poll_thread():
+    global exit
+    print('Start Poll Thread')
+    battery = batt.INA219()
+    while True:
+        if exit:
+            break
+        cpu_usage=cpu.get_cpuUsage()
+        percent_bar(2,cpu_usage,get_color(6))
+        sense.set_pixels(led_matrix)
+        #print('CPU usage   : {}%'.format(cpu_usage))        
+        if battery.exist():
+            bat_info=batt.get_baterry_info(battery)            
+            batt_usage = bat_info['Percent']
+            percent_bar(5,batt_usage,get_color(24))
+            sense.set_pixels(led_matrix)
+            #print("Batt Percent: {:4.1f}%".format(batt_usage))
+        tm.sleep(1)
+    print('Exit Poll Thread')        
+
+
+def start_server():
+    global p_thrd
+    # start poll thread
+    if p_thrd == None:
+        p_thrd=thrd.Thread(target=poll_thread)
+        p_thrd.start()    
+        
+
+def stop_server():
+    global p_thrd,exit
+    if sense != None:
+        sense.clear()
+    exit = True
+    if p_thrd != None:
+        p_thrd.join()
+        p_thrd = None
+
+
 def cli():
     while True:
-        print('\n1.exit\n2.clear\n3.colors\n4.hello\n5.intro')
+        print('\n1.exit\n2.clear\n3.colors\n4.hello\n5.intro\n6.start\n7.stop')
         try:
             choice = input('> ').strip()
         except (EOFError, KeyboardInterrupt):
             choice = '1'
         if choice=='1':
-            sense.clear()
-            return()
+            stop_server()
+            break
         elif choice=='2':
             clear_matrix(Black_col)
             sense.set_pixels(led_matrix)
@@ -191,6 +258,10 @@ def cli():
             hello()
         elif choice=='5':
             intro2(0.2)
+        elif choice=='6':
+            start_server()
+        elif choice=='7':
+            stop_server()
         else:
             print('unknown option: ' + choice)
 
