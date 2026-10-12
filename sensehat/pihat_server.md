@@ -18,14 +18,17 @@ Fixes were applied in commit `dcd2b7b`. They were tested against a fake SenseHat
 | 9 | `intro`, `intro2`, `colors` called `sense.*` with no `None` check | `AttributeError` if called before `init()` succeeded | Added `if sense is None: return`. `start_server` also checks it |
 | 10 | `clear_matrix`, `set_matrix`, `draw_rect`, `percent_bar` returned early when `sense is None` | They only edit the in-memory matrix, so without hardware they silently did nothing | Removed the guard |
 
+## Fixed in follow-up (uncommitted)
+
+Tested against a fake SenseHat, not on real hardware.
+
+| # | Issue | Effect | Fix |
+|---|-------|--------|-----|
+| 11 | `colors()` drew with `set_pixel` and never updated `led_matrix` | The stored matrix went out of sync with the display | It writes with `set_matrix`, then calls `sense.set_pixels(led_matrix)` once |
+| 12 | The poll thread and the CLI both changed `led_matrix` and the display | Their updates could interleave, for example bars drawn halfway through `intro2` | While polling runs, the menu accepts only `7.stop` and `1.exit`. Any other choice prints a message. A new `server_running()` checks this |
+| 13 | If the poll thread died on an error, `p_thrd` still pointed at the dead thread | `6.start` did nothing until `7.stop` | `start_server` also starts a new thread when `p_thrd` isn't alive |
+| 14 | Style | | Removed the tabs and trailing whitespace. `== None` became `is None`. `exist()` is now one line. The local `battery` became `ina219`. Removed the unused `O`/`X` |
+
 ## Still open (not changed)
 
-- `colors()` draws with `set_pixel` and never updates `led_matrix`, so the stored matrix goes out of sync with the display.
-- The poll thread and the CLI both change `led_matrix` with no lock. For example, menu `2.clear` while the thread runs gets redrawn on its next tick.
 - `intro()` and `test_matrix()` aren't called anywhere, because the menu's intro option runs `intro2`.
-- Style:
-  - Lines 12–13 use tabs for alignment, and some lines have trailing whitespace.
-  - The code uses `== None` / `!= None` where `is None` is the convention.
-  - `exist()` can be a single line, `return sense is not None`.
-  - The local variable `battery` in `poll_thread` shares its name with the module (imported as `batt`), which is easy to mix up.
-- `O`/`X` are aliases of `Black_col`/`White_col` and are no longer used.

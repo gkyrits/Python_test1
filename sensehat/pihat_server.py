@@ -9,16 +9,14 @@ if os.path.exists(libdir):
 import cpuinfo as cpu
 import battery as batt
 
-LED_LUM_HI	= 255
-LED_LUM_LOW	= 128
+LED_LUM_HI = 255
+LED_LUM_LOW = 128
 sense=None
 p_thrd=None
 poll_exit=False
 
 White_col = [LED_LUM_HI, LED_LUM_HI, LED_LUM_HI]  # White
 Black_col = [0, 0, 0]  # Black
-O = Black_col
-X = White_col
 
 # each cell gets its own list so changing one cell never changes another
 led_matrix = [list(Black_col) for _ in range(64)]
@@ -37,18 +35,15 @@ def init():
 
 
 def hello():
-    if sense == None:
-        return         
+    if sense is None:
+        return
     sense.show_message("Hello", text_colour=[0,       LED_LUM_LOW, 0])
     sense.show_message("Sense", text_colour=[0,       0,       LED_LUM_LOW])
-    sense.show_message("Hat"  , text_colour=[LED_LUM_LOW, 0,       0])    
+    sense.show_message("Hat"  , text_colour=[LED_LUM_LOW, 0,       0])
 
 
 def exist():
-    if sense != None:
-        return True
-    else:
-        return False
+    return sense is not None
 
 def colors():
     if sense is None:
@@ -61,13 +56,14 @@ def colors():
         for G in col_ar:
             for B in col_ar:
                 col = (R,G,B)
-                sense.set_pixel(x,y,col)
+                set_matrix(x,y,col)
                 idx = idx+1
                 print(idx,':',x,y,col)
                 x=x+1
                 if x>7:
                     x=0
                     y=y+1
+    sense.set_pixels(led_matrix)
 
 
 def get_color(idx):
@@ -86,14 +82,14 @@ def get_color(idx):
 def test_matrix():
     if sense is None:
         return
-    matrix_size = len(led_matrix)    
+    matrix_size = len(led_matrix)
     for x in range(0,matrix_size):
         led_matrix[x]=list(Black_col)
     sense.set_pixels(led_matrix)
     tm.sleep(2)
     for x in range(0,matrix_size):
         led_matrix[x]=list(White_col)
-    sense.set_pixels(led_matrix)  
+    sense.set_pixels(led_matrix)
 
 
 def clear_matrix(col):
@@ -182,7 +178,7 @@ def intro2(delay): #delay in sec
     clear_matrix(Black_col)
     draw_rect(1,1,6,6,White_col)
     sense.set_pixels(led_matrix)
-    tm.sleep(delay)    
+    tm.sleep(delay)
     clear_matrix(Black_col)
     draw_rect(0,0,8,8,White_col)
     sense.set_pixels(led_matrix)
@@ -193,7 +189,7 @@ def intro2(delay): #delay in sec
 
 def poll_thread():
     print('Start Poll Thread')
-    battery = batt.INA219()
+    ina219 = batt.INA219()
     while True:
         if poll_exit:
             break
@@ -201,15 +197,15 @@ def poll_thread():
         if cpu_usage != '':  # '' when psutil is missing
             percent_bar(2,cpu_usage,get_color(6))
             sense.set_pixels(led_matrix)
-        #print('CPU usage   : {}%'.format(cpu_usage))        
-        if battery.exist():
-            bat_info=batt.get_baterry_info(battery)            
+        #print('CPU usage   : {}%'.format(cpu_usage))
+        if ina219.exist():
+            bat_info=batt.get_baterry_info(ina219)
             batt_usage = bat_info['Percent']
             percent_bar(5,batt_usage,get_color(24))
             sense.set_pixels(led_matrix)
             #print("Batt Percent: {:4.1f}%".format(batt_usage))
         tm.sleep(1)
-    print('Exit Poll Thread')        
+    print('Exit Poll Thread')
 
 
 def start_server():
@@ -217,20 +213,25 @@ def start_server():
     if sense is None:
         return
     # start poll thread
-    if p_thrd == None:
+    # also restart when a previous thread died on an error
+    if not server_running():
         poll_exit = False
         p_thrd=thrd.Thread(target=poll_thread)
-        p_thrd.start()    
-        
+        p_thrd.start()
+
+
+def server_running():
+    return p_thrd is not None and p_thrd.is_alive()
+
 
 def stop_server():
     global p_thrd,poll_exit
     poll_exit = True
     # wait for the thread first, so it can't redraw after the clear
-    if p_thrd != None:
+    if p_thrd is not None:
         p_thrd.join()
         p_thrd = None
-    if sense != None:
+    if sense is not None:
         sense.clear()
 
 
@@ -241,6 +242,10 @@ def cli():
             choice = input('> ').strip()
         except (EOFError, KeyboardInterrupt):
             choice = '1'
+        # while polling, only stop and exit are allowed
+        if server_running() and choice not in ('1', '7'):
+            print('polling is running: use 7.stop or 1.exit')
+            continue
         if choice=='1':
             stop_server()
             break
