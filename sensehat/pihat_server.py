@@ -197,6 +197,10 @@ def poll_thread():
         if cpu_usage != '':  # '' when psutil is missing
             percent_bar(2,cpu_usage,get_color(6))
             sense.set_pixels(led_matrix)
+        mem_usage=cpu.get_memUsage()
+        if mem_usage != '':  # '' when psutil and /proc/meminfo are missing
+            percent_bar(1,mem_usage,get_color(15))
+            sense.set_pixels(led_matrix)
         #print('CPU usage   : {}%'.format(cpu_usage))
         if ina219.exist():
             bat_info=batt.get_baterry_info(ina219)
