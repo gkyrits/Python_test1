@@ -8,7 +8,6 @@
 
 [Unit]
 Description=Sense HAT CPU, memory and battery bars for raspi_play
-After=multi-user.target
 
 [Service]
 Type=simple
