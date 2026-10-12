@@ -202,6 +202,11 @@ def poll_thread():
             bat_info=batt.get_baterry_info(ina219)
             batt_usage = bat_info['Percent']
             percent_bar(5,batt_usage,get_color(24))
+            # current bar: full at >= 1.5 A, colour shows the direction
+            batt_current = bat_info['Current']
+            current_pct = min(abs(batt_current) / 1.5 * 100, 100)
+            current_col = get_color(16) if batt_current < 0 else get_color(23)
+            percent_bar(6,current_pct,current_col)
             sense.set_pixels(led_matrix)
             #print("Batt Percent: {:4.1f}%".format(batt_usage))
         tm.sleep(1)
