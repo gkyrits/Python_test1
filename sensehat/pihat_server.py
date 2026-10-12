@@ -1,6 +1,7 @@
 import time as tm
 import threading as thrd
 import os,sys
+import signal
 
 #import lib
 libdir = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), 'lib')
@@ -275,14 +276,38 @@ def cli():
             print('unknown option: ' + choice)
 
 
+def daemon():
+    # no console: show the intro, poll until SIGTERM/SIGINT, then exit
+    stop_evt = thrd.Event()
+    def on_signal(signum, frame):
+        print('Got signal', signum)
+        stop_evt.set()
+    signal.signal(signal.SIGTERM, on_signal)
+    signal.signal(signal.SIGINT, on_signal)
+    intro2(0.2)
+    start_server()
+    # also return if the poll thread dies, so a service manager can restart us
+    while server_running() and not stop_evt.wait(1):
+        pass
+    # True on a normal stop, False when the poll thread died
+    return stop_evt.is_set()
+
+
 if __name__ == '__main__':
-    print("Start PiHat")
+    # -d or --daemon: run without the menu, e.g. from systemd
+    daemon_mode = len(sys.argv) > 1 and sys.argv[1] in ('-d', '--daemon')
+    print("Start PiHat", "(daemon)" if daemon_mode else "", flush=True)
     if not init():
         print("Fail Start. End.")
         sys.exit(1)
+    ok = True
     try:
-        cli()
+        if daemon_mode:
+            ok = daemon()
+        else:
+            cli()
     finally:
         # also stop the poll thread on Ctrl+C or an error, or the process hangs
         stop_server()
     print("End.")
+    sys.exit(0 if ok else 1)

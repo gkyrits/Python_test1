@@ -1,0 +1,22 @@
+# systemd unit for pihat_server.py
+# install:
+#   sudo cp pihat_server.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now pihat_server
+# log:
+#   journalctl -u pihat_server -f
+
+[Unit]
+Description=Sense HAT CPU, memory and battery bars for raspi_play
+After=multi-user.target
+
+[Service]
+Type=simple
+User=gkyr
+WorkingDirectory=/home/gkyr/Work/Python_test1/sensehat
+ExecStart=/usr/bin/python3 -u pihat_server.py --daemon
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
