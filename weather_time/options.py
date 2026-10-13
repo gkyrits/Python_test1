@@ -142,9 +142,14 @@ def grab_keyboard(win):
 
 
 # position of the main (root) window, every other window opens over it
-def main_pos(win):
+# frame=True: of its frame (as in geometry(), for a window with the same frame)
+# frame=False: of its content (for a frameless popup), on Linux below the title bar
+def main_pos(win, frame=True):
     root = win._root()
-    return root.winfo_x(), root.winfo_y()
+    if frame:
+        x_pos, y_pos = root.geometry().split('+')[1:3]  #'WxH+X+Y'
+        return int(x_pos), int(y_pos)
+    return root.winfo_rootx(), root.winfo_rooty()
 
 # LCD size window at the position of the main window
 def place_on_main(win):
@@ -152,10 +157,10 @@ def place_on_main(win):
     win.geometry(f'{LCD_SIZE}+{x_pos}+{y_pos}')
 
 
-# centered on the main window
+# frameless popup centered on the content of the main window
 def center_form(win, width, height):
     display_width, display_height = map(int, LCD_SIZE.split('x', 1))
-    main_x, main_y = main_pos(win)
+    main_x, main_y = main_pos(win, frame=False)
     x_pos = main_x + (display_width - width) // 2
     y_pos = main_y + (display_height - height) // 2
     win.geometry(f'{width}x{height}+{x_pos}+{y_pos}')
