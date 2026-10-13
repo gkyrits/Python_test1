@@ -141,10 +141,23 @@ def grab_keyboard(win):
     win.after(100, grab, 20)
 
 
+# position of the main (root) window, every other window opens over it
+def main_pos(win):
+    root = win._root()
+    return root.winfo_x(), root.winfo_y()
+
+# LCD size window at the position of the main window
+def place_on_main(win):
+    x_pos, y_pos = main_pos(win)
+    win.geometry(f'{LCD_SIZE}+{x_pos}+{y_pos}')
+
+
+# centered on the main window
 def center_form(win, width, height):
     display_width, display_height = map(int, LCD_SIZE.split('x', 1))
-    x_pos = (display_width - width) // 2
-    y_pos = (display_height - height) // 2
+    main_x, main_y = main_pos(win)
+    x_pos = main_x + (display_width - width) // 2
+    y_pos = main_y + (display_height - height) // 2
     win.geometry(f'{width}x{height}+{x_pos}+{y_pos}')
 
 

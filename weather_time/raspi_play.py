@@ -232,7 +232,7 @@ class Gui:
      def graph_window(self,waitWin):
          waitWin.update()
          win=tk.Toplevel()
-         win.geometry(LCD_SIZE+'+0+0')
+         opt.place_on_main(win)
          opt.full_screen(win)
          plot.draw_form(win,waitWin)         
 
@@ -243,7 +243,7 @@ class Gui:
             print('fail open options form:', e)
             return
         win=tk.Toplevel()
-        win.geometry(LCD_SIZE+'+0+0')
+        opt.place_on_main(win)
         opt.full_screen(win)
         optform.draw_form(win)
         #apply the new settings when the form closes
