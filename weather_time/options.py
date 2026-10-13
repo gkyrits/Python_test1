@@ -17,6 +17,7 @@ locations = {
 }
 LOCATION = 1
 SHOW_PLACE = 1  # show the place name in the weather panel of raspi_play
+WINDOW_FRAME = 0  # 1: windows with frame (title bar) on a Linux screen bigger than LCD_SIZE, after restart
 
 # selected location (lat, lon), the first one if LOCATION is not in locations
 def get_location():
@@ -44,7 +45,7 @@ SENSEHAT_PRESS_OFFSET      = 0.0  # hPa, altitude is calculated from the correct
 # values above are defaults, the ones edited in the options form are saved in
 # options.json (next to this file) and loaded on start
 SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'options.json')
-SAVED_NAMES = ('LANG', 'LOCATION', 'locations', 'SHOW_PLACE',
+SAVED_NAMES = ('LANG', 'LOCATION', 'locations', 'SHOW_PLACE', 'WINDOW_FRAME',
                'SENSE1_EN', 'SENSE2_EN', 'SENSE3_EN',
                'AHT10_TEMP_OFFSET', 'AHT10_HUMID_OFFSET',
                'SI7021_TEMP_OFFSET', 'SI7021_HUMID_OFFSET',
@@ -107,9 +108,19 @@ def reload_if_changed():
     if mtime != settings_mtime:
         load()
 
-# LCD size window without frame (when FULL_SCREEN)
+# WINDOW_FRAME as it was at start, a change in the options form applies after restart
+window_frame_start = None
+
+# frame (title bar) for the windows: options WINDOW_FRAME, on Linux, screen bigger than the LCD
+def use_window_frame(win):
+    if not (window_frame_start and sys.platform.startswith('linux')):
+        return False
+    lcd_width, lcd_height = map(int, LCD_SIZE.split('x', 1))
+    return win.winfo_screenwidth() > lcd_width or win.winfo_screenheight() > lcd_height
+
+# LCD size window without frame (when FULL_SCREEN and no WINDOW_FRAME)
 def full_screen(win):
-    if FULL_SCREEN:
+    if FULL_SCREEN and not use_window_frame(win):
         win.overrideredirect(1)
 
 
@@ -117,8 +128,8 @@ def full_screen(win):
 # manager on Linux (Pi), so grab the keyboard while a form that needs keys is
 # open; the grab ends when the window is closed
 def grab_keyboard(win):
-    if not (FULL_SCREEN and sys.platform.startswith('linux')):
-        return
+    if not (FULL_SCREEN and sys.platform.startswith('linux')) or use_window_frame(win):
+        return  #a window with frame gets the keys from the window manager
     def grab(tries):
         try:
             win.grab_set_global()
@@ -151,5 +162,4 @@ def wait_msg(info):
 
 
 load()
-
-
+window_frame_start = WINDOW_FRAME

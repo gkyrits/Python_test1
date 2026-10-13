@@ -179,6 +179,13 @@ def options_page(win):
     tk.Button(frm2, text='Del', command=delete, **btn).grid(row=4, column=3, sticky=tk.W, padx=2, pady=1)
     frm2.pack(side=tk.TOP, fill=tk.X, padx=2, pady=2)
     show(sel[0])
+    #--appearance frame
+    frm3 = tk.Frame(win, **frm_opt)
+    tk.Label(frm3, text='Appearance', **lblB).pack(side=tk.TOP, anchor=tk.W, padx=2)
+    frame_var = tk.IntVar(value=opt.WINDOW_FRAME)
+    #frame on Linux when the screen is bigger than the LCD, after restart
+    tk.Checkbutton(frm3, text='Window Frame', variable=frame_var, activebackground=win_col2, **lbl).pack(side=tk.TOP, anchor=tk.W, padx=2)
+    frm3.pack(side=tk.TOP, fill=tk.X, padx=2, pady=2)
 
     #check the entries, return a function that stores the page in options (None if a value is wrong)
     def apply():
@@ -189,6 +196,7 @@ def options_page(win):
             opt.locations = locs
             opt.LOCATION = sel[0]
             opt.SHOW_PLACE = place_var.get()
+            opt.WINDOW_FRAME = frame_var.get()
         return save_page
     return apply
 
