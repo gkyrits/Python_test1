@@ -518,15 +518,18 @@ class Gui:
         self.SensorFrm.pack(side=tk.LEFT, padx=self.pnlPad, pady=self.pnlPad, fill=tk.BOTH, expand=tk.YES) 
         
 
-     def sensePanel_nextShow(self):
+     def sensePanel_nextShow(self,show_id=None):
         #cycle: enabled sensors (options SENSEx_EN) then the cpu/ip panel (id 0)
+        #show_id: build that panel again (if still enabled) instead of the next one
         global sense_need_update
         order=[sid for sid,en in ((1,opt.SENSE1_EN),(2,opt.SENSE2_EN),(3,opt.SENSE3_EN)) if en]+[0]
-        if self.sense_id in order:
+        if show_id in order:
+            new_id=show_id
+        elif self.sense_id in order:
             new_id=order[(order.index(self.sense_id)+1) % len(order)]
         else:
             new_id=order[0]  #first show (sense_id -1)
-        if new_id==self.sense_id:
+        if new_id==self.sense_id and show_id is None:
             return  #no sensor enabled, keep the cpu/ip panel
         if self.IPInfoFrm != None:
             self.IPInfoFrm.pack_forget()
@@ -554,8 +557,9 @@ class Gui:
                 self.SensorFrm=None
             self.pnlSenseInfo.pack_forget()
         if visible:
+            prev_id=self.sense_id  #back from the forecast: the panel shown before it
             self.sense_id=-1
-            self.sensePanel_nextShow()            
+            self.sensePanel_nextShow(prev_id)            
             self.weatherFrm.pack_forget()
             self.pnlSenseInfo.pack(side=tk.LEFT, fill=tk.BOTH, expand=tk.YES, anchor=tk.W)                        
             self.weatherFrm.pack(side=tk.LEFT, fill=tk.BOTH, expand=tk.YES, anchor=tk.W)
