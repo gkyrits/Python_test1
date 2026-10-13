@@ -84,19 +84,6 @@ def get_color(idx):
     )
 
 
-def test_matrix():
-    if sense is None:
-        return
-    matrix_size = len(led_matrix)
-    for x in range(0,matrix_size):
-        led_matrix[x]=list(Black_col)
-    sense.set_pixels(led_matrix)
-    tm.sleep(2)
-    for x in range(0,matrix_size):
-        led_matrix[x]=list(White_col)
-    sense.set_pixels(led_matrix)
-
-
 def clear_matrix(col):
     led_matrix[:] = [list(col) for _ in led_matrix]
 
@@ -107,19 +94,6 @@ def set_matrix(x, y, col):
     if len(col) != 3:
         raise ValueError("col must contain three RGB values")
     led_matrix[y * 8 + x] = list(col)
-
-
-def intro():
-    if sense is None:
-        return
-    test_matrix()
-    tm.sleep(2)
-    clear_matrix(Black_col)
-    set_matrix(4,4,get_color(9))
-    sense.set_pixels(led_matrix)
-    tm.sleep(2)
-    clear_matrix(Black_col)
-    sense.set_pixels(led_matrix)
 
 
 def draw_rect(x, y, w, h, col):
@@ -175,7 +149,7 @@ def percent_bar(x, val, col):
         set_matrix(x, 7 - full, [round(c * level) for c in col])
 
 
-def intro2(delay): #delay in sec
+def intro(delay): #delay in sec
     if sense is None:
         return
     clear_matrix(Black_col)
@@ -277,7 +251,7 @@ def cli():
         elif choice=='4':
             hello()
         elif choice=='5':
-            intro2(0.2)
+            intro(0.2)
         elif choice=='6':
             start_server()
         elif choice=='7':
@@ -294,7 +268,7 @@ def daemon():
         stop_evt.set()
     signal.signal(signal.SIGTERM, on_signal)
     signal.signal(signal.SIGINT, on_signal)
-    intro2(0.2)
+    intro(0.2)
     start_server()
     # also return if the poll thread dies, so a service manager can restart us
     while server_running() and not stop_evt.wait(1):
