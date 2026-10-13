@@ -7,7 +7,7 @@
 #   journalctl -u pihat_server -f
 
 [Unit]
-Description=Sense HAT CPU, memory and battery bars for raspi_play
+Description=Sense HAT CPU, memory and battery bars
 
 [Service]
 Type=simple

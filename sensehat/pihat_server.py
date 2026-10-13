@@ -156,13 +156,18 @@ def percent_bar(x, val, col):
         raise ValueError("val must be between 0 and 100")
     if len(col) != 3:
         raise ValueError("col must contain three RGB values")
-    # 0% lights no LEDs, 100% lights all 8
-    top_y = 8 - round(val * 8 / 100)
-    # Clear this column, then fill from the mapped row to the bottom.
+    # each LED is 12.5%: light the full LEDs from the bottom, then show
+    # what is left over as the brightness of the LED above them
+    leds = val * 8 / 100
+    full = int(leds)
+    rest = leds - full
+    # Clear this column, then fill from the bottom.
     for y in range(8):
         set_matrix(x, y, Black_col)
-    for y in range(top_y, 8):
+    for y in range(8 - full, 8):
         set_matrix(x, y, col)
+    if full < 8 and rest > 0:
+        set_matrix(x, 7 - full, [round(c * rest) for c in col])
 
 
 def intro2(delay): #delay in sec
