@@ -12,6 +12,10 @@ import battery as batt
 
 LED_LUM_HI = 255
 LED_LUM_LOW = 128
+# gamma for the brightness of a bar's top LED. The Sense HAT driver already
+# applies its own gamma table (sense.gamma), so 1.0 adds nothing on top of it;
+# try 2.2 if the partial LED still looks too bright
+BAR_GAMMA = 1.0
 sense=None
 p_thrd=None
 poll_exit=False
@@ -167,7 +171,8 @@ def percent_bar(x, val, col):
     for y in range(8 - full, 8):
         set_matrix(x, y, col)
     if full < 8 and rest > 0:
-        set_matrix(x, 7 - full, [round(c * rest) for c in col])
+        level = rest ** BAR_GAMMA
+        set_matrix(x, 7 - full, [round(c * level) for c in col])
 
 
 def intro2(delay): #delay in sec
