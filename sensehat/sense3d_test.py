@@ -113,9 +113,9 @@ class Transparent3DCubeApp:
         if self.pi3d_display.loop_running():
             orientation = self.sense.get_orientation()
             
-            self.cube.rotateToX(orientation['pitch'])
+            self.cube.rotateToZ(orientation['pitch'])
             self.cube.rotateToY(orientation['yaw'])
-            self.cube.rotateToZ(orientation['roll'])
+            self.cube.rotateToX(orientation['roll'])
             
             self.cube.draw(self.shader)
             
