@@ -1,19 +1,25 @@
+import pi3d
 import tkinter as tk
 from PIL import Image, ImageTk
-import pi3d
 
 try:
     from sense_hat import SenseHat
 except ImportError:
-    from sense_emu import SenseHat
+    try:
+        from sense_emu import SenseHat
+    except ImportError:
+        SenseHat = None
 
 class Transparent3DCubeApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Independent Cuboid Dimensions")
         
-        self.sense = SenseHat()
-        self.sense.clear()
+        if SenseHat is not None:
+            self.sense = SenseHat()
+            self.sense.clear()
+        else:
+            self.sense = None
         
         # 1. ΟΡΙΣΤΕ ΕΔΩ ΤΙΣ ΑΝΕΞΑΡΤΗΤΕΣ ΔΙΑΣΤΑΣΕΙΣ (Width, Height, Depth)
         MY_W = 1.6  # Μήκος (Άξονας X)
@@ -111,7 +117,10 @@ class Transparent3DCubeApp:
 
     def render_loop(self):
         if self.pi3d_display.loop_running():
-            orientation = self.sense.get_orientation()
+            if self.sense is None:
+                orientation = {'pitch': 0, 'yaw': 0, 'roll': 0}
+            else:
+                orientation = self.sense.get_orientation()
             
             self.cube.rotateToZ(orientation['pitch'])
             self.cube.rotateToY(orientation['yaw'])
