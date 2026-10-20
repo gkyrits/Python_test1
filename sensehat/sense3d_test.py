@@ -18,6 +18,10 @@ def _setup_sdl2_angle():
     # Ζητάμε από το SDL GLES2 context μέσω EGL (ANGLE) πριν δημιουργηθεί το παράθυρο,
     # και εμποδίζουμε το pi3d να το γυρίσει σε COMPATIBILITY profile.
     import sdl2
+    # Το SDL_PollEvent (μέσα στο loop_running) κάνει dispatch ΟΛΑ τα Windows messages
+    # του thread, και του Tk, με το GIL ελεύθερο -> Fatal "PyEval_RestoreThread".
+    # Τα messages τα μοιράζει μόνο το mainloop του Tk (και στο παράθυρο του SDL).
+    sdl2.SDL_SetHint(sdl2.SDL_HINT_WINDOWS_ENABLE_MESSAGELOOP, b"0")
     sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO)
     sdl2.SDL_SetHint(sdl2.SDL_HINT_OPENGL_ES_DRIVER, b"1")
     set_attribute = sdl2.SDL_GL_SetAttribute
@@ -50,6 +54,11 @@ WINDOW_TITLE = "Sense Gyroscope"
 # Αν το Tk δείχνει μαύρη εικόνα με κρυφό παράθυρο pi3d, κάντε το False
 HIDE_PI3D_WINDOW = True
 
+CANVAS_BG_COLOR = "light gray"
+CANVAS_WIDTH = 300
+CANVAS_HEIGHT = 300
+
+
 class Transparent3DCubeApp:
     def __init__(self, root):
         self.root = root
@@ -70,14 +79,15 @@ class Transparent3DCubeApp:
         xw, yh, zd = MY_W / 2.0, MY_H / 2.0, MY_D / 2.0
         
         # 2. Αρχικοποίηση pi3D Display
-        self.pi3d_display = pi3d.Display.create(w=500, h=500, background=(0.1, 0.1, 0.1, 1.0),
-                                                window_title=WINDOW_TITLE)
-        self.pi3d_display.resize(x=0, y=self.pi3d_display.max_height, w=500, h=500)
+        self.pi3d_display = pi3d.Display.create(w=CANVAS_WIDTH, h=CANVAS_HEIGHT, background=(0.1, 0.1, 0.1, 1.0),
+                                                window_title=WINDOW_TITLE+ " (pi3d)")
+        self.pi3d_display.resize(x=0, y=self.pi3d_display.max_height, w=CANVAS_WIDTH, h=CANVAS_HEIGHT)
         if HIDE_PI3D_WINDOW:
             self._hide_pi3d_window()
         
         self.shader = pi3d.Shader("mat_flat")
-        
+        self.camera = pi3d.Camera()
+
         # 3. Δημιουργία του Cuboid με τις ανεξάρτητες διαστάσεις
         self.cube = pi3d.Cuboid(w=MY_W, h=MY_H, d=MY_D)
         self.cube.set_material((0.3, 0.3, 0.3))
@@ -165,9 +175,12 @@ class Transparent3DCubeApp:
         self.frame.add_child(lz3)
         
         # 7. Στήσιμο του Tkinter GUI Canvas
-        self.canvas = tk.Canvas(root, width=500, height=500, bg="black")
-        self.canvas.pack(padx=10, pady=10)
-        
+        # Ο canvas ακολουθεί το μέγεθος του παραθύρου, και το pi3d display τον canvas
+        self.canvas = tk.Canvas(root, width=CANVAS_WIDTH, height=CANVAS_HEIGHT, bg=CANVAS_BG_COLOR, highlightthickness=0)
+        self.canvas.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+        self.view_size = (CANVAS_WIDTH, CANVAS_HEIGHT)
+        self.canvas.bind("<Configure>", self._on_canvas_resize)
+
         self.canvas_image_id = self.canvas.create_image(0, 0, anchor=tk.NW)
         self.tk_image = None
 
@@ -181,12 +194,29 @@ class Transparent3DCubeApp:
             if pi3d.USE_SDL2:  # Windows (και Linux με SDL2)
                 import sdl2
                 sdl2.SDL_HideWindow(gl.window)
-            elif hasattr(gl, "d"):  # Linux / Raspberry Pi με X11
-                from pyxlib import xlib
-                xlib.XUnmapWindow(gl.d, gl.window)
-                xlib.XFlush(gl.d)
+            elif gl.d is not None:  # Linux / Raspberry Pi με X11: ελαχιστοποίηση
+                import ctypes
+                import ctypes.util
+                x11 = ctypes.CDLL(ctypes.util.find_library("X11"))
+                x11.XDefaultScreen.argtypes = [ctypes.c_void_p]
+                x11.XIconifyWindow.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_int]
+                x11.XFlush.argtypes = [ctypes.c_void_p]
+                d = gl.d if isinstance(gl.d, int) else ctypes.cast(gl.d, ctypes.c_void_p)
+                window = gl.window if isinstance(gl.window, int) else gl.window.value
+                x11.XIconifyWindow(d, window, x11.XDefaultScreen(d))
+                x11.XFlush(d)
         except Exception as e:
             print("Could not hide pi3d window:", e)
+
+    def _on_canvas_resize(self, event):
+        self.view_size = (max(event.width, 1), max(event.height, 1))
+
+    def _resize_view(self, w, h):
+        d = self.pi3d_display
+        d.resize(x=0, y=d.max_height, w=w, h=h)
+        pi3d.opengles.glViewport(0, 0, w, h)
+        # Νέο aspect ratio στην προβολή ώστε το σχήμα να μην παραμορφώνεται
+        self.camera.reset(lens=[d.near, d.far, d.fov, w / float(h)])
 
     @staticmethod
     def _empty_node(z=0.0):
@@ -198,6 +228,9 @@ class Transparent3DCubeApp:
         self.root.destroy()
 
     def render_loop(self):
+        # Αλλαγή μεγέθους πριν το loop_running, ώστε το νέο frame να έχει το νέο μέγεθος
+        if self.view_size != (self.pi3d_display.width, self.pi3d_display.height):
+            self._resize_view(*self.view_size)
         if self.pi3d_display.loop_running():
             if self.sense is None:
                 orientation = {'pitch': 0, 'yaw': 0, 'roll': 0}
@@ -208,7 +241,7 @@ class Transparent3DCubeApp:
             self.pitch_node.rotateToZ(orientation['pitch'])
             self.yaw_node.rotateToY(orientation['yaw'])
 
-            self.yaw_node.draw(self.shader)
+            self.yaw_node.draw(self.shader, camera=self.camera)
             
             grid_screenshot = pi3d.screenshot()
             pil_img = Image.fromarray(grid_screenshot)
