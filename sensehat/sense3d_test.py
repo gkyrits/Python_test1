@@ -1,3 +1,4 @@
+import ctypes
 import os
 import sys
 import tkinter as tk
@@ -49,14 +50,62 @@ if sys.platform == "win32":
     _setup_sdl2_angle()
 else:
     import pi3d
+from pi3d.constants import (GL_FRAMEBUFFER, GL_RENDERBUFFER, GL_COLOR_ATTACHMENT0,
+                            GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT16, GL_TEXTURE_2D,
+                            GL_TEXTURE_MIN_FILTER, GL_TEXTURE_MAG_FILTER, GL_NEAREST,
+                            GL_RGBA, GL_UNSIGNED_BYTE, GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT,
+                            GLuint)
+
+
+class ViewFramebuffer:
+    # Offscreen framebuffer (RGBA texture + depth renderbuffer) σταθερού μεγέθους.
+    # Το pi3d.OffScreenTexture δεν κάνει: εκτός Pi κολλάει depth texture, που το
+    # GLES2 του ANGLE (Windows) δεν υποστηρίζει -> incomplete framebuffer
+    def __init__(self, w, h):
+        gl = pi3d.opengles
+        self.w, self.h = w, h
+        self.fbo, self.color, self.depth = GLuint(), GLuint(), GLuint()
+        gl.glGenTextures(1, ctypes.byref(self.color))
+        gl.glBindTexture(GL_TEXTURE_2D, self.color)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, None)
+        gl.glBindTexture(GL_TEXTURE_2D, 0)
+        gl.glGenRenderbuffers(1, ctypes.byref(self.depth))
+        gl.glBindRenderbuffer(GL_RENDERBUFFER, self.depth)
+        gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, w, h)
+        gl.glBindRenderbuffer(GL_RENDERBUFFER, 0)
+        gl.glGenFramebuffers(1, ctypes.byref(self.fbo))
+        gl.glBindFramebuffer(GL_FRAMEBUFFER, self.fbo)
+        gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.color, 0)
+        gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, self.depth)
+        gl.glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+    def begin(self):
+        gl = pi3d.opengles
+        gl.glBindFramebuffer(GL_FRAMEBUFFER, self.fbo)
+        gl.glViewport(0, 0, self.w, self.h)
+        gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+    def read_pixels(self):
+        return pi3d.masked_screenshot(0, 0, self.w, self.h)
+
+    def end(self):
+        pi3d.opengles.glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+    def delete(self):
+        gl = pi3d.opengles
+        gl.glDeleteFramebuffers(1, ctypes.byref(self.fbo))
+        gl.glDeleteRenderbuffers(1, ctypes.byref(self.depth))
+        gl.glDeleteTextures(1, ctypes.byref(self.color))
 
 WINDOW_TITLE = "Sense Gyroscope"
 # Αν το Tk δείχνει μαύρη εικόνα με κρυφό παράθυρο pi3d, κάντε το False
 HIDE_PI3D_WINDOW = True
 
 CANVAS_BG_COLOR = "light gray"
-CANVAS_WIDTH = 300
-CANVAS_HEIGHT = 300
+CANVAS_WIDTH = 350
+CANVAS_HEIGHT = 250
 
 
 class Transparent3DCubeApp:
@@ -180,6 +229,10 @@ class Transparent3DCubeApp:
         self.canvas.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
         self.view_size = (CANVAS_WIDTH, CANVAS_HEIGHT)
         self.canvas.bind("<Configure>", self._on_canvas_resize)
+        # Η σκηνή σχεδιάζεται σε offscreen framebuffer με το μέγεθος του canvas,
+        # ανεξάρτητα από το (κρυφό/ελαχιστοποιημένο) παράθυρο του pi3d
+        self.offscreen = None
+        self.offscreen_size = None
 
         self.canvas_image_id = self.canvas.create_image(0, 0, anchor=tk.NW)
         self.tk_image = None
@@ -195,7 +248,6 @@ class Transparent3DCubeApp:
                 import sdl2
                 sdl2.SDL_HideWindow(gl.window)
             elif gl.d is not None:  # Linux / Raspberry Pi με X11: ελαχιστοποίηση
-                import ctypes
                 import ctypes.util
                 x11 = ctypes.CDLL(ctypes.util.find_library("X11"))
                 x11.XDefaultScreen.argtypes = [ctypes.c_void_p]
@@ -212,9 +264,13 @@ class Transparent3DCubeApp:
         self.view_size = (max(event.width, 1), max(event.height, 1))
 
     def _resize_view(self, w, h):
+        # Το παράθυρο του pi3d δεν αλλάζει μέγεθος (ελαχιστοποιημένο στο X11 δεν
+        # αλλάζει ποτέ το buffer του), φτιάχνεται νέο offscreen framebuffer
         d = self.pi3d_display
-        d.resize(x=0, y=d.max_height, w=w, h=h)
-        pi3d.opengles.glViewport(0, 0, w, h)
+        if self.offscreen is not None:
+            self.offscreen.delete()
+        self.offscreen = ViewFramebuffer(w, h)
+        self.offscreen_size = (w, h)
         # Νέο aspect ratio στην προβολή ώστε το σχήμα να μην παραμορφώνεται
         self.camera.reset(lens=[d.near, d.far, d.fov, w / float(h)])
 
@@ -228,8 +284,7 @@ class Transparent3DCubeApp:
         self.root.destroy()
 
     def render_loop(self):
-        # Αλλαγή μεγέθους πριν το loop_running, ώστε το νέο frame να έχει το νέο μέγεθος
-        if self.view_size != (self.pi3d_display.width, self.pi3d_display.height):
+        if self.view_size != self.offscreen_size:
             self._resize_view(*self.view_size)
         if self.pi3d_display.loop_running():
             if self.sense is None:
@@ -241,9 +296,10 @@ class Transparent3DCubeApp:
             self.pitch_node.rotateToZ(orientation['pitch'])
             self.yaw_node.rotateToY(orientation['yaw'])
 
+            self.offscreen.begin()
             self.yaw_node.draw(self.shader, camera=self.camera)
-            
-            grid_screenshot = pi3d.screenshot()
+            grid_screenshot = self.offscreen.read_pixels()
+            self.offscreen.end()
             pil_img = Image.fromarray(grid_screenshot)
             self.tk_image = ImageTk.PhotoImage(pil_img)
             self.canvas.itemconfig(self.canvas_image_id, image=self.tk_image)
