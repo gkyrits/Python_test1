@@ -226,7 +226,20 @@ class Transparent3DCubeApp:
         # 7. Στήσιμο του Tkinter GUI Canvas
         # Ο canvas ακολουθεί το μέγεθος του παραθύρου, και το pi3d display τον canvas
         self.canvas = tk.Canvas(root, width=CANVAS_WIDTH, height=CANVAS_HEIGHT, bg=CANVAS_BG_COLOR, highlightthickness=0)
-        self.canvas.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+
+        # 8. Πλαίσιο με τις τρέχουσες τιμές Roll / Pitch / Yaw κάτω από τον canvas
+        # (pack πριν τον canvas, ώστε να μένει ορατό όταν μικραίνει το παράθυρο)
+        info_frame = tk.Frame(root, relief=tk.SUNKEN, borderwidth=2)
+        info_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=(0, 5))
+        self.angle_vars = {}
+        self.angle_titles = {"roll": "Roll (X)", "pitch": "Pitch (Z)", "yaw": "Yaw (Y)"}
+        for name, title in self.angle_titles.items():
+            var = tk.StringVar(value=f"{title}: ---")
+            tk.Label(info_frame, textvariable=var, width=18, anchor=tk.W,
+                     font="TkFixedFont").pack(side=tk.LEFT, expand=True, padx=5, pady=2)
+            self.angle_vars[name] = var
+
+        self.canvas.pack(padx=5, pady=5, fill=tk.BOTH, expand=True)
         self.view_size = (CANVAS_WIDTH, CANVAS_HEIGHT)
         self.canvas.bind("<Configure>", self._on_canvas_resize)
         # Η σκηνή σχεδιάζεται σε offscreen framebuffer με το μέγεθος του canvas,
@@ -295,6 +308,8 @@ class Transparent3DCubeApp:
             self.roll_node.rotateToX(orientation['roll'])
             self.pitch_node.rotateToZ(orientation['pitch'])
             self.yaw_node.rotateToY(orientation['yaw'])
+            for name, var in self.angle_vars.items():
+                var.set(f"{self.angle_titles[name]}: {orientation[name]:6.1f}°")
 
             self.offscreen.begin()
             self.yaw_node.draw(self.shader, camera=self.camera)
