@@ -227,15 +227,36 @@ class Transparent3DCubeApp:
         # Ο canvas ακολουθεί το μέγεθος του παραθύρου, και το pi3d display τον canvas
         self.canvas = tk.Canvas(root, width=CANVAS_WIDTH, height=CANVAS_HEIGHT, bg=CANVAS_BG_COLOR, highlightthickness=0)
 
+        self.angle_titles = {"roll": "Roll (X)", "pitch": "Pitch (Z)", "yaw": "Yaw (Y)"}
+
+        # 9. Πλαίσιο με sliders: τιμές προσανατολισμού χωρίς Sense HAT, αλλιώς offsets
+        # (pack πρώτο με side=BOTTOM ώστε να βρίσκεται κάτω από το info_frame)
+        control_frame = tk.Frame(root, relief=tk.SUNKEN, borderwidth=2)
+        control_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=(0, 5))
+        control_frame.columnconfigure(1, weight=1)
+        title = "Orientation values" if self.sense is None else "Orientation offsets"
+        tk.Label(control_frame, text=title, font="TkDefaultFont 9 bold").grid(
+            row=0, column=0, columnspan=3, sticky=tk.W, padx=5)
+        self.scale_vars = {}
+        for row, (name, angle_title) in enumerate(self.angle_titles.items(), start=1):
+            var = tk.IntVar(value=0)
+            value_label = tk.Label(control_frame, text="   0°", width=5, anchor=tk.E, font="TkFixedFont")
+            tk.Label(control_frame, text=angle_title, anchor=tk.W).grid(row=row, column=0, sticky=tk.W, padx=(5, 2))
+            tk.Scale(control_frame, variable=var, from_=-180, to=180, orient=tk.HORIZONTAL,
+                     showvalue=False, width=10, sliderlength=15, borderwidth=1
+                     ).grid(row=row, column=1, sticky=tk.EW, padx=2)
+            var.trace_add("write", lambda *_, v=var, lbl=value_label: lbl.config(text=f"{v.get():4d}°"))
+            value_label.grid(row=row, column=2, padx=(2, 5))
+            self.scale_vars[name] = var
+
         # 8. Πλαίσιο με τις τρέχουσες τιμές Roll / Pitch / Yaw κάτω από τον canvas
         # (pack πριν τον canvas, ώστε να μένει ορατό όταν μικραίνει το παράθυρο)
         info_frame = tk.Frame(root, relief=tk.SUNKEN, borderwidth=2)
         info_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=(0, 5))
         self.angle_vars = {}
-        self.angle_titles = {"roll": "Roll (X)", "pitch": "Pitch (Z)", "yaw": "Yaw (Y)"}
         for name, title in self.angle_titles.items():
             var = tk.StringVar(value=f"{title}: ---")
-            tk.Label(info_frame, textvariable=var, width=18, anchor=tk.W,
+            tk.Label(info_frame, textvariable=var, width=15, anchor=tk.W,
                      font="TkFixedFont").pack(side=tk.LEFT, expand=True, padx=5, pady=2)
             self.angle_vars[name] = var
 
@@ -300,16 +321,18 @@ class Transparent3DCubeApp:
         if self.view_size != self.offscreen_size:
             self._resize_view(*self.view_size)
         if self.pi3d_display.loop_running():
-            if self.sense is None:
-                orientation = {'pitch': 0, 'yaw': 0, 'roll': 0}
-            else:
-                orientation = self.sense.get_orientation()
+            # Χωρίς Sense HAT οι sliders δίνουν τις τιμές, αλλιώς προστίθενται ως offset
+            orientation = {name: var.get() for name, var in self.scale_vars.items()}
+            if self.sense is not None:
+                sensor = self.sense.get_orientation()
+                orientation = {name: (sensor[name] + offset) % 360
+                               for name, offset in orientation.items()}
             
             self.roll_node.rotateToX(orientation['roll'])
             self.pitch_node.rotateToZ(orientation['pitch'])
             self.yaw_node.rotateToY(orientation['yaw'])
             for name, var in self.angle_vars.items():
-                var.set(f"{self.angle_titles[name]}: {orientation[name]:6.1f}°")
+                var.set(f"{self.angle_titles[name]}: {orientation[name]:3.1f}°")
 
             self.offscreen.begin()
             self.yaw_node.draw(self.shader, camera=self.camera)
