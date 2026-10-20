@@ -1,4 +1,5 @@
-import pi3d
+import os
+import sys
 import tkinter as tk
 from PIL import Image, ImageTk
 
@@ -9,6 +10,41 @@ except ImportError:
         from sense_emu import SenseHat
     except ImportError:
         SenseHat = None
+
+
+def _setup_sdl2_angle():
+    # Στα Windows το pi3d φτιάχνει desktop OpenGL context μέσω SDL2, αλλά καλεί
+    # τις GL συναρτήσεις από το ANGLE libglesv2.dll -> glGetString επιστρέφει None.
+    # Ζητάμε από το SDL GLES2 context μέσω EGL (ANGLE) πριν δημιουργηθεί το παράθυρο,
+    # και εμποδίζουμε το pi3d να το γυρίσει σε COMPATIBILITY profile.
+    import sdl2
+    sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO)
+    sdl2.SDL_SetHint(sdl2.SDL_HINT_OPENGL_ES_DRIVER, b"1")
+    set_attribute = sdl2.SDL_GL_SetAttribute
+
+    def es_set_attribute(attr, value):
+        if attr == sdl2.SDL_GL_CONTEXT_PROFILE_MASK:
+            value = sdl2.SDL_GL_CONTEXT_PROFILE_ES
+        return set_attribute(attr, value)
+
+    sdl2.SDL_GL_SetAttribute = es_set_attribute
+    es_set_attribute(sdl2.SDL_GL_CONTEXT_PROFILE_MASK, sdl2.SDL_GL_CONTEXT_PROFILE_ES)
+    es_set_attribute(sdl2.SDL_GL_CONTEXT_MAJOR_VERSION, 2)
+    es_set_attribute(sdl2.SDL_GL_CONTEXT_MINOR_VERSION, 0)
+    es_set_attribute(sdl2.SDL_GL_DEPTH_SIZE, 24)
+
+
+if sys.platform == "win32":
+    # Το pi3d φορτώνει τα ANGLE dll (libEGL/libGLESv2) από τον τρέχοντα φάκελο
+    _cwd = os.getcwd()
+    os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), "pi3d"))
+    try:
+        import pi3d
+    finally:
+        os.chdir(_cwd)
+    _setup_sdl2_angle()
+else:
+    import pi3d
 
 WINDOW_TITLE = "Sense Gyroscope"
 # Αν το Tk δείχνει μαύρη εικόνα με κρυφό παράθυρο pi3d, κάντε το False
