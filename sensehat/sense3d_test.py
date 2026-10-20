@@ -256,7 +256,7 @@ class Transparent3DCubeApp:
         self.angle_vars = {}
         for name, title in self.angle_titles.items():
             var = tk.StringVar(value=f"{title}: ---")
-            tk.Label(info_frame, textvariable=var, width=11, anchor=tk.W,
+            tk.Label(info_frame, textvariable=var, width=12, anchor=tk.W,
                      font="TkDefaultFont").pack(side=tk.LEFT, expand=True, padx=5, pady=2)
             self.angle_vars[name] = var
 
