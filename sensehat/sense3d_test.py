@@ -10,10 +10,14 @@ except ImportError:
     except ImportError:
         SenseHat = None
 
+WINDOW_TITLE = "Sense Gyroscope"
+# Αν το Tk δείχνει μαύρη εικόνα με κρυφό παράθυρο pi3d, κάντε το False
+HIDE_PI3D_WINDOW = True
+
 class Transparent3DCubeApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Independent Cuboid Dimensions")
+        self.root.title(WINDOW_TITLE)
         
         if SenseHat is not None:
             self.sense = SenseHat()
@@ -30,8 +34,11 @@ class Transparent3DCubeApp:
         xw, yh, zd = MY_W / 2.0, MY_H / 2.0, MY_D / 2.0
         
         # 2. Αρχικοποίηση pi3D Display
-        self.pi3d_display = pi3d.Display.create(w=500, h=500, background=(0.1, 0.1, 0.1, 1.0))
+        self.pi3d_display = pi3d.Display.create(w=500, h=500, background=(0.1, 0.1, 0.1, 1.0),
+                                                window_title=WINDOW_TITLE)
         self.pi3d_display.resize(x=0, y=self.pi3d_display.max_height, w=500, h=500)
+        if HIDE_PI3D_WINDOW:
+            self._hide_pi3d_window()
         
         self.shader = pi3d.Shader("mat_flat")
         
@@ -130,6 +137,20 @@ class Transparent3DCubeApp:
 
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.render_loop()
+
+    def _hide_pi3d_window(self):
+        # Κρύβει το παράθυρο του pi3d: η εικόνα φτάνει στο Tk μέσω screenshot
+        gl = self.pi3d_display.opengl
+        try:
+            if pi3d.USE_SDL2:  # Windows (και Linux με SDL2)
+                import sdl2
+                sdl2.SDL_HideWindow(gl.window)
+            elif hasattr(gl, "d"):  # Linux / Raspberry Pi με X11
+                from pyxlib import xlib
+                xlib.XUnmapWindow(gl.d, gl.window)
+                xlib.XFlush(gl.d)
+        except Exception as e:
+            print("Could not hide pi3d window:", e)
 
     @staticmethod
     def _empty_node(z=0.0):
