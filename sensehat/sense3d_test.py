@@ -39,7 +39,11 @@ class Transparent3DCubeApp:
         self.cube = pi3d.Cuboid(w=MY_W, h=MY_H, d=MY_D, z=3.0)
         self.cube.set_material((0.3, 0.3, 0.3)) 
         self.cube.set_alpha(0.3)
-        
+
+        # Αόρατος γονέας για ακμές/άξονες/γράμματα: σχεδιάζεται πριν το διάφανο
+        # cuboid ώστε οι γραμμές πίσω/μέσα από τις έδρες να μην κόβονται από το depth buffer
+        self.frame = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], z=3.0)
+
         # 4. Αυτόματος υπολογισμός των 12 ακμών με βάση τα xw, yh, zd
         edges_vertices = [
             # Μπροστινό ορθογώνιο (z = -zd)
@@ -56,7 +60,7 @@ class Transparent3DCubeApp:
         for vertices in edges_vertices:
             edge = pi3d.Lines(vertices=vertices, line_width=3, closed=False)
             edge.set_material((1.0, 1.0, 1.0))
-            self.cube.add_child(edge)
+            self.frame.add_child(edge)
         
         # 5. Σχεδιασμός των Κύριων Αξόνων
         # Οι άξονες εκτείνονται λίγο πιο έξω από το σώμα του παραλληλεπιπέδου
@@ -71,9 +75,9 @@ class Transparent3DCubeApp:
         axis_z = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, 0.0, Lz]], line_width=4, closed=False)
         axis_z.set_material((0.0, 0.0, 1.0)) # Μπλε
         
-        self.cube.add_child(axis_x)
-        self.cube.add_child(axis_y)
-        self.cube.add_child(axis_z)
+        self.frame.add_child(axis_x)
+        self.frame.add_child(axis_y)
+        self.frame.add_child(axis_z)
         
         # 6. Αυτόματη τοποθέτηση των Γραμμάτων (Labels) στις άκρες των αξόνων
         # Γράμμα X (στο τέλος του άξονα X)
@@ -81,8 +85,8 @@ class Transparent3DCubeApp:
         lx2 = pi3d.Lines(vertices=[[Lx+0.05, -0.05, 0], [Lx+0.15, 0.05, 0]], line_width=3, closed=False)
         lx1.set_material((1.0, 0.2, 0.2))
         lx2.set_material((1.0, 0.2, 0.2))
-        self.cube.add_child(lx1)
-        self.cube.add_child(lx2)
+        self.frame.add_child(lx1)
+        self.frame.add_child(lx2)
         
         # Γράμμα Y (στο τέλος του άξονα Y)
         ly1 = pi3d.Lines(vertices=[[-0.04, Ly+0.12, 0], [0, Ly+0.07, 0]], line_width=3, closed=False)
@@ -91,9 +95,9 @@ class Transparent3DCubeApp:
         ly1.set_material((0.2, 1.0, 0.2))
         ly2.set_material((0.2, 1.0, 0.2))
         ly3.set_material((0.2, 1.0, 0.2))
-        self.cube.add_child(ly1)
-        self.cube.add_child(ly2)
-        self.cube.add_child(ly3)
+        self.frame.add_child(ly1)
+        self.frame.add_child(ly2)
+        self.frame.add_child(ly3)
         
         # Γράμμα Z (στο τέλος του άξονα Z)
         lz1 = pi3d.Lines(vertices=[[-0.04, 0.04, Lz+0.05], [0.04, 0.04, Lz+0.05]], line_width=3, closed=False)
@@ -102,9 +106,9 @@ class Transparent3DCubeApp:
         lz1.set_material((0.2, 0.2, 1.0))
         lz2.set_material((0.2, 0.2, 1.0))
         lz3.set_material((0.2, 0.2, 1.0))
-        self.cube.add_child(lz1)
-        self.cube.add_child(lz2)
-        self.cube.add_child(lz3)
+        self.frame.add_child(lz1)
+        self.frame.add_child(lz2)
+        self.frame.add_child(lz3)
         
         # 7. Στήσιμο του Tkinter GUI Canvas
         self.canvas = tk.Canvas(root, width=500, height=500, bg="black")
@@ -112,8 +116,13 @@ class Transparent3DCubeApp:
         
         self.canvas_image_id = self.canvas.create_image(0, 0, anchor=tk.NW)
         self.tk_image = None
-        
+
+        self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.render_loop()
+
+    def close(self):
+        self.pi3d_display.destroy()
+        self.root.destroy()
 
     def render_loop(self):
         if self.pi3d_display.loop_running():
@@ -122,10 +131,13 @@ class Transparent3DCubeApp:
             else:
                 orientation = self.sense.get_orientation()
             
-            self.cube.rotateToZ(orientation['pitch'])
-            self.cube.rotateToY(orientation['yaw'])
-            self.cube.rotateToX(orientation['roll'])
-            
+            for shape in (self.frame, self.cube):
+                shape.rotateToZ(orientation['pitch'])
+                shape.rotateToY(orientation['yaw'])
+                shape.rotateToX(orientation['roll'])
+
+            # Πρώτα οι γραμμές, μετά το διάφανο σώμα
+            self.frame.draw(self.shader)
             self.cube.draw(self.shader)
             
             grid_screenshot = pi3d.screenshot()
@@ -134,6 +146,8 @@ class Transparent3DCubeApp:
             self.canvas.itemconfig(self.canvas_image_id, image=self.tk_image)
             
             self.root.after(15, self.render_loop)
+        else:
+            self.close()
 
 if __name__ == "__main__":
     window = tk.Tk()
