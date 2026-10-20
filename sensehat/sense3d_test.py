@@ -240,7 +240,7 @@ class Transparent3DCubeApp:
         self.scale_vars = {}
         for row, (name, angle_title) in enumerate(self.angle_titles.items(), start=1):
             var = tk.IntVar(value=0)
-            value_label = tk.Label(control_frame, text="   0°", width=5, anchor=tk.E, font="TkFixedFont")
+            value_label = tk.Label(control_frame, text="   0°", width=5, anchor=tk.E)
             tk.Label(control_frame, text=angle_title, anchor=tk.W).grid(row=row, column=0, sticky=tk.W, padx=(5, 2))
             tk.Scale(control_frame, variable=var, from_=-180, to=180, orient=tk.HORIZONTAL,
                      showvalue=False, width=10, sliderlength=15, borderwidth=1
@@ -256,8 +256,8 @@ class Transparent3DCubeApp:
         self.angle_vars = {}
         for name, title in self.angle_titles.items():
             var = tk.StringVar(value=f"{title}: ---")
-            tk.Label(info_frame, textvariable=var, width=15, anchor=tk.W,
-                     font="TkFixedFont").pack(side=tk.LEFT, expand=True, padx=5, pady=2)
+            tk.Label(info_frame, textvariable=var, width=11, anchor=tk.W,
+                     font="TkDefaultFont").pack(side=tk.LEFT, expand=True, padx=5, pady=2)
             self.angle_vars[name] = var
 
         self.canvas.pack(padx=5, pady=5, fill=tk.BOTH, expand=True)
@@ -332,7 +332,7 @@ class Transparent3DCubeApp:
             self.pitch_node.rotateToZ(orientation['pitch'])
             self.yaw_node.rotateToY(orientation['yaw'])
             for name, var in self.angle_vars.items():
-                var.set(f"{self.angle_titles[name]}: {orientation[name]:3.1f}°")
+                var.set(f"{self.angle_titles[name]}: {orientation[name]:4.1f}°")
 
             self.offscreen.begin()
             self.yaw_node.draw(self.shader, camera=self.camera)
