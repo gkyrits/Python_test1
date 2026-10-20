@@ -36,13 +36,24 @@ class Transparent3DCubeApp:
         self.shader = pi3d.Shader("mat_flat")
         
         # 3. Δημιουργία του Cuboid με τις ανεξάρτητες διαστάσεις
-        self.cube = pi3d.Cuboid(w=MY_W, h=MY_H, d=MY_D, z=3.0)
-        self.cube.set_material((0.3, 0.3, 0.3)) 
+        self.cube = pi3d.Cuboid(w=MY_W, h=MY_H, d=MY_D)
+        self.cube.set_material((0.3, 0.3, 0.3))
         self.cube.set_alpha(0.3)
 
         # Αόρατος γονέας για ακμές/άξονες/γράμματα: σχεδιάζεται πριν το διάφανο
         # cuboid ώστε οι γραμμές πίσω/μέσα από τις έδρες να μην κόβονται από το depth buffer
-        self.frame = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], z=3.0)
+        self.frame = self._empty_node()
+
+        # Gimbal: το pi3d εφαρμόζει πάντα Y->X->Z σε ένα Shape, ενώ η Sense HAT
+        # θέλει roll->pitch->yaw. Κάθε κόμβος κάνει μία περιστροφή και ο γονέας
+        # εφαρμόζεται μετά το παιδί: roll (X) -> pitch (Z) -> yaw (Y) + μετατόπιση
+        self.yaw_node = self._empty_node(z=3.0)
+        self.pitch_node = self._empty_node()
+        self.roll_node = self._empty_node()
+        self.yaw_node.add_child(self.pitch_node)
+        self.pitch_node.add_child(self.roll_node)
+        self.roll_node.add_child(self.frame)  # πρώτα οι γραμμές,
+        self.roll_node.add_child(self.cube)   # μετά το διάφανο σώμα
 
         # 4. Αυτόματος υπολογισμός των 12 ακμών με βάση τα xw, yh, zd
         edges_vertices = [
@@ -120,6 +131,11 @@ class Transparent3DCubeApp:
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.render_loop()
 
+    @staticmethod
+    def _empty_node(z=0.0):
+        # Γραμμή μηδενικού μήκους: δεν φαίνεται, χρησιμεύει μόνο ως γονέας
+        return pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], z=z)
+
     def close(self):
         self.pi3d_display.destroy()
         self.root.destroy()
@@ -131,14 +147,11 @@ class Transparent3DCubeApp:
             else:
                 orientation = self.sense.get_orientation()
             
-            for shape in (self.frame, self.cube):
-                shape.rotateToZ(orientation['pitch'])
-                shape.rotateToY(orientation['yaw'])
-                shape.rotateToX(orientation['roll'])
+            self.roll_node.rotateToX(orientation['roll'])
+            self.pitch_node.rotateToZ(orientation['pitch'])
+            self.yaw_node.rotateToY(orientation['yaw'])
 
-            # Πρώτα οι γραμμές, μετά το διάφανο σώμα
-            self.frame.draw(self.shader)
-            self.cube.draw(self.shader)
+            self.yaw_node.draw(self.shader)
             
             grid_screenshot = pi3d.screenshot()
             pil_img = Image.fromarray(grid_screenshot)
