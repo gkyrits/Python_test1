@@ -149,7 +149,7 @@ class Transparent3DCubeApp:
 
         # Gimbal: το pi3d εφαρμόζει πάντα Y->X->Z σε ένα Shape, ενώ η Sense HAT
         # θέλει roll->pitch->yaw. Κάθε κόμβος κάνει μία περιστροφή και ο γονέας
-        # εφαρμόζεται μετά το παιδί: roll (X) -> pitch (Z) -> yaw (Y) + μετατόπιση
+        # εφαρμόζεται μετά το παιδί: roll (pi3d X) -> pitch (pi3d Z) -> yaw (pi3d Y) + μετατόπιση
         self.yaw_node = self._empty_node(z=3.0)
         self.pitch_node = self._empty_node()
         self.roll_node = self._empty_node()
@@ -183,10 +183,13 @@ class Transparent3DCubeApp:
         axis_x = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [Lx, 0.0, 0.0]], line_width=4, closed=False)
         axis_x.set_material((1.0, 0.0, 0.0)) # Κόκκινο
         
-        axis_y = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, Ly, 0.0]], line_width=4, closed=False)
+        # Ονόματα αξόνων όπως της Sense HAT: X = roll, Y = pitch, Z = yaw.
+        # Στο pi3d ο Y είναι ο κάθετος άξονας και ο Z το βάθος, οπότε ο άξονας Y
+        # της Sense HAT σχεδιάζεται στο βάθος (pi3d Z) και ο Z κάθετα (pi3d Y)
+        axis_y = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, 0.0, Lz]], line_width=4, closed=False)
         axis_y.set_material((0.0, 1.0, 0.0)) # Πράσινο
-        
-        axis_z = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, 0.0, Lz]], line_width=4, closed=False)
+
+        axis_z = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, Ly, 0.0]], line_width=4, closed=False)
         axis_z.set_material((0.0, 0.0, 1.0)) # Μπλε
         
         self.frame.add_child(axis_x)
@@ -202,10 +205,10 @@ class Transparent3DCubeApp:
         self.frame.add_child(lx1)
         self.frame.add_child(lx2)
         
-        # Γράμμα Y (στο τέλος του άξονα Y)
-        ly1 = pi3d.Lines(vertices=[[-0.04, Ly+0.12, 0], [0, Ly+0.07, 0]], line_width=3, closed=False)
-        ly2 = pi3d.Lines(vertices=[[0.04, Ly+0.12, 0], [0, Ly+0.07, 0]], line_width=3, closed=False)
-        ly3 = pi3d.Lines(vertices=[[0, Ly+0.07, 0], [0, Ly+0.02, 0]], line_width=3, closed=False)
+        # Γράμμα Y (στο τέλος του άξονα Y, στο βάθος)
+        ly1 = pi3d.Lines(vertices=[[-0.04, 0.06, Lz+0.05], [0, 0.01, Lz+0.05]], line_width=3, closed=False)
+        ly2 = pi3d.Lines(vertices=[[0.04, 0.06, Lz+0.05], [0, 0.01, Lz+0.05]], line_width=3, closed=False)
+        ly3 = pi3d.Lines(vertices=[[0, 0.01, Lz+0.05], [0, -0.04, Lz+0.05]], line_width=3, closed=False)
         ly1.set_material((0.2, 1.0, 0.2))
         ly2.set_material((0.2, 1.0, 0.2))
         ly3.set_material((0.2, 1.0, 0.2))
@@ -213,10 +216,10 @@ class Transparent3DCubeApp:
         self.frame.add_child(ly2)
         self.frame.add_child(ly3)
         
-        # Γράμμα Z (στο τέλος του άξονα Z)
-        lz1 = pi3d.Lines(vertices=[[-0.04, 0.04, Lz+0.05], [0.04, 0.04, Lz+0.05]], line_width=3, closed=False)
-        lz2 = pi3d.Lines(vertices=[[0.04, 0.04, Lz+0.05], [-0.04, -0.04, Lz+0.05]], line_width=3, closed=False)
-        lz3 = pi3d.Lines(vertices=[[-0.04, -0.04, Lz+0.05], [0.04, -0.04, Lz+0.05]], line_width=3, closed=False)
+        # Γράμμα Z (στο τέλος του άξονα Z, πάνω)
+        lz1 = pi3d.Lines(vertices=[[-0.04, Ly+0.12, 0], [0.04, Ly+0.12, 0]], line_width=3, closed=False)
+        lz2 = pi3d.Lines(vertices=[[0.04, Ly+0.12, 0], [-0.04, Ly+0.02, 0]], line_width=3, closed=False)
+        lz3 = pi3d.Lines(vertices=[[-0.04, Ly+0.02, 0], [0.04, Ly+0.02, 0]], line_width=3, closed=False)
         lz1.set_material((0.2, 0.2, 1.0))
         lz2.set_material((0.2, 0.2, 1.0))
         lz3.set_material((0.2, 0.2, 1.0))
@@ -240,7 +243,7 @@ class Transparent3DCubeApp:
             self.tool_buttons[text] = button
         self.canvas = tk.Canvas(shape_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT, bg=CANVAS_BG_COLOR, highlightthickness=0)
 
-        self.angle_titles = {"roll": "Roll (X)", "pitch": "Pitch (Z)", "yaw": "Yaw (Y)"}
+        self.angle_titles = {"roll": "Roll (X)", "pitch": "Pitch (Y)", "yaw": "Yaw (Z)"}
 
         # 9. Πλαίσιο με sliders: τιμές προσανατολισμού χωρίς Sense HAT, αλλιώς offsets
         # (pack πρώτο με side=BOTTOM ώστε να βρίσκεται κάτω από το info_frame)
