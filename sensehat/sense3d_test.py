@@ -225,42 +225,53 @@ class Transparent3DCubeApp:
         
         # 7. Στήσιμο του Tkinter GUI Canvas
         # Ο canvas ακολουθεί το μέγεθος του παραθύρου, και το pi3d display τον canvas
-        self.canvas = tk.Canvas(root, width=CANVAS_WIDTH, height=CANVAS_HEIGHT, bg=CANVAS_BG_COLOR, highlightthickness=0)
+        # shape_frame: αριστερά το tool_frame με τα κουμπιά, δεξιά ο canvas
+        # (pack στο τέλος, μετά τα πλαίσια του κάτω μέρους, ώστε να παίρνει τον χώρο που μένει)
+        shape_frame = tk.Frame(root)
+        tool_frame = tk.Frame(shape_frame)
+        tool_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 2))
+        self.tool_buttons = {}
+        for text in ("M", "R", "F"):
+            button = tk.Button(tool_frame, text=text, width=2, padx=0, pady=0)
+            button.pack(side=tk.TOP, pady=1)
+            self.tool_buttons[text] = button
+        self.canvas = tk.Canvas(shape_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT, bg=CANVAS_BG_COLOR, highlightthickness=0)
 
         self.angle_titles = {"roll": "Roll (X)", "pitch": "Pitch (Z)", "yaw": "Yaw (Y)"}
 
         # 9. Πλαίσιο με sliders: τιμές προσανατολισμού χωρίς Sense HAT, αλλιώς offsets
         # (pack πρώτο με side=BOTTOM ώστε να βρίσκεται κάτω από το info_frame)
         control_frame = tk.Frame(root, relief=tk.SUNKEN, borderwidth=2)
-        control_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=(0, 5))
+        control_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
         control_frame.columnconfigure(1, weight=1)
         title = "Orientation values" if self.sense is None else "Orientation offsets"
         tk.Label(control_frame, text=title, font="TkDefaultFont 9 bold").grid(
-            row=0, column=0, columnspan=3, sticky=tk.W, padx=5)
+            row=0, column=0, columnspan=3, sticky=tk.W, padx=2)
         self.scale_vars = {}
         for row, (name, angle_title) in enumerate(self.angle_titles.items(), start=1):
             var = tk.IntVar(value=0)
             value_label = tk.Label(control_frame, text="   0°", width=5, anchor=tk.E)
-            tk.Label(control_frame, text=angle_title, anchor=tk.W).grid(row=row, column=0, sticky=tk.W, padx=(5, 2))
+            tk.Label(control_frame, text=angle_title, anchor=tk.W).grid(row=row, column=0, sticky=tk.W, padx=2)
             tk.Scale(control_frame, variable=var, from_=-180, to=180, orient=tk.HORIZONTAL,
                      showvalue=False, width=10, sliderlength=15, borderwidth=1
                      ).grid(row=row, column=1, sticky=tk.EW, padx=2)
             var.trace_add("write", lambda *_, v=var, lbl=value_label: lbl.config(text=f"{v.get():4d}°"))
-            value_label.grid(row=row, column=2, padx=(2, 5))
+            value_label.grid(row=row, column=2, padx=2)
             self.scale_vars[name] = var
 
         # 8. Πλαίσιο με τις τρέχουσες τιμές Roll / Pitch / Yaw κάτω από τον canvas
         # (pack πριν τον canvas, ώστε να μένει ορατό όταν μικραίνει το παράθυρο)
         info_frame = tk.Frame(root, relief=tk.SUNKEN, borderwidth=2)
-        info_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=(0, 5))
+        info_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
         self.angle_vars = {}
         for name, title in self.angle_titles.items():
             var = tk.StringVar(value=f"{title}: ---")
             tk.Label(info_frame, textvariable=var, width=12, anchor=tk.W,
-                     font="TkDefaultFont").pack(side=tk.LEFT, expand=True, padx=5, pady=2)
+                     font="TkDefaultFont").pack(side=tk.LEFT, expand=True, padx=2, pady=1)
             self.angle_vars[name] = var
 
-        self.canvas.pack(padx=5, pady=5, fill=tk.BOTH, expand=True)
+        shape_frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.view_size = (CANVAS_WIDTH, CANVAS_HEIGHT)
         self.canvas.bind("<Configure>", self._on_canvas_resize)
         # Η σκηνή σχεδιάζεται σε offscreen framebuffer με το μέγεθος του canvas,
