@@ -363,7 +363,8 @@ class Transparent3DCubeApp:
                 orientation = {name: self._wrap_angle(self.sensor[name] + offset)
                                for name, offset in orientation.items()}
             
-            self.roll_node.rotateToX(orientation['roll'])
+            # Ο άξονας X του pi3d έχει αντίθετη φορά περιστροφής από το roll της Sense HAT
+            self.roll_node.rotateToX(-orientation['roll'])
             self.pitch_node.rotateToZ(orientation['pitch'])
             self.yaw_node.rotateToY(orientation['yaw'])
             for name, var in self.angle_vars.items():
