@@ -238,8 +238,8 @@ class Transparent3DCubeApp:
         # R = reset offsets, C = calibrate (το σχήμα γίνεται 0,0,0)
         tool_commands = {"M": None, "R": self.reset_offsets, "C": self.calibrate}
         for text, command in tool_commands.items():
-            button = tk.Button(tool_frame, text=text, width=2, padx=0, pady=0, command=command)
-            button.pack(side=tk.TOP, pady=1)
+            button = tk.Button(tool_frame, text=text, width=2, height=2, padx=0, pady=0, command=command)
+            button.pack(side=tk.TOP, pady=(10, 0))
             self.tool_buttons[text] = button
         self.canvas = tk.Canvas(shape_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT, bg=CANVAS_BG_COLOR, highlightthickness=0)
 
