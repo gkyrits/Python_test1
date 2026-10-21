@@ -118,7 +118,8 @@ class Transparent3DCubeApp:
             self.sense.clear()
         else:
             self.sense = None
-        
+        self.sensor = None  # τελευταία ανάγνωση του αισθητήρα (για το calibrate)
+
         # 1. ΟΡΙΣΤΕ ΕΔΩ ΤΙΣ ΑΝΕΞΑΡΤΗΤΕΣ ΔΙΑΣΤΑΣΕΙΣ (Width, Height, Depth)
         MY_W = 1.6  # Μήκος (Άξονας X)
         MY_H = 0.2  # Ύψος (Άξονας Y)
@@ -231,8 +232,10 @@ class Transparent3DCubeApp:
         tool_frame = tk.Frame(shape_frame)
         tool_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 2))
         self.tool_buttons = {}
-        for text in ("M", "R", "F"):
-            button = tk.Button(tool_frame, text=text, width=2, padx=0, pady=0)
+        # R = reset offsets, C = calibrate (το σχήμα γίνεται 0,0,0)
+        tool_commands = {"M": None, "R": self.reset_offsets, "C": self.calibrate}
+        for text, command in tool_commands.items():
+            button = tk.Button(tool_frame, text=text, width=2, padx=0, pady=0, command=command)
             button.pack(side=tk.TOP, pady=1)
             self.tool_buttons[text] = button
         self.canvas = tk.Canvas(shape_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT, bg=CANVAS_BG_COLOR, highlightthickness=0)
@@ -249,13 +252,14 @@ class Transparent3DCubeApp:
             row=0, column=0, columnspan=3, sticky=tk.W, padx=2)
         self.scale_vars = {}
         for row, (name, angle_title) in enumerate(self.angle_titles.items(), start=1):
-            var = tk.IntVar(value=0)
-            value_label = tk.Label(control_frame, text="   0°", width=5, anchor=tk.E)
+            # Βήμα 0.1° ώστε το calibrate να φτάνει το σχήμα πρακτικά ακριβώς στο 0
+            var = tk.DoubleVar(value=0.0)
+            value_label = tk.Label(control_frame, text="0.0°", width=7, anchor=tk.E)
             tk.Label(control_frame, text=angle_title, anchor=tk.W).grid(row=row, column=0, sticky=tk.W, padx=2)
-            tk.Scale(control_frame, variable=var, from_=-180, to=180, orient=tk.HORIZONTAL,
+            tk.Scale(control_frame, variable=var, from_=-180, to=180, resolution=0.1, orient=tk.HORIZONTAL,
                      showvalue=False, width=10, sliderlength=15, borderwidth=1
                      ).grid(row=row, column=1, sticky=tk.EW, padx=2)
-            var.trace_add("write", lambda *_, v=var, lbl=value_label: lbl.config(text=f"{v.get():4d}°"))
+            var.trace_add("write", lambda *_, v=var, lbl=value_label: lbl.config(text=f"{round(v.get(), 1) + 0.0:.1f}°"))
             value_label.grid(row=row, column=2, padx=2)
             self.scale_vars[name] = var
 
@@ -305,6 +309,26 @@ class Transparent3DCubeApp:
         except Exception as e:
             print("Could not hide pi3d window:", e)
 
+    @staticmethod
+    def _wrap_angle(angle):
+        # Γωνία στο διάστημα -180..180 (ίδιο με το εύρος των sliders)
+        return (angle + 180.0) % 360.0 - 180.0
+
+    def calibrate(self):
+        # Offsets = -(τιμές αισθητήρα), ώστε Roll, Pitch, Yaw του σχήματος = 0, 0, 0
+        if self.sense is None:
+            self.reset_offsets()
+            return
+        if self.sensor is None:
+            self.sensor = self.sense.get_orientation()
+        for name, var in self.scale_vars.items():
+            var.set(self._wrap_angle(-self.sensor[name]))
+
+    def reset_offsets(self):
+        # Offsets = 0: το σχήμα ακολουθεί ξανά ακριβώς τον αισθητήρα
+        for var in self.scale_vars.values():
+            var.set(0.0)
+
     def _on_canvas_resize(self, event):
         self.view_size = (max(event.width, 1), max(event.height, 1))
 
@@ -335,15 +359,15 @@ class Transparent3DCubeApp:
             # Χωρίς Sense HAT οι sliders δίνουν τις τιμές, αλλιώς προστίθενται ως offset
             orientation = {name: var.get() for name, var in self.scale_vars.items()}
             if self.sense is not None:
-                sensor = self.sense.get_orientation()
-                orientation = {name: (sensor[name] + offset) % 360
+                self.sensor = self.sense.get_orientation()
+                orientation = {name: self._wrap_angle(self.sensor[name] + offset)
                                for name, offset in orientation.items()}
             
             self.roll_node.rotateToX(orientation['roll'])
             self.pitch_node.rotateToZ(orientation['pitch'])
             self.yaw_node.rotateToY(orientation['yaw'])
             for name, var in self.angle_vars.items():
-                var.set(f"{self.angle_titles[name]}: {orientation[name]:4.1f}°")
+                var.set(f"{self.angle_titles[name]}: {round(orientation[name], 1) + 0.0:4.1f}°")
 
             self.offscreen.begin()
             self.yaw_node.draw(self.shader, camera=self.camera)
