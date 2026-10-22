@@ -1,7 +1,9 @@
 import ctypes
+import math
 import os
 import sys
 import tkinter as tk
+import numpy as np
 from PIL import Image, ImageTk
 
 try:
@@ -11,6 +13,24 @@ except ImportError:
         from sense_emu import SenseHat
     except ImportError:
         SenseHat = None
+
+
+def euler_to_matrix(angles):
+    # Πίνακας περιστροφής από roll/pitch/yaw (μοίρες), με τη σύμβαση της Sense HAT
+    # (RTIMULib, aerospace Z-Y-X): R = Rz(yaw) · Ry(pitch) · Rx(roll)
+    r, p, y = (math.radians(angles[name]) for name in ("roll", "pitch", "yaw"))
+    cr, sr, cp, sp, cy, sy = math.cos(r), math.sin(r), math.cos(p), math.sin(p), math.cos(y), math.sin(y)
+    return np.array([[cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
+                     [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
+                     [-sp,     cp * sr,                cp * cr]])
+
+
+def matrix_to_euler(m):
+    # Αντίστροφο του euler_to_matrix: roll, yaw στο -180..180, pitch στο -90..90
+    pitch = math.asin(max(-1.0, min(1.0, -m[2, 0])))
+    roll = math.atan2(m[2, 1], m[2, 2])
+    yaw = math.atan2(m[1, 0], m[0, 0])
+    return {"roll": math.degrees(roll), "pitch": math.degrees(pitch), "yaw": math.degrees(yaw)}
 
 
 def _setup_sdl2_angle():
@@ -312,20 +332,18 @@ class Transparent3DCubeApp:
         except Exception as e:
             print("Could not hide pi3d window:", e)
 
-    @staticmethod
-    def _wrap_angle(angle):
-        # Γωνία στο διάστημα -180..180 (ίδιο με το εύρος των sliders)
-        return (angle + 180.0) % 360.0 - 180.0
-
     def calibrate(self):
-        # Offsets = -(τιμές αισθητήρα), ώστε Roll, Pitch, Yaw του σχήματος = 0, 0, 0
+        # Offset = η αντίστροφη περιστροφή της τρέχουσας θέσης του αισθητήρα, ώστε
+        # Roll, Pitch, Yaw του σχήματος = 0, 0, 0 και οι επόμενες κινήσεις να
+        # μετριούνται σχετικά με αυτή τη θέση (σωστά και όταν η πλακέτα είναι γερμένη)
         if self.sense is None:
             self.reset_offsets()
             return
         if self.sensor is None:
             self.sensor = self.sense.get_orientation()
+        offsets = matrix_to_euler(euler_to_matrix(self.sensor).T)
         for name, var in self.scale_vars.items():
-            var.set(self._wrap_angle(-self.sensor[name]))
+            var.set(offsets[name])
 
     def reset_offsets(self):
         # Offsets = 0: το σχήμα ακολουθεί ξανά ακριβώς τον αισθητήρα
@@ -359,12 +377,12 @@ class Transparent3DCubeApp:
         if self.view_size != self.offscreen_size:
             self._resize_view(*self.view_size)
         if self.pi3d_display.loop_running():
-            # Χωρίς Sense HAT οι sliders δίνουν τις τιμές, αλλιώς προστίθενται ως offset
+            # Χωρίς Sense HAT οι sliders δίνουν τις τιμές, αλλιώς είναι μια περιστροφή
+            # offset που εφαρμόζεται πριν από αυτή του αισθητήρα: R = R_offset · R_sensor
             orientation = {name: var.get() for name, var in self.scale_vars.items()}
             if self.sense is not None:
                 self.sensor = self.sense.get_orientation()
-                orientation = {name: self._wrap_angle(self.sensor[name] + offset)
-                               for name, offset in orientation.items()}
+                orientation = matrix_to_euler(euler_to_matrix(orientation) @ euler_to_matrix(self.sensor))
             
             # Ο άξονας X του pi3d έχει αντίθετη φορά περιστροφής από το roll της Sense HAT
             self.roll_node.rotateToX(-orientation['roll'])
