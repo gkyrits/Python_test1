@@ -644,9 +644,11 @@ class Gui:
         #    print(info_rng)
         info_rng=forecast_find_day(info,day)
         print(info_rng)
+        nslots=info_rng[1]-info_rng[0] # 8 normally, 9 on DST-end day
+        self.smlimg=[None]*nslots
         for row in range(7): # 7 rows
             parent.rowconfigure(row, weight=1) #resize grid height
-        for col in range(9): # 9 rows
+        for col in range(nslots+1): # label column + one per slot
             parent.columnconfigure(col, weight=1) #resize grid height            
         infodate=info['List'][info_rng[0]]['Date']
         #get epoch time
@@ -662,7 +664,7 @@ class Gui:
             daytxt= tomorrow_lst[lang]+' '+daytxt
         else:
             daytxt='(+'+str(rel_day)+') '+daytxt
-        tk.Label(parent, text=daytxt, bg=prnt_bg, fg=pressCol, font="Arial 8 bold").grid(row=0, columnspan=9)
+        tk.Label(parent, text=daytxt, bg=prnt_bg, fg=pressCol, font="Arial 8 bold").grid(row=0, columnspan=nslots+1)
         tk.Label(parent, text='Hr',     bg=prnt_bg, font="Arial 8").grid(row=1, sticky=tk.W)
         #tk.Label(parent, text='Icon',     bg=prnt_bg, font="Arial 8").grid(row=2, sticky=tk.W)
         tk.Label(parent, text='°C',   bg=prnt_bg, font="Arial 8").grid(row=3, sticky=tk.W)
