@@ -165,7 +165,7 @@ class Transparent3DCubeApp:
         self.north_var = tk.DoubleVar(value=0.0)
         north_label = tk.Label(compass_control, text="0.0°", width=7, anchor=tk.E)
         tk.Label(compass_control, text="North", anchor=tk.W).grid(row=1, column=0, sticky=tk.W, padx=2)
-        tk.Scale(compass_control, variable=self.north_var, from_=0, to=360, resolution=0.1,
+        tk.Scale(compass_control, variable=self.north_var, from_=-180, to=180, resolution=0.1,
                  orient=tk.HORIZONTAL, showvalue=False, width=10, sliderlength=15, borderwidth=1
                  ).grid(row=1, column=1, sticky=tk.EW, padx=2)
         self.north_var.trace_add("write", lambda *_: north_label.config(
