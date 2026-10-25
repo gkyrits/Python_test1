@@ -186,10 +186,16 @@ class Transparent3DCubeApp:
         return self.notebook.nametowidget(self.notebook.select())
 
     def _on_tab_changed(self, event):
-        # Το sense.get_compass() αφήνει ενεργό μόνο το μαγνητόμετρο στο IMU, οπότε
-        # στο Gyroscope ξαναενεργοποιούνται gyro + accel για σωστό get_orientation()
-        if self.sense is not None and self._selected_tab() is self.gyro_tab:
-            self.sense.set_imu_config(True, True, True)
+        # Αισθητήρες του IMU ανά tab: set_imu_config(compass, gyroscope, accelerometer)
+        # Compass:   μόνο μαγνητόμετρο (όπως το κάνει και το sense.get_compass())
+        # Gyroscope: gyroscope + accelerometer, χωρίς μαγνητόμετρο
+        if self.sense is None:
+            return
+        tab = self._selected_tab()
+        if tab is self.compass_tab:
+            self.sense.set_imu_config(True, False, False)
+        elif tab is self.gyro_tab:
+            self.sense.set_imu_config(False, True, True)
 
     def render_loop(self):
         # Σχεδιάζει μόνο όταν φαίνεται το tab Gyroscope (λιγότερη CPU, και δεν
