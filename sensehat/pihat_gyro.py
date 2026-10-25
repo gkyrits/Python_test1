@@ -135,15 +135,33 @@ class Transparent3DCubeApp:
         self.canvas_image_id = self.canvas.create_image(0, 0, anchor=tk.NW)
         self.tk_image = None
 
-        # 5. Tab Compass: info_frame κάτω (pack πρώτο), compass_frame με τον canvas από πάνω
-        self.heading = None  # τελευταία τιμή του sense.get_compass()
+        # 5. Tab Compass: από κάτω προς τα πάνω (pack με side=BOTTOM) το πλαίσιο με τον
+        # slider, το info_frame, και από πάνω το compass_frame με τον canvas
+        self.heading = None  # τελική τιμή North (αισθητήρας + offset, ή ο slider)
+        # Slider North: τιμή χωρίς Sense HAT, αλλιώς offset στο sense.get_compass()
+        compass_control = tk.Frame(compass_tab, relief=tk.SUNKEN, borderwidth=2)
+        compass_control.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
+        compass_control.columnconfigure(1, weight=1)
+        title = "Compass value" if self.sense is None else "Compass offset"
+        tk.Label(compass_control, text=title, font="TkDefaultFont 9 bold").grid(
+            row=0, column=0, columnspan=3, sticky=tk.W, padx=2)
+        self.north_var = tk.DoubleVar(value=0.0)
+        north_label = tk.Label(compass_control, text="0.0°", width=7, anchor=tk.E)
+        tk.Label(compass_control, text="North", anchor=tk.W).grid(row=1, column=0, sticky=tk.W, padx=2)
+        tk.Scale(compass_control, variable=self.north_var, from_=0, to=360, resolution=0.1,
+                 orient=tk.HORIZONTAL, showvalue=False, width=10, sliderlength=15, borderwidth=1
+                 ).grid(row=1, column=1, sticky=tk.EW, padx=2)
+        self.north_var.trace_add("write", lambda *_: north_label.config(
+            text=f"{round(self.north_var.get(), 1) + 0.0:.1f}°"))
+        north_label.grid(row=1, column=2, padx=2)
+
         compass_info = tk.Frame(compass_tab, relief=tk.SUNKEN, borderwidth=2)
         compass_info.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
         self.compass_vars = {}
         for name in ("north", "x", "y", "z"):
             var = tk.StringVar()
-            tk.Label(compass_info, textvariable=var, width=12, anchor=tk.W,
-                     font="TkDefaultFont").pack(side=tk.LEFT, expand=True, padx=2, pady=1)
+            tk.Label(compass_info, textvariable=var, anchor=tk.W,
+                     font="TkDefaultFont").pack(side=tk.LEFT, padx=(4, 6), pady=0)
             self.compass_vars[name] = var
         self._show_compass_values(None, None)
         compass_frame = tk.Frame(compass_tab)
@@ -195,7 +213,7 @@ class Transparent3DCubeApp:
         if tab is self.compass_tab:
             self.sense.set_imu_config(True, False, False)
         elif tab is self.gyro_tab:
-            self.sense.set_imu_config(False, True, True)
+            self.sense.set_imu_config(True, True, True)
 
     def render_loop(self):
         # Σχεδιάζει μόνο όταν φαίνεται το tab Gyroscope (λιγότερη CPU, και δεν
@@ -206,17 +224,23 @@ class Transparent3DCubeApp:
         self.root.after(15, self.render_loop)
 
     def compass_loop(self):
-        if self.sense is not None and self._selected_tab() is self.compass_tab:
-            self.heading = self.sense.get_compass()
-            self._show_compass_values(self.heading, self.sense.get_compass_raw())
+        # Χωρίς Sense HAT ο slider δίνει την τιμή North, αλλιώς προστίθεται ως offset
+        if self._selected_tab() is self.compass_tab:
+            north = self.north_var.get()
+            raw = None
+            if self.sense is not None:
+                north += self.sense.get_compass()
+                raw = self.sense.get_compass_raw()
+            self.heading = north % 360.0
+            self._show_compass_values(self.heading, raw)
             self._draw_compass()
         self.root.after(100, self.compass_loop)
 
     def _show_compass_values(self, heading, raw):
-        self.compass_vars["north"].set("North: ---" if heading is None else f"North: {heading:5.1f}°")
+        self.compass_vars["north"].set("North: ---" if heading is None else f"North: {round(heading, 1) % 360.0:.1f}°")
         for axis in ("x", "y", "z"):
-            value = "---" if raw is None else f"{raw[axis]:6.1f} µT"
-            self.compass_vars[axis].set(f"Raw {axis.upper()}: {value}")
+            value = "---" if raw is None else f"{raw[axis]:.1f} µT"
+            self.compass_vars[axis].set(f"{axis.upper()}: {value}")
 
     def _draw_compass(self):
         # Πυξίδα: η ροδέλα στρέφεται ώστε το N να δείχνει τον πραγματικό βορρά,
