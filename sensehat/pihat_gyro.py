@@ -157,13 +157,19 @@ class Transparent3DCubeApp:
 
         compass_info = tk.Frame(compass_tab, relief=tk.SUNKEN, borderwidth=2)
         compass_info.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
+        # Γραμμή 1: North + raw X/Y/Z. Γραμμή 2 (διάγνωση): ένταση πεδίου και
+        # heading υπολογισμένο απευθείας από τα raw X/Y (χωρίς το fusion του RTIMULib)
         self.compass_vars = {}
-        for name in ("north", "x", "y", "z"):
-            var = tk.StringVar()
-            tk.Label(compass_info, textvariable=var, anchor=tk.W,
-                     font="TkDefaultFont").pack(side=tk.LEFT, padx=(4, 6), pady=0)
-            self.compass_vars[name] = var
+        for names in (("north", "x", "y", "z"), ("field", "raw_heading")):
+            row = tk.Frame(compass_info)
+            row.pack(fill=tk.X)
+            for name in names:
+                var = tk.StringVar()
+                tk.Label(row, textvariable=var, anchor=tk.W,
+                         font="TkDefaultFont").pack(side=tk.LEFT, padx=(4, 6), pady=0)
+                self.compass_vars[name] = var
         self._show_compass_values(None, None)
+        self.compass_ticks = 0
         compass_frame = tk.Frame(compass_tab)
         compass_frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
         self.compass_canvas = tk.Canvas(compass_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT,
@@ -224,7 +230,9 @@ class Transparent3DCubeApp:
         self.root.after(15, self.render_loop)
 
     def compass_loop(self):
-        # Χωρίς Sense HAT ο slider δίνει την τιμή North, αλλιώς προστίθεται ως offset
+        # Χωρίς Sense HAT ο slider δίνει την τιμή North, αλλιώς προστίθεται ως offset.
+        # Ανάγνωση κάθε 20 ms (το fusion του RTIMULib συγκλίνει με κάθε ανάγνωση),
+        # αλλά ενημέρωση οθόνης κάθε 5η φορά (100 ms) για λιγότερη CPU
         if self._selected_tab() is self.compass_tab:
             north = self.north_var.get()
             raw = None
@@ -232,15 +240,26 @@ class Transparent3DCubeApp:
                 north += self.sense.get_compass()
                 raw = self.sense.get_compass_raw()
             self.heading = north % 360.0
-            self._show_compass_values(self.heading, raw)
-            self._draw_compass()
-        self.root.after(100, self.compass_loop)
+            self.compass_ticks += 1
+            if self.compass_ticks % 5 == 0:
+                self._show_compass_values(self.heading, raw)
+                self._draw_compass()
+        self.root.after(20, self.compass_loop)
 
     def _show_compass_values(self, heading, raw):
         self.compass_vars["north"].set("North: ---" if heading is None else f"North: {round(heading, 1) % 360.0:.1f}°")
         for axis in ("x", "y", "z"):
             value = "---" if raw is None else f"{raw[axis]:.1f} µT"
             self.compass_vars[axis].set(f"{axis.upper()}: {value}")
+        # Διάγνωση: η ένταση του γήινου πεδίου είναι ~25-65 µT και μένει σταθερή όταν
+        # η πλακέτα περιστρέφεται· το raw heading ισχύει μόνο με την πλακέτα οριζόντια
+        if raw is None:
+            field = raw_heading = "---"
+        else:
+            field = f"{math.sqrt(raw['x'] ** 2 + raw['y'] ** 2 + raw['z'] ** 2):.1f} µT"
+            raw_heading = f"{math.degrees(math.atan2(raw['y'], raw['x'])) % 360.0:.1f}°"
+        self.compass_vars["field"].set(f"Field |B|: {field}")
+        self.compass_vars["raw_heading"].set(f"Raw XY heading: {raw_heading}")
 
     def _draw_compass(self):
         # Πυξίδα: η ροδέλα στρέφεται ώστε το N να δείχνει τον πραγματικό βορρά,
