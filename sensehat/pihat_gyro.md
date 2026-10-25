@@ -1,4 +1,4 @@
-# Review: `sense3d_test.py`
+# Review: `pihat_gyro.py`
 
 Reviewed at commit `75813e0` (branch `sense_gyro_test`) on 2026-10-22. This replaces the reviews made at `64dfce2` and `a2fdab8`.
 
@@ -21,13 +21,13 @@ It shows a transparent cuboid with a wireframe and X/Y/Z axes. The axes are name
 
 ### Medium
 
-1. **Moving a slider by hand behaves differently with a Sense HAT** ([sense3d_test.py:385](sense3d_test.py:385))
+1. **Moving a slider by hand behaves differently with a Sense HAT** ([pihat_gyro.py:385](pihat_gyro.py:385))
    The sliders are now a rotation applied before the sensor's. Moving one slider no longer shifts the matching angle by the same amount: after calibrating, moving only the Yaw slider can also change roll and pitch. C and R work exactly, but fine-tuning by hand is less intuitive than before. If you want sliders that map 1:1, store C's correction as a separate rotation and apply the slider values on top as simple added offsets.
 
-2. **Info labels may be cut off on the Pi** ([sense3d_test.py:296](sense3d_test.py:296))
+2. **Info labels may be cut off on the Pi** ([pihat_gyro.py:296](pihat_gyro.py:296))
    The labels are 12 characters wide, and they keep that width because they don't stretch. `Pitch (Y): -123.4°` is 18 characters. It fits on Windows because the font there is wide, but the Pi's default font is different. Check it on the Pi with large negative values. If it's cut off, use `fill=tk.X` with `width=0`, or go back to about 17.
 
-3. **Bold title font may come out a different size on the Pi** ([sense3d_test.py:274](sense3d_test.py:274))
+3. **Bold title font may come out a different size on the Pi** ([pihat_gyro.py:274](pihat_gyro.py:274))
    `font="TkDefaultFont 9 bold"` is read as a font *family* called "TkDefaultFont" at size 9, not as the named default font. Fix:
    ```python
    import tkinter.font as tkfont
@@ -39,26 +39,26 @@ It shows a transparent cuboid with a wireframe and X/Y/Z axes. The axes are name
 
 ### Low
 
-5. **Shown values jump when pitch is near ±90°** ([sense3d_test.py:28-33](sense3d_test.py:28))
+5. **Shown values jump when pitch is near ±90°** ([pihat_gyro.py:28-33](pihat_gyro.py:28))
    This is a limit of describing a rotation with three angles. At pitch ±90°, roll and yaw are no longer separate, so the displayed roll and yaw can jump suddenly. The shape itself is still drawn correctly. Since calibration, this can also happen relative to the calibrated position, e.g. calibrate with the board flat, then stand it up vertically.
 
-6. **An error stops the rendering for good** ([sense3d_test.py:376](sense3d_test.py:376))
+6. **An error stops the rendering for good** ([pihat_gyro.py:376](pihat_gyro.py:376))
    Any exception in `render_loop`, such as an I2C read error from `get_orientation()`, ends the `after()` chain. The window stays open but frozen. A `try/finally` that always reschedules would keep it running.
 
-7. **No check that the framebuffer is complete** ([sense3d_test.py:80-102](sense3d_test.py:80))
+7. **No check that the framebuffer is complete** ([pihat_gyro.py:80-102](pihat_gyro.py:80))
    If a driver rejects the framebuffer setup, everything renders silently black. Add a check after the attachments:
    ```python
    if gl.glCheckFramebufferStatus(GL_FRAMEBUFFER) != 0x8CD5:  # GL_FRAMEBUFFER_COMPLETE
        raise RuntimeError("offscreen framebuffer incomplete")
    ```
 
-8. **Stale comment and setting** ([sense3d_test.py:123-124](sense3d_test.py:123), [154](sense3d_test.py:154))
+8. **Stale comment and setting** ([pihat_gyro.py:123-124](pihat_gyro.py:123), [154](pihat_gyro.py:154))
    The comment says to set `HIDE_PI3D_WINDOW = False` if Tk shows black. That can no longer happen since the switch to off-screen drawing. The flag now only controls whether the pi3d window is visible. The off-screen move at line 154 is also no longer needed.
 
-9. **A new image is created every frame** ([sense3d_test.py:398-400](sense3d_test.py:398))
+9. **A new image is created every frame** ([pihat_gyro.py:398-400](pihat_gyro.py:398))
    When the size hasn't changed, `self.tk_image.paste(pil_img)` reuses the existing `PhotoImage`. That is cheaper on the Pi, where reading the pixels back and converting them is the main cost at larger window sizes.
 
-10. **`M` button has no command** ([sense3d_test.py:259](sense3d_test.py:259))
+10. **`M` button has no command** ([pihat_gyro.py:259](pihat_gyro.py:259))
     It's a placeholder, so clicking it does nothing.
 
 11. **Naming and leftovers**
@@ -69,7 +69,7 @@ It shows a transparent cuboid with a wireframe and X/Y/Z axes. The axes are name
     - `MY_W/H/D` are written like constants but are local variables. Their comments still use pi3d axis names: height is pi3d Y, which is the Sense HAT's Z.
     - `pi3d_windll-master.zip` sits untracked in `sensehat/pi3d/`. Delete it or add it to `.gitignore`.
 
-12. **The 24 separate `pi3d.Lines` objects could be fewer** ([sense3d_test.py:194-248](sense3d_test.py:194))
+12. **The 24 separate `pi3d.Lines` objects could be fewer** ([pihat_gyro.py:194-248](pihat_gyro.py:194))
     pi3d's `Lines(..., strip=False)` draws separate pairs of points, so the 12 edges could be one object and each letter could be one object. This is only a speed improvement.
 
 ## Fixed since earlier reviews
