@@ -302,6 +302,7 @@ class camera_win:
 
     #----------------------------------
     def get_video_quality(self,quality):
+        quality = quality.replace(" ", "_")
         if quality == "very_low":
             return Quality.VERY_LOW
         if quality == "low":
@@ -536,11 +537,12 @@ class camera_win:
     #udp test:
     #pi test: rpicam-vid -t 0 --inline -o udp://<IP_WINDOWS_PC>:8000
     #vlc: udp://@:8000 or udp/h264://@:8000
-    def start_udp_stream(self):
+    def start_udp_stream(self, size=(640,480), quality="medium"):
         print('start udp live stream.. ')
         self.picam.stop()
         video_conf = self.picam.create_video_configuration()
-        cam_config_size(video_conf, [640,480])
+        video_conf["transform"] = Transform(hflip=self.hflip.get(), vflip=self.vflip.get())
+        cam_config_size(video_conf, size)
         self.picam.align_configuration(video_conf)
         self.picam.configure(video_conf)
         #encoder = H264Encoder()
@@ -549,7 +551,7 @@ class camera_win:
         #sock.connect(("127.0.0.1", 8000))       #<localhost>
         self.sock.connect(("192.168.2.5", 8000)) #<IP_WINDOWS_PC>
         stream = self.sock.makefile("wb")
-        self.picam.start_recording(encoder, FileOutput(stream))
+        self.picam.start_recording(encoder, FileOutput(stream), quality=self.get_video_quality(quality))
 
     def stop_udp_stream(self):
         print('stop udp stream.. ')
@@ -563,11 +565,12 @@ class camera_win:
     #tcp test:
     #pi test: rpicam-vid -t 0 --inline --listen -o tcp://0.0.0.0:8000
     #vlc: tcp://<IP_PI>:8000 or tcp/h264://<IP_PI>:8000
-    def start_tcp_stream(self):
+    def start_tcp_stream(self, size=(640,480), quality="medium"):
         print('start tcp live stream.. ')
         self.picam.stop()
         video_conf = self.picam.create_video_configuration()
-        cam_config_size(video_conf, [640,480])
+        video_conf["transform"] = Transform(hflip=self.hflip.get(), vflip=self.vflip.get())
+        cam_config_size(video_conf, size)
         self.picam.align_configuration(video_conf)
         self.picam.configure(video_conf)
         self.encoder = H264Encoder()
@@ -578,10 +581,10 @@ class camera_win:
         self.server_sock.listen(1)
         self.tcp_closed = False
         self.sock = None
-        self.tcp_thread=thrd.Thread(target=self.__wait_tcp_client_3)
+        self.tcp_thread=thrd.Thread(target=self.__wait_tcp_client_3, args=(quality,))
         self.tcp_thread.start()
 
-    def __wait_tcp_client_3(self):
+    def __wait_tcp_client_3(self, quality):
         while True:
             print('Waiting for TCP connection...')
             try:
@@ -596,7 +599,7 @@ class camera_win:
             #set TCP_NODELAY to reduce latency
             self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             stream = self.sock.makefile("wb")
-            self.picam.start_recording(self.encoder, FileOutput(stream), quality=Quality.VERY_LOW)
+            self.picam.start_recording(self.encoder, FileOutput(stream), quality=self.get_video_quality(quality))
             print('Starting Recording to TCP stream...')
 
     def stop_tcp_stream(self):
@@ -616,11 +619,12 @@ class camera_win:
     #----------------------------------
     #web page test
     #pc web: http://192.168.1.31:8000
-    def start_webPage(self):
+    def start_webPage(self, size=(640,480), quality="medium"):
         print('start web Page.. ')
         self.picam.stop()
         video_conf = self.picam.create_video_configuration()
-        cam_config_size(video_conf, [640,480])
+        video_conf["transform"] = Transform(hflip=self.hflip.get(), vflip=self.vflip.get())
+        cam_config_size(video_conf, size)
         self.picam.align_configuration(video_conf)
         print("---video conf-----")
         utl.d_print(video_conf)
@@ -632,7 +636,7 @@ class camera_win:
         #encoder = JpegEncoder()
         encoder = MJPEGEncoder()
         output = web.StreamingOutput()
-        self.picam.start_recording(encoder, FileOutput(output))
+        self.picam.start_recording(encoder, FileOutput(output), quality=self.get_video_quality(quality))
         self.webserver = web.pageServer(output)
         self.webserver.start()
 
@@ -648,11 +652,12 @@ class camera_win:
     #----------------------------------
     #tcp custom server:
     #send cupture buffer on request
-    def start_tcp_server(self):
+    def start_tcp_server(self, size=(640,480)):
         print('start tcp server.. ')
         self.picam.stop()
         video_conf = self.picam.create_video_configuration()
-        cam_config_size(video_conf, [640,480])
+        video_conf["transform"] = Transform(hflip=self.hflip.get(), vflip=self.vflip.get())
+        cam_config_size(video_conf, size)
         self.picam.align_configuration(video_conf)
         self.picam.configure(video_conf)
         self.picam.start()
@@ -729,29 +734,51 @@ class camera_win:
     #------------------------------------------
     def start_stream(self):
         print('start stream.. ')
-        self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.stop_stream)
         opt.update_options()
         size = opt.cam_options["stream"]["size"]
         quality = opt.cam_options["stream"]["quality"]
-        self.stream_type = opt.cam_options["stream"]["type"]
-        if self.stream_type == "FFMPEG HLS":
-            self.start_ffmpeg_stream('HLS')
-        elif self.stream_type == "FFMPEG DASH":
-            self.start_ffmpeg_stream('DASH')
-        elif self.stream_type == "FFMPEG UDP":
-            self.start_ffmpeg_stream('UDP')
-        #...
+        stream_type = opt.cam_options["stream"]["type"]
+        if stream_type == "FFMPEG HLS":
+            self.start_ffmpeg_stream('HLS', size=size, quality=quality)
+        elif stream_type == "FFMPEG DASH":
+            self.start_ffmpeg_stream('DASH', size=size, quality=quality)
+        elif stream_type == "FFMPEG UDP":
+            self.start_ffmpeg_stream('UDP', size=size, quality=quality)
+        elif stream_type == "UDP":
+            self.start_udp_stream(size=size, quality=quality)
+        elif stream_type == "TCP":
+            self.start_tcp_stream(size=size, quality=quality)
+        elif stream_type == "PAGE":
+            self.start_webPage(size=size, quality=quality)
+        elif stream_type == "TCP SERVER":
+            self.start_tcp_server(size=size)
+        else:
+            print(f"Unsupported stream type: {stream_type}")
+            return
+        self.stream_type = stream_type
+        self.webBtn.config(text="Stop Web", fg="red", activeforeground="red", font="bold", command=self.stop_stream)
 
     def stop_stream(self):
         print('stop stream.. ')
-        self.webBtn.config(text="Start Web", fg="black", activeforeground="black", font="TkDefaultFont", command=self.start_stream)
         if self.stream_type == "FFMPEG HLS":
             self.stop_ffmpeg_stream()
         elif self.stream_type == "FFMPEG DASH":
             self.stop_ffmpeg_stream()
         elif self.stream_type == "FFMPEG UDP":
             self.stop_ffmpeg_stream()
-        #...
+        elif self.stream_type == "UDP":
+            self.stop_udp_stream()
+        elif self.stream_type == "TCP":
+            self.stop_tcp_stream()
+        elif self.stream_type == "PAGE":
+            self.stop_webPage()
+        elif self.stream_type == "TCP SERVER":
+            self.stop_tcp_server()
+        else:
+            raise RuntimeError("No supported stream is currently active")
+
+        self.stream_type = None
+        self.webBtn.config(text="Start Web", fg="black", activeforeground="black", font="TkDefaultFont", command=self.start_stream)
     
     #=========================================================================
 
