@@ -1,5 +1,6 @@
 import math
 import tkinter as tk
+from tkinter import ttk
 import numpy as np
 from PIL import Image, ImageTk
 
@@ -59,11 +60,23 @@ class Transparent3DCubeApp:
         # 1. Η 3D σκηνή (σχήμα, άξονες, γράμματα) από το module gyro3d
         self.scene = gyro3d.GyroScene(CANVAS_WIDTH, CANVAS_HEIGHT, shape_size=SHAPE_SIZE, title=WINDOW_TITLE)
 
-        # 2. Στήσιμο του Tkinter GUI Canvas
+        # Notebook με μικρά tabs (ίδια γραμματοσειρά με το υπόλοιπο GUI, μικρό ύψος tab)
+        style = ttk.Style(root)
+        style.configure("Small.TNotebook", tabmargins=(2, 2, 2, 0))
+        style.configure("Small.TNotebook.Tab", font="TkDefaultFont", padding=(6, 0))
+        notebook = ttk.Notebook(root, style="Small.TNotebook")
+        notebook.pack(fill=tk.BOTH, expand=True)
+        gyro_tab = tk.Frame(notebook)
+        notebook.add(gyro_tab, text="Gyroscope")
+        # Κενά (προς το παρόν) tabs
+        for text in ("Compass", "Accelerometer", "Magnetometer"):
+            notebook.add(tk.Frame(notebook), text=text)
+
+        # 2. Στήσιμο του Tkinter GUI Canvas (στο tab Gyroscope)
         # Ο canvas ακολουθεί το μέγεθος του παραθύρου, και η 3D σκηνή τον canvas
         # shape_frame: αριστερά το tool_frame με τα κουμπιά, δεξιά ο canvas
         # (pack στο τέλος, μετά τα πλαίσια του κάτω μέρους, ώστε να παίρνει τον χώρο που μένει)
-        shape_frame = tk.Frame(root)
+        shape_frame = tk.Frame(gyro_tab)
         tool_frame = tk.Frame(shape_frame)
         tool_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 2))
         self.tool_buttons = {}
@@ -79,7 +92,7 @@ class Transparent3DCubeApp:
 
         # 4. Πλαίσιο με sliders: τιμές προσανατολισμού χωρίς Sense HAT, αλλιώς offsets
         # (pack πρώτο με side=BOTTOM ώστε να βρίσκεται κάτω από το info_frame)
-        control_frame = tk.Frame(root, relief=tk.SUNKEN, borderwidth=2)
+        control_frame = tk.Frame(gyro_tab, relief=tk.SUNKEN, borderwidth=2)
         control_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
         control_frame.columnconfigure(1, weight=1)
         title = "Orientation values" if self.sense is None else "Orientation offsets"
@@ -100,7 +113,7 @@ class Transparent3DCubeApp:
 
         # 3. Πλαίσιο με τις τρέχουσες τιμές Roll / Pitch / Yaw κάτω από τον canvas
         # (pack πριν τον canvas, ώστε να μένει ορατό όταν μικραίνει το παράθυρο)
-        info_frame = tk.Frame(root, relief=tk.SUNKEN, borderwidth=2)
+        info_frame = tk.Frame(gyro_tab, relief=tk.SUNKEN, borderwidth=2)
         info_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
         self.angle_vars = {}
         for name, title in self.angle_titles.items():
