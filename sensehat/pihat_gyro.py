@@ -35,6 +35,13 @@ def matrix_to_euler(m):
     return {"roll": math.degrees(roll), "pitch": math.degrees(pitch), "yaw": math.degrees(yaw)}
 
 
+def raw_heading(raw):
+    # Heading (0..360, αυξάνει δεξιόστροφα όπως η πυξίδα) από τα raw X/Y του
+    # μαγνητόμετρου. Η γωνία atan2(y, x) μικραίνει όταν η πλακέτα στρίβει δεξιόστροφα,
+    # γι' αυτό 360 - γωνία. Σωστό μόνο με την πλακέτα οριζόντια.
+    return (360.0 - math.degrees(math.atan2(raw["y"], raw["x"]))) % 360.0
+
+
 WINDOW_TITLE = "Sense Gyroscope"
 
 CANVAS_BG_COLOR = "light gray"
@@ -144,7 +151,17 @@ class Transparent3DCubeApp:
         compass_control.columnconfigure(1, weight=1)
         title = "Compass value" if self.sense is None else "Compass offset"
         tk.Label(compass_control, text=title, font="TkDefaultFont 9 bold").grid(
-            row=0, column=0, columnspan=3, sticky=tk.W, padx=2)
+            row=0, column=0, columnspan=2, sticky=tk.W, padx=2)
+        # Πηγή του North: Raw = από τα raw X/Y του μαγνητόμετρου (πλακέτα οριζόντια),
+        # get_compass() = από το fusion του RTIMULib (θέλει calibration με RTIMULibCal)
+        self.compass_source = tk.StringVar(value="raw")
+        source_frame = tk.Frame(compass_control)
+        source_frame.grid(row=0, column=1, columnspan=2, sticky=tk.E, padx=2)
+        for text, value in (("Raw XY", "raw"), ("get_compass()", "fusion")):
+            tk.Radiobutton(source_frame, text=text, value=value, variable=self.compass_source,
+                           padx=0, pady=0, borderwidth=0, highlightthickness=0,
+                           state=tk.DISABLED if self.sense is None else tk.NORMAL
+                           ).pack(side=tk.LEFT, padx=(6, 0))
         self.north_var = tk.DoubleVar(value=0.0)
         north_label = tk.Label(compass_control, text="0.0°", width=7, anchor=tk.E)
         tk.Label(compass_control, text="North", anchor=tk.W).grid(row=1, column=0, sticky=tk.W, padx=2)
@@ -237,8 +254,11 @@ class Transparent3DCubeApp:
             north = self.north_var.get()
             raw = None
             if self.sense is not None:
-                north += self.sense.get_compass()
                 raw = self.sense.get_compass_raw()
+                if self.compass_source.get() == "raw":
+                    north += raw_heading(raw)
+                else:
+                    north += self.sense.get_compass()
             self.heading = north % 360.0
             self.compass_ticks += 1
             if self.compass_ticks % 5 == 0:
@@ -254,12 +274,12 @@ class Transparent3DCubeApp:
         # Διάγνωση: η ένταση του γήινου πεδίου είναι ~25-65 µT και μένει σταθερή όταν
         # η πλακέτα περιστρέφεται· το raw heading ισχύει μόνο με την πλακέτα οριζόντια
         if raw is None:
-            field = raw_heading = "---"
+            field = xy_angle = "---"
         else:
             field = f"{math.sqrt(raw['x'] ** 2 + raw['y'] ** 2 + raw['z'] ** 2):.1f} µT"
-            raw_heading = f"{math.degrees(math.atan2(raw['y'], raw['x'])) % 360.0:.1f}°"
+            xy_angle = f"{math.degrees(math.atan2(raw['y'], raw['x'])) % 360.0:.1f}°"
         self.compass_vars["field"].set(f"Field |B|: {field}")
-        self.compass_vars["raw_heading"].set(f"Raw XY heading: {raw_heading}")
+        self.compass_vars["raw_heading"].set(f"Raw XY heading: {xy_angle}")
 
     def _draw_compass(self):
         # Πυξίδα: η ροδέλα στρέφεται ώστε το N να δείχνει τον πραγματικό βορρά,
