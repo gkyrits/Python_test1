@@ -52,6 +52,7 @@ CANVAS_HEIGHT = 250
 COMPASS_BG_COLOR = "#1a1a1a"  # ίδιο με το φόντο της 3D σκηνής
 MAGNET_RANGE = 100.0  # µT στο άκρο των αξόνων (γήινο πεδίο ~25-65 µT)
 ACCEL_RANGE = 2.0  # g στο άκρο των αξόνων (σε ηρεμία |a| ≈ 1 g, η βαρύτητα)
+ACCEL_RANGE_CHOICES = (0.5, 1.0, 1.5, 2.0)  # επιλογές κλίμακας (g) ξεχωριστά για X/Y και Z
 
 # Hard-iron calibration: αρχείο με τα offsets (µT) δίπλα στο script, και ελάχιστο
 # εύρος τιμών ανά άξονα στην καταγραφή για να θεωρηθεί ο άξονας βαθμονομημένος
@@ -247,7 +248,8 @@ class Transparent3DCubeApp:
         # 6. Tabs Magnetometer και Accelerometer: ίδιο design (βλ. _build_vector_tab)
         self.magnet = self._build_vector_tab(magnet_tab, "Magnetometer", "µT", MAGNET_RANGE, 0.1, 1)
         self._show_magnet_values(None)
-        self.accel = self._build_vector_tab(accel_tab, "Accelerometer", "g", ACCEL_RANGE, 0.01, 2)
+        self.accel = self._build_vector_tab(accel_tab, "Accelerometer", "g", ACCEL_RANGE, 0.01, 2,
+                                            range_choices=ACCEL_RANGE_CHOICES)
         self._show_accel_values(None)
 
         self.root.protocol("WM_DELETE_WINDOW", self.close)
@@ -404,11 +406,12 @@ class Transparent3DCubeApp:
         messagebox.showinfo("Hard-iron calibration",
                             f"Offsets: {offsets}" + (f"\nKept previous: {', '.join(kept)} (small range)" if kept else ""))
 
-    def _build_vector_tab(self, tab, title, unit, value_range, resolution, decimals):
+    def _build_vector_tab(self, tab, title, unit, value_range, resolution, decimals, range_choices=None):
         # Κοινό design για Magnetometer και Accelerometer: από κάτω προς τα πάνω (pack με
-        # side=BOTTOM) οι sliders προσομοίωσης (μόνο χωρίς Sense HAT), το info_frame, και
-        # το frame με τους δύο canvas: X/Y σε σταυρό και Z σε στενότερο canvas
-        panel = {"range": value_range, "unit": unit, "decimals": decimals,
+        # side=BOTTOM) οι sliders προσομοίωσης (μόνο χωρίς Sense HAT), το info_frame,
+        # η επιλογή κλίμακας (αν δοθεί range_choices), και το frame με τους δύο canvas:
+        # X/Y σε σταυρό και Z σε στενότερο canvas
+        panel = {"range_xy": value_range, "range_z": value_range, "unit": unit, "decimals": decimals,
                  "vars": {}, "labels": {}, "label_widgets": {}, "raw": None}
         if self.sense is None:
             control = tk.Frame(tab, relief=tk.SUNKEN, borderwidth=2)
@@ -436,6 +439,24 @@ class Transparent3DCubeApp:
             label.pack(side=tk.LEFT, padx=(4, 6), pady=0)
             panel["labels"][name] = var
             panel["label_widgets"][name] = label
+
+        if range_choices:
+            # Μέγιστη τιμή στο άκρο των αξόνων, ξεχωριστά για τον σταυρό X/Y και τον Z
+            range_frame = tk.Frame(tab, relief=tk.SUNKEN, borderwidth=2)
+            range_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
+            tk.Label(range_frame, text="Axes range", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 8))
+            for key, text in (("range_xy", "X/Y:"), ("range_z", "Z:")):
+                tk.Label(range_frame, text=text).pack(side=tk.LEFT, padx=(4, 2))
+                choice = ttk.Combobox(range_frame, values=[f"{v:g}" for v in range_choices],
+                                      width=4, state="readonly")
+                choice.set(f"{value_range:g}")
+                choice.pack(side=tk.LEFT, pady=1)
+                tk.Label(range_frame, text=unit).pack(side=tk.LEFT, padx=(2, 6))
+
+                def on_select(event, key=key, choice=choice):
+                    panel[key] = float(choice.get())
+                    self._draw_vector(panel)
+                choice.bind("<<ComboboxSelected>>", on_select)
 
         frame = tk.Frame(tab)
         frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
@@ -507,24 +528,29 @@ class Transparent3DCubeApp:
     @staticmethod
     def _draw_vector(panel):
         # Βέλη με μήκος ανάλογο της τιμής: X οριζόντια (δεξιά +), Y κάθετα (πάνω +),
-        # Z κάθετα στον δεύτερο canvas. Ίδια κλίμακα (range στο άκρο) και στους δύο,
-        # γραμμές κλίμακας ανά range/4 (μεγαλύτερες ανά range/2)
-        raw, value_range = panel["raw"], panel["range"]
+        # Z κάθετα στον δεύτερο canvas. Οι άξονες έχουν ίδιο μήκος στην οθόνη, με τιμή
+        # στο άκρο range_xy (X/Y) και range_z (Z). Γραμμές κλίμακας ανά range/4
+        # (μεγαλύτερες ανά range/2), τιμές πέρα από το range σταματούν στο άκρο.
+        raw = panel["raw"]
         xy, zc = panel["xy"], panel["z"]
         w, h = xy.winfo_width(), xy.winfo_height()
         zw = zc.winfo_width()
         margin = 22
-        scale = (min(w, h) / 2.0 - margin) / value_range
-        if scale <= 0:
+        reach = min(w, h) / 2.0 - margin  # μήκος μισού άξονα σε pixels
+        if reach <= 0:
             return
-        clamp = lambda v: max(-value_range, min(value_range, v))
-        step = value_range / 4.0
-        ticks = [(i * step, 5 if i % 2 == 0 else 3) for i in range(-4, 5) if i]
+
+        def axis_scale(value_range):
+            step = value_range / 4.0
+            ticks = [(i * step, 5 if i % 2 == 0 else 3) for i in range(-4, 5) if i]
+            clamp = lambda v: max(-value_range, min(value_range, v))
+            return reach / value_range, ticks, clamp
 
         # Canvas 1: σταυρός X/Y
+        range_xy = panel["range_xy"]
+        scale, ticks, clamp = axis_scale(range_xy)
         xy.delete("all")
         cx, cy = w / 2.0, h / 2.0
-        reach = value_range * scale
         xy.create_line(cx - reach, cy, cx + reach, cy, fill="gray50")
         xy.create_line(cx, cy - reach, cx, cy + reach, fill="gray50")
         for t, size in ticks:
@@ -532,7 +558,7 @@ class Transparent3DCubeApp:
             xy.create_line(cx - size, cy - t * scale, cx + size, cy - t * scale, fill="gray50")
         xy.create_text(cx + reach + 10, cy, text="X", fill="red", font="TkDefaultFont 10 bold")
         xy.create_text(cx, cy - reach - 10, text="Y", fill="#00c000", font="TkDefaultFont 10 bold")
-        xy.create_text(cx + value_range / 2.0 * scale, cy + 12, text=f"{value_range / 2.0:g}",
+        xy.create_text(cx + reach / 2.0, cy + 12, text=f"{range_xy / 2.0:g}",
                        fill="gray60", font="TkDefaultFont 7")
         if raw is not None:
             xy.create_line(cx, cy, cx + clamp(raw["x"]) * scale, cy, fill="red", width=4,
@@ -541,6 +567,8 @@ class Transparent3DCubeApp:
                            arrow=tk.LAST, arrowshape=(10, 12, 5))
 
         # Canvas 2: οριζόντια γραμμή μηδέν του Z, βέλος πάνω (+) ή κάτω (-)
+        range_z = panel["range_z"]
+        scale, ticks, clamp = axis_scale(range_z)
         zc.delete("all")
         zx, zy = zw / 2.0, zc.winfo_height() / 2.0
         zc.create_line(4, zy, zw - 4, zy, fill="gray50")
@@ -548,6 +576,8 @@ class Transparent3DCubeApp:
         for t, size in ticks:
             zc.create_line(zx - size, zy - t * scale, zx + size, zy - t * scale, fill="gray50")
         zc.create_text(zx, zy - reach - 10, text="Z", fill="#4080ff", font="TkDefaultFont 10 bold")
+        zc.create_text(zx + 16, zy - reach / 2.0, text=f"{range_z / 2.0:g}",
+                       fill="gray60", font="TkDefaultFont 7")
         if raw is not None:
             zc.create_line(zx, zy, zx, zy - clamp(raw["z"]) * scale, fill="#4080ff", width=4,
                            arrow=tk.LAST, arrowshape=(10, 12, 5))
