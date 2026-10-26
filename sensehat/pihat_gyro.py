@@ -48,6 +48,7 @@ CANVAS_BG_COLOR = "light gray"
 CANVAS_WIDTH = 350
 CANVAS_HEIGHT = 250
 COMPASS_BG_COLOR = "#1a1a1a"  # ίδιο με το φόντο της 3D σκηνής
+MAGNET_RANGE = 100.0  # µT στο άκρο των αξόνων (γήινο πεδίο ~25-65 µT)
 
 # ΟΡΙΣΤΕ ΕΔΩ ΤΙΣ ΑΝΕΞΑΡΤΗΤΕΣ ΔΙΑΣΤΑΣΕΙΣ του σχήματος (μήκος, ύψος, βάθος)
 SHAPE_SIZE = (1.6, 0.2, 1.0)
@@ -78,11 +79,13 @@ class Transparent3DCubeApp:
         notebook.add(gyro_tab, text="Gyroscope")
         compass_tab = tk.Frame(notebook)
         notebook.add(compass_tab, text="Compass")
-        # Κενά (προς το παρόν) tabs
-        for text in ("Magnetometer", "Accelerometer"):
-            notebook.add(tk.Frame(notebook), text=text)
+        magnet_tab = tk.Frame(notebook)
+        notebook.add(magnet_tab, text="Magnetometer")
+        # Κενό (προς το παρόν) tab
+        notebook.add(tk.Frame(notebook), text="Accelerometer")
         notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
         self.notebook, self.gyro_tab, self.compass_tab = notebook, gyro_tab, compass_tab
+        self.magnet_tab = magnet_tab
 
         # 2. Στήσιμο του Tkinter GUI Canvas (στο tab Gyroscope)
         # Ο canvas ακολουθεί το μέγεθος του παραθύρου, και η 3D σκηνή τον canvas
@@ -202,9 +205,54 @@ class Transparent3DCubeApp:
         self.compass_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.compass_canvas.bind("<Configure>", lambda event: self._draw_compass())
 
+        # 6. Tab Magnetometer: από κάτω προς τα πάνω (pack με side=BOTTOM) οι sliders
+        # προσομοίωσης (μόνο χωρίς Sense HAT), το info_frame, και το magnet_frame με
+        # τους δύο canvas: X/Y σε σταυρό και Z σε στενότερο canvas
+        self.magnet_vars = {}
+        if self.sense is None:
+            magnet_control = tk.Frame(magnet_tab, relief=tk.SUNKEN, borderwidth=2)
+            magnet_control.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
+            magnet_control.columnconfigure(1, weight=1)
+            tk.Label(magnet_control, text="Magnetometer values", font="TkDefaultFont 9 bold").grid(
+                row=0, column=0, columnspan=3, sticky=tk.W, padx=2)
+            for row, axis in enumerate(("x", "y", "z"), start=1):
+                var = tk.DoubleVar(value=0.0)
+                value_label = tk.Label(magnet_control, text="0.0 µT", width=9, anchor=tk.E)
+                tk.Label(magnet_control, text=axis.upper(), anchor=tk.W).grid(row=row, column=0, sticky=tk.W, padx=2)
+                tk.Scale(magnet_control, variable=var, from_=-MAGNET_RANGE, to=MAGNET_RANGE, resolution=0.1,
+                         orient=tk.HORIZONTAL, showvalue=False, width=10, sliderlength=15, borderwidth=1
+                         ).grid(row=row, column=1, sticky=tk.EW, padx=2)
+                var.trace_add("write", lambda *_, v=var, lbl=value_label: lbl.config(
+                    text=f"{round(v.get(), 1) + 0.0:.1f} µT"))
+                value_label.grid(row=row, column=2, padx=2)
+                self.magnet_vars[axis] = var
+
+        magnet_info = tk.Frame(magnet_tab, relief=tk.SUNKEN, borderwidth=2)
+        magnet_info.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
+        self.magnet_labels = {}
+        for name in ("x", "y", "z", "field"):
+            var = tk.StringVar()
+            tk.Label(magnet_info, textvariable=var, anchor=tk.W,
+                     font="TkDefaultFont").pack(side=tk.LEFT, padx=(4, 6), pady=0)
+            self.magnet_labels[name] = var
+
+        magnet_frame = tk.Frame(magnet_tab)
+        magnet_frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
+        self.magnet_xy = tk.Canvas(magnet_frame, width=CANVAS_HEIGHT, height=CANVAS_HEIGHT,
+                                   bg=COMPASS_BG_COLOR, highlightthickness=0)
+        self.magnet_xy.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.magnet_z = tk.Canvas(magnet_frame, width=80, height=CANVAS_HEIGHT,
+                                  bg=COMPASS_BG_COLOR, highlightthickness=0)
+        self.magnet_z.pack(side=tk.LEFT, fill=tk.Y, padx=(2, 0))
+        self.magnet_raw = None  # τελευταία τιμή {x, y, z} σε µT
+        self._show_magnet_values(None)
+        for canvas in (self.magnet_xy, self.magnet_z):
+            canvas.bind("<Configure>", lambda event: self._draw_magnet())
+
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.render_loop()
         self.compass_loop()
+        self.magnet_loop()
 
     def calibrate(self):
         # Offset = η αντίστροφη περιστροφή της τρέχουσας θέσης του αισθητήρα, ώστε
@@ -236,12 +284,12 @@ class Transparent3DCubeApp:
 
     def _on_tab_changed(self, event):
         # Αισθητήρες του IMU ανά tab: set_imu_config(compass, gyroscope, accelerometer)
-        # Compass:   μόνο μαγνητόμετρο (όπως το κάνει και το sense.get_compass())
-        # Gyroscope: gyroscope + accelerometer, χωρίς μαγνητόμετρο
+        # Compass, Magnetometer: μόνο μαγνητόμετρο (όπως το κάνει και το sense.get_compass())
+        # Gyroscope: όλοι οι αισθητήρες (gyroscope + accelerometer + μαγνητόμετρο)
         if self.sense is None:
             return
         tab = self._selected_tab()
-        if tab is self.compass_tab:
+        if tab is self.compass_tab or tab is self.magnet_tab:
             self.sense.set_imu_config(True, False, False)
         elif tab is self.gyro_tab:
             self.sense.set_imu_config(True, True, True)
@@ -319,6 +367,70 @@ class Transparent3DCubeApp:
         c.create_oval(cx - 4, cy - 4, cx + 4, cy + 4, fill="white", outline="")
         # Σταθερό σημάδι της κατεύθυνσης της πλακέτας
         c.create_polygon(cx, cy - r + 2, cx - 7, cy - r - 12, cx + 7, cy - r - 12, fill="yellow", outline="")
+
+    def magnet_loop(self):
+        # Raw μαγνητόμετρο (Sense HAT) ή οι sliders προσομοίωσης, κάθε 50 ms
+        if self._selected_tab() is self.magnet_tab:
+            if self.sense is not None:
+                self.magnet_raw = self.sense.get_compass_raw()
+            else:
+                self.magnet_raw = {axis: var.get() for axis, var in self.magnet_vars.items()}
+            self._show_magnet_values(self.magnet_raw)
+            self._draw_magnet()
+        self.root.after(50, self.magnet_loop)
+
+    def _show_magnet_values(self, raw):
+        for axis in ("x", "y", "z"):
+            value = "---" if raw is None else f"{raw[axis]:.1f} µT"
+            self.magnet_labels[axis].set(f"{axis.upper()}: {value}")
+        field = "---" if raw is None else f"{math.sqrt(raw['x'] ** 2 + raw['y'] ** 2 + raw['z'] ** 2):.1f} µT"
+        self.magnet_labels["field"].set(f"|B|: {field}")
+
+    def _draw_magnet(self):
+        # Βέλη με μήκος ανάλογο της τιμής: X οριζόντια (δεξιά +), Y κάθετα (πάνω +),
+        # Z κάθετα στον δεύτερο canvas. Ίδια κλίμακα (MAGNET_RANGE στο άκρο) και στους δύο.
+        raw = self.magnet_raw
+        xy, zc = self.magnet_xy, self.magnet_z
+        w, h = xy.winfo_width(), xy.winfo_height()
+        zw = zc.winfo_width()
+        margin = 22
+        scale = (min(w, h) / 2.0 - margin) / MAGNET_RANGE
+        if scale <= 0:
+            return
+        clamp = lambda v: max(-MAGNET_RANGE, min(MAGNET_RANGE, v))
+        ticks = [v * 25.0 for v in range(-4, 5) if v]
+
+        # Canvas 1: σταυρός X/Y
+        xy.delete("all")
+        cx, cy = w / 2.0, h / 2.0
+        reach = MAGNET_RANGE * scale
+        xy.create_line(cx - reach, cy, cx + reach, cy, fill="gray50")
+        xy.create_line(cx, cy - reach, cx, cy + reach, fill="gray50")
+        for t in ticks:
+            size = 5 if t % 50 == 0 else 3
+            xy.create_line(cx + t * scale, cy - size, cx + t * scale, cy + size, fill="gray50")
+            xy.create_line(cx - size, cy - t * scale, cx + size, cy - t * scale, fill="gray50")
+        xy.create_text(cx + reach + 10, cy, text="X", fill="red", font="TkDefaultFont 10 bold")
+        xy.create_text(cx, cy - reach - 10, text="Y", fill="#00c000", font="TkDefaultFont 10 bold")
+        xy.create_text(cx + 50 * scale, cy + 12, text="50", fill="gray60", font="TkDefaultFont 7")
+        if raw is not None:
+            xy.create_line(cx, cy, cx + clamp(raw["x"]) * scale, cy, fill="red", width=4,
+                           arrow=tk.LAST, arrowshape=(10, 12, 5))
+            xy.create_line(cx, cy, cx, cy - clamp(raw["y"]) * scale, fill="#00c000", width=4,
+                           arrow=tk.LAST, arrowshape=(10, 12, 5))
+
+        # Canvas 2: οριζόντια γραμμή μηδέν του Z, βέλος πάνω (+) ή κάτω (-)
+        zc.delete("all")
+        zx, zy = zw / 2.0, zc.winfo_height() / 2.0
+        zc.create_line(4, zy, zw - 4, zy, fill="gray50")
+        zc.create_line(zx, zy - reach, zx, zy + reach, fill="gray30", dash=(2, 3))
+        for t in ticks:
+            size = 5 if t % 50 == 0 else 3
+            zc.create_line(zx - size, zy - t * scale, zx + size, zy - t * scale, fill="gray50")
+        zc.create_text(zx, zy - reach - 10, text="Z", fill="#4080ff", font="TkDefaultFont 10 bold")
+        if raw is not None:
+            zc.create_line(zx, zy, zx, zy - clamp(raw["z"]) * scale, fill="#4080ff", width=4,
+                           arrow=tk.LAST, arrowshape=(10, 12, 5))
 
     def _render_gyro(self):
         # Χωρίς Sense HAT οι sliders δίνουν τις τιμές, αλλιώς είναι μια περιστροφή
