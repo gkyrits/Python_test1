@@ -79,7 +79,7 @@ class Transparent3DCubeApp:
         compass_tab = tk.Frame(notebook)
         notebook.add(compass_tab, text="Compass")
         # Κενά (προς το παρόν) tabs
-        for text in ("Accelerometer", "Magnetometer"):
+        for text in ("Magnetometer", "Accelerometer"):
             notebook.add(tk.Frame(notebook), text=text)
         notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
         self.notebook, self.gyro_tab, self.compass_tab = notebook, gyro_tab, compass_tab
@@ -157,7 +157,7 @@ class Transparent3DCubeApp:
         self.compass_source = tk.StringVar(value="raw")
         source_frame = tk.Frame(compass_control)
         source_frame.grid(row=0, column=1, columnspan=2, sticky=tk.E, padx=2)
-        for text, value in (("Raw XY", "raw"), ("get_compass()", "fusion")):
+        for text, value in (("Raw XY", "raw"), ("sense compass", "fusion")):
             tk.Radiobutton(source_frame, text=text, value=value, variable=self.compass_source,
                            padx=0, pady=0, borderwidth=0, highlightthickness=0,
                            state=tk.DISABLED if self.sense is None else tk.NORMAL
@@ -187,11 +187,19 @@ class Transparent3DCubeApp:
                 self.compass_vars[name] = var
         self._show_compass_values(None, None)
         self.compass_ticks = 0
+        # compass_frame: αριστερά το tool frame με τα κουμπιά (όπως στο Gyroscope), δεξιά ο canvas
         compass_frame = tk.Frame(compass_tab)
         compass_frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
+        compass_tools = tk.Frame(compass_frame)
+        compass_tools.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 2))
+        self.compass_buttons = {}
+        for text in ("H", "S"):
+            button = tk.Button(compass_tools, text=text, width=2, height=2, padx=0, pady=0)
+            button.pack(side=tk.TOP, pady=(10, 0))
+            self.compass_buttons[text] = button
         self.compass_canvas = tk.Canvas(compass_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT,
                                         bg=COMPASS_BG_COLOR, highlightthickness=0)
-        self.compass_canvas.pack(fill=tk.BOTH, expand=True)
+        self.compass_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.compass_canvas.bind("<Configure>", lambda event: self._draw_compass())
 
         self.root.protocol("WM_DELETE_WINDOW", self.close)
@@ -249,7 +257,7 @@ class Transparent3DCubeApp:
     def compass_loop(self):
         # Χωρίς Sense HAT ο slider δίνει την τιμή North, αλλιώς προστίθεται ως offset.
         # Ανάγνωση κάθε 20 ms (το fusion του RTIMULib συγκλίνει με κάθε ανάγνωση),
-        # αλλά ενημέρωση οθόνης κάθε 5η φορά (100 ms) για λιγότερη CPU
+        # αλλά ενημέρωση οθόνης κάθε 2η φορά (40 ms) για λιγότερη CPU
         if self._selected_tab() is self.compass_tab:
             north = self.north_var.get()
             raw = None
@@ -261,7 +269,7 @@ class Transparent3DCubeApp:
                     north += self.sense.get_compass()
             self.heading = north % 360.0
             self.compass_ticks += 1
-            if self.compass_ticks % 5 == 0:
+            if self.compass_ticks % 2 == 0:
                 self._show_compass_values(self.heading, raw)
                 self._draw_compass()
         self.root.after(20, self.compass_loop)
