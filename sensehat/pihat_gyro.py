@@ -1,6 +1,8 @@
+import json
 import math
+import os
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 import numpy as np
 from PIL import Image, ImageTk
 
@@ -49,6 +51,25 @@ CANVAS_WIDTH = 350
 CANVAS_HEIGHT = 250
 COMPASS_BG_COLOR = "#1a1a1a"  # ίδιο με το φόντο της 3D σκηνής
 MAGNET_RANGE = 100.0  # µT στο άκρο των αξόνων (γήινο πεδίο ~25-65 µT)
+
+# Hard-iron calibration: αρχείο με τα offsets (µT) δίπλα στο script, και ελάχιστο
+# εύρος τιμών ανά άξονα στην καταγραφή για να θεωρηθεί ο άξονας βαθμονομημένος
+HARD_IRON_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pihat_gyro_hardiron.json")
+HARD_IRON_MIN_SPAN = 20.0
+
+
+def load_hard_iron():
+    try:
+        with open(HARD_IRON_FILE) as f:
+            data = json.load(f)
+        return {axis: float(data[axis]) for axis in ("x", "y", "z")}
+    except (OSError, ValueError, KeyError, TypeError):
+        return {"x": 0.0, "y": 0.0, "z": 0.0}
+
+
+def save_hard_iron(offsets):
+    with open(HARD_IRON_FILE, "w") as f:
+        json.dump(offsets, f, indent=2)
 
 # ΟΡΙΣΤΕ ΕΔΩ ΤΙΣ ΑΝΕΞΑΡΤΗΤΕΣ ΔΙΑΣΤΑΣΕΙΣ του σχήματος (μήκος, ύψος, βάθος)
 SHAPE_SIZE = (1.6, 0.2, 1.0)
@@ -196,10 +217,19 @@ class Transparent3DCubeApp:
         compass_tools = tk.Frame(compass_frame)
         compass_tools.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 2))
         self.compass_buttons = {}
-        for text in ("H", "S"):
-            button = tk.Button(compass_tools, text=text, width=2, height=2, padx=0, pady=0)
+        # H = hard-iron calibration του μαγνητόμετρου (πάτημα: έναρξη, περιστροφή, πάτημα: αποθήκευση)
+        compass_commands = {"H": self.toggle_hard_iron, "S": None}
+        for text, command in compass_commands.items():
+            button = tk.Button(compass_tools, text=text, width=2, height=2, padx=0, pady=0, command=command)
             button.pack(side=tk.TOP, pady=(10, 0))
             self.compass_buttons[text] = button
+        # Hard-iron offsets (µT) που αφαιρούνται από κάθε ανάγνωση του μαγνητόμετρου.
+        # Χωρίς Sense HAT δεν υπάρχει αισθητήρας για calibration, οπότε το H είναι ανενεργό
+        self.hard_iron = load_hard_iron()
+        self.hard_iron_rec = None  # min/max ανά άξονα όσο γίνεται η καταγραφή
+        self.button_bg = self.compass_buttons["H"].cget("bg")
+        if self.sense is None:
+            self.compass_buttons["H"].config(state=tk.DISABLED)
         self.compass_canvas = tk.Canvas(compass_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT,
                                         bg=COMPASS_BG_COLOR, highlightthickness=0)
         self.compass_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -310,7 +340,7 @@ class Transparent3DCubeApp:
             north = self.north_var.get()
             raw = None
             if self.sense is not None:
-                raw = self.sense.get_compass_raw()
+                raw = self._read_magnet()
                 if self.compass_source.get() == "raw":
                     north += raw_heading(raw)
                 else:
@@ -368,11 +398,46 @@ class Transparent3DCubeApp:
         # Σταθερό σημάδι της κατεύθυνσης της πλακέτας
         c.create_polygon(cx, cy - r + 2, cx - 7, cy - r - 12, cx + 7, cy - r - 12, fill="yellow", outline="")
 
+    def _read_magnet(self):
+        # Ανάγνωση του μαγνητόμετρου (µT) διορθωμένη με τα hard-iron offsets.
+        # Όσο γίνεται καταγραφή (H), κρατάει min/max των αδιόρθωτων τιμών.
+        raw = self.sense.get_compass_raw()
+        if self.hard_iron_rec is not None:
+            for axis, (low, high) in self.hard_iron_rec.items():
+                self.hard_iron_rec[axis] = (min(low, raw[axis]), max(high, raw[axis]))
+        return {axis: raw[axis] - self.hard_iron[axis] for axis in ("x", "y", "z")}
+
+    def toggle_hard_iron(self):
+        # 1ο πάτημα: έναρξη καταγραφής -> περιστροφή της πλακέτας σε πλήρη κύκλο
+        # (ιδανικά και με κλίσεις). 2ο πάτημα: offset = κέντρο (min+max)/2 ανά άξονα.
+        # Άξονες με μικρό εύρος (π.χ. Z όταν η πλακέτα έμεινε οριζόντια) κρατούν το παλιό offset.
+        button = self.compass_buttons["H"]
+        if self.hard_iron_rec is None:
+            self.hard_iron_rec = {axis: (math.inf, -math.inf) for axis in ("x", "y", "z")}
+            button.config(relief=tk.SUNKEN, bg="orange")
+            return
+        record, self.hard_iron_rec = self.hard_iron_rec, None
+        button.config(relief=tk.RAISED, bg=self.button_bg)
+        updated = [axis for axis, (low, high) in record.items() if high - low >= HARD_IRON_MIN_SPAN]
+        if not updated:
+            messagebox.showwarning("Hard-iron calibration",
+                                   "Not enough rotation, the previous calibration is kept.\n"
+                                   "Turn the board slowly through a full circle while recording.")
+            return
+        for axis in updated:
+            low, high = record[axis]
+            self.hard_iron[axis] = (low + high) / 2.0
+        save_hard_iron(self.hard_iron)
+        kept = [axis.upper() for axis in ("x", "y", "z") if axis not in updated]
+        offsets = ", ".join(f"{axis.upper()}: {self.hard_iron[axis]:.1f} µT" for axis in ("x", "y", "z"))
+        messagebox.showinfo("Hard-iron calibration",
+                            f"Offsets: {offsets}" + (f"\nKept previous: {', '.join(kept)} (small range)" if kept else ""))
+
     def magnet_loop(self):
         # Raw μαγνητόμετρο (Sense HAT) ή οι sliders προσομοίωσης, κάθε 50 ms
         if self._selected_tab() is self.magnet_tab:
             if self.sense is not None:
-                self.magnet_raw = self.sense.get_compass_raw()
+                self.magnet_raw = self._read_magnet()
             else:
                 self.magnet_raw = {axis: var.get() for axis, var in self.magnet_vars.items()}
             self._show_magnet_values(self.magnet_raw)
