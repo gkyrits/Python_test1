@@ -57,6 +57,11 @@ MAGNET_RANGE = 100.0  # µT στο άκρο των αξόνων (γήινο πε
 HARD_IRON_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pihat_gyro_hardiron.json")
 HARD_IRON_MIN_SPAN = 20.0
 
+# Προειδοποίηση έντασης πεδίου (µT) για πειράματα με μαγνήτη
+FIELD_WARN = 150.0
+FIELD_DANGER = 300.0
+FIELD_WARN_COLOR = "#d07000"  # σκούρο πορτοκαλί, ευανάγνωστο σε ανοιχτό φόντο
+
 
 def load_hard_iron():
     try:
@@ -201,14 +206,16 @@ class Transparent3DCubeApp:
         # Γραμμή 1: North + raw X/Y/Z. Γραμμή 2 (διάγνωση): ένταση πεδίου και
         # heading υπολογισμένο απευθείας από τα raw X/Y (χωρίς το fusion του RTIMULib)
         self.compass_vars = {}
+        self.compass_label_widgets = {}
         for names in (("north", "x", "y", "z"), ("field", "raw_heading")):
             row = tk.Frame(compass_info)
             row.pack(fill=tk.X)
             for name in names:
                 var = tk.StringVar()
-                tk.Label(row, textvariable=var, anchor=tk.W,
-                         font="TkDefaultFont").pack(side=tk.LEFT, padx=(4, 6), pady=0)
+                label = tk.Label(row, textvariable=var, anchor=tk.W, font="TkDefaultFont")
+                label.pack(side=tk.LEFT, padx=(4, 6), pady=0)
                 self.compass_vars[name] = var
+                self.compass_label_widgets[name] = label
         self._show_compass_values(None, None)
         self.compass_ticks = 0
         # compass_frame: αριστερά το tool frame με τα κουμπιά (όπως στο Gyroscope), δεξιά ο canvas
@@ -260,11 +267,13 @@ class Transparent3DCubeApp:
         magnet_info = tk.Frame(magnet_tab, relief=tk.SUNKEN, borderwidth=2)
         magnet_info.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
         self.magnet_labels = {}
+        self.magnet_label_widgets = {}
         for name in ("x", "y", "z", "field"):
             var = tk.StringVar()
-            tk.Label(magnet_info, textvariable=var, anchor=tk.W,
-                     font="TkDefaultFont").pack(side=tk.LEFT, padx=(4, 6), pady=0)
+            label = tk.Label(magnet_info, textvariable=var, anchor=tk.W, font="TkDefaultFont")
+            label.pack(side=tk.LEFT, padx=(4, 6), pady=0)
             self.magnet_labels[name] = var
+            self.magnet_label_widgets[name] = label
 
         magnet_frame = tk.Frame(magnet_tab)
         magnet_frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
@@ -359,12 +368,8 @@ class Transparent3DCubeApp:
             self.compass_vars[axis].set(f"{axis.upper()}: {value}")
         # Διάγνωση: η ένταση του γήινου πεδίου είναι ~25-65 µT και μένει σταθερή όταν
         # η πλακέτα περιστρέφεται· το raw heading ισχύει μόνο με την πλακέτα οριζόντια
-        if raw is None:
-            field = xy_angle = "---"
-        else:
-            field = f"{math.sqrt(raw['x'] ** 2 + raw['y'] ** 2 + raw['z'] ** 2):.1f} µT"
-            xy_angle = f"{math.degrees(math.atan2(raw['y'], raw['x'])) % 360.0:.1f}°"
-        self.compass_vars["field"].set(f"Field |B|: {field}")
+        xy_angle = "---" if raw is None else f"{math.degrees(math.atan2(raw['y'], raw['x'])) % 360.0:.1f}°"
+        self._show_field(self.compass_vars["field"], self.compass_label_widgets["field"], "Field |B|", raw)
         self.compass_vars["raw_heading"].set(f"Raw XY heading: {xy_angle}")
 
     def _draw_compass(self):
@@ -448,8 +453,24 @@ class Transparent3DCubeApp:
         for axis in ("x", "y", "z"):
             value = "---" if raw is None else f"{raw[axis]:.1f} µT"
             self.magnet_labels[axis].set(f"{axis.upper()}: {value}")
-        field = "---" if raw is None else f"{math.sqrt(raw['x'] ** 2 + raw['y'] ** 2 + raw['z'] ** 2):.1f} µT"
-        self.magnet_labels["field"].set(f"|B|: {field}")
+        self._show_field(self.magnet_labels["field"], self.magnet_label_widgets["field"], "|B|", raw)
+
+    @staticmethod
+    def _show_field(var, label, title, raw):
+        # Ένταση πεδίου |B| με προειδοποίηση όταν ένας μαγνήτης είναι πολύ κοντά:
+        # πορτοκαλί πάνω από FIELD_WARN, κόκκινο με "too close!" πάνω από FIELD_DANGER
+        # (εκεί κοντινά ατσάλινα μέρη μπορεί να μαγνητιστούν -> νέο hard-iron offset)
+        if raw is None:
+            var.set(f"{title}: ---")
+            label.config(fg="black")
+            return
+        field = math.sqrt(raw["x"] ** 2 + raw["y"] ** 2 + raw["z"] ** 2)
+        if field > FIELD_DANGER:
+            var.set(f"{title}: {field:.1f} µT  too close!")
+            label.config(fg="red")
+        else:
+            var.set(f"{title}: {field:.1f} µT")
+            label.config(fg=FIELD_WARN_COLOR if field > FIELD_WARN else "black")
 
     def _draw_magnet(self):
         # Βέλη με μήκος ανάλογο της τιμής: X οριζόντια (δεξιά +), Y κάθετα (πάνω +),
