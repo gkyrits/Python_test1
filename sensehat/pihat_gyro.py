@@ -50,7 +50,7 @@ MAGNET_RANGE = 100.0  # µT στο άκρο των αξόνων (γήινο πε
 ACCEL_RANGE = 2.0  # g στο άκρο των αξόνων (σε ηρεμία |a| ≈ 1 g, η βαρύτητα)
 # Επιλογές κλίμακας (g) και αρχική τιμή, ξεχωριστά για τον σταυρό X/Y και τον Z
 ACCEL_RANGE_CHOICES = {"range_xy": ((0.1, 0.5, 1.0, 1.5, 2.0), 1.0),
-                       "range_z": ((0.5, 1.0, 1.5, 2.0), 2.0)}
+                       "range_z": ((0.1, 0.5, 1.0, 1.5, 2.0), 1.0)}
 
 # Προειδοποίηση έντασης πεδίου (µT) για πειράματα με μαγνήτη
 FIELD_WARN = 150.0
@@ -237,9 +237,9 @@ class Transparent3DCubeApp:
         # Raw = μέτρηση όπως είναι (με τη βαρύτητα), Linear = χωρίς βαρύτητα σε X, Y, Z
         # (module acceleration, με την κλίση από gyroscope + accelerometer).
         # Χωρίς Sense HAT δεν υπάρχει προσανατολισμός για την αφαίρεση, οπότε μόνο Raw.
-        self.accel_mode = tk.StringVar(value="raw")
-        mode_frame = tk.Frame(accel_tab, relief=tk.SUNKEN, borderwidth=2)
-        mode_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2), before=self.accel["frame"])
+        self.accel_mode = tk.StringVar(value="raw" if self.sense is None else "linear")
+        mode_frame = tk.Frame(self.accel["options"])
+        mode_frame.pack(side=tk.TOP, fill=tk.X)
         tk.Label(mode_frame, text="Mode", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 8))
         for text, value in (("Raw", "raw"), ("Linear (gravity removed)", "linear")):
             tk.Radiobutton(mode_frame, text=text, value=value, variable=self.accel_mode,
@@ -363,8 +363,8 @@ class Transparent3DCubeApp:
 
     def _build_vector_tab(self, tab, title, unit, value_range, resolution, decimals, range_choices=None):
         # Κοινό design για Magnetometer και Accelerometer: από κάτω προς τα πάνω (pack με
-        # side=BOTTOM) οι sliders προσομοίωσης (μόνο χωρίς Sense HAT), το info_frame,
-        # η επιλογή κλίμακας (αν δοθεί range_choices), και το frame με τους δύο canvas:
+        # side=BOTTOM) οι sliders προσομοίωσης (μόνο χωρίς Sense HAT), το πλαίσιο επιλογών
+        # (αν δοθεί range_choices), το info_frame, και το frame με τους δύο canvas:
         # X/Y σε σταυρό και Z σε στενότερο canvas
         panel = {"unit": unit, "decimals": decimals, "vars": {}, "labels": {}, "label_widgets": {}}
         if self.sense is None:
@@ -385,19 +385,14 @@ class Transparent3DCubeApp:
                 value_label.grid(row=row, column=2, padx=2)
                 panel["vars"][axis] = var
 
-        info = tk.Frame(tab, relief=tk.SUNKEN, borderwidth=2)
-        info.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
-        for name in ("x", "y", "z", "total"):
-            var = tk.StringVar()
-            label = tk.Label(info, textvariable=var, anchor=tk.W, font="TkDefaultFont")
-            label.pack(side=tk.LEFT, padx=(4, 6), pady=0)
-            panel["labels"][name] = var
-            panel["label_widgets"][name] = label
-
         if range_choices:
-            # Μέγιστη τιμή στο άκρο των αξόνων, ξεχωριστά για τον σταυρό X/Y και τον Z
-            range_frame = tk.Frame(tab, relief=tk.SUNKEN, borderwidth=2)
-            range_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
+            # Πλαίσιο επιλογών: γραμμή με τη μέγιστη τιμή στο άκρο των αξόνων, ξεχωριστά
+            # για τον σταυρό X/Y και τον Z (επιπλέον γραμμές μπαίνουν στο panel["options"])
+            options = tk.Frame(tab, relief=tk.SUNKEN, borderwidth=2)
+            options.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
+            range_frame = tk.Frame(options)
+            range_frame.pack(side=tk.BOTTOM, fill=tk.X)
+            panel["options"] = options
             tk.Label(range_frame, text="Axes range", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 8))
             for key, text in (("range_xy", "X/Y:"), ("range_z", "Z:")):
                 values, default = range_choices[key]
@@ -412,6 +407,15 @@ class Transparent3DCubeApp:
                     setattr(panel["view"], key, float(choice.get()))
                     panel["view"].draw()
                 choice.bind("<<ComboboxSelected>>", on_select)
+
+        info = tk.Frame(tab, relief=tk.SUNKEN, borderwidth=2)
+        info.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
+        for name in ("x", "y", "z", "total"):
+            var = tk.StringVar()
+            label = tk.Label(info, textvariable=var, anchor=tk.W, font="TkDefaultFont")
+            label.pack(side=tk.LEFT, padx=(4, 6), pady=0)
+            panel["labels"][name] = var
+            panel["label_widgets"][name] = label
 
         frame = tk.Frame(tab)
         frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
