@@ -1,110 +1,114 @@
-# Review: `pihat_gyro.py` + `pi3d_gyro.py`
+# Review: `pihat_gyro.py` and its modules
 
-Reviewed at commit `fda8e1c` (branch `sense_gyro_test`) on 2026-10-25. This replaces the earlier reviews of `sense3d_test.py`.
+Reviewed at commit `f681d22` (branch `sense_gyro_test`) on 2026-10-27. This replaces the earlier reviews.
 
-## What the program does
+## Structure
 
-It's a Tk app with a notebook of four tabs: **Gyroscope**, **Compass**, and two empty tabs for now (**Accelerometer**, **Magnetometer**).
+| File | Lines | Contents |
+|---|---|---|
+| `pihat_gyro.py` | 657 | Tk app with 6 tabs, Sense HAT reading, per-tab sensor setup, orientation maths |
+| `pi3d_gyro.py` | 278 | 3D scene (pi3d): Windows setup, off-screen framebuffer, gimbal rotation. Interface `GyroScene` |
+| `compass.py` | 125 | `raw_heading`, `xy_angle`, `HardIronCalibration`, `CompassView` (compass drawing) |
+| `xyz_force.py` | 88 | `XYZForceView` (X/Y cross and Z arrows), `magnitude` |
+| `acceleration.py` | 86 | `gravity_vector`, `remove_gravity`, `ResidualCorrection` (Zero / Auto-zero) |
+| `track.py` | 259 | `level_acceleration`, `Tracker` (integration with ZUPT), `TrackSampler` (thread), `TrackView` |
 
-- **Gyroscope tab:**
-  - A transparent cuboid with a wireframe and X/Y/Z axes, named as on the Sense HAT (X = roll red, Y = pitch green, Z = yaw blue). It follows the Sense HAT orientation, or sliders when no Sense HAT is present.
-  - **C** calibrates the shape to 0/0/0, and **R** resets the offsets. The offsets are a rotation: `R = R_offset · R_sensor`.
-- **Compass tab:**
-  - A 2D compass drawn on a Tk canvas.
-  - North comes from the raw magnetometer X/Y (`raw_heading`, the default) or from `get_compass()`, chosen with radio buttons. A slider adds an offset from −180° to 180°, or sets North directly without a Sense HAT.
-  - The info frame shows North, the raw X/Y/Z, and diagnostics: field strength |B| and the raw XY angle.
-- **Sensors per tab:** `set_imu_config` is set to magnetometer only on Compass, and to all three sensors on Gyroscope. The 3D view is drawn only while the Gyroscope tab is showing, and the compass is read only while the Compass tab is showing.
-- **Module split:**
-  - `pihat_gyro.py` holds the Tk interface, the Sense HAT and the orientation maths.
-  - `pi3d_gyro.py` holds everything pi3d: the Windows setup, the off-screen framebuffer, and the scene with its gimbal rotation. Its `GyroScene` interface (`render(orientation, size)` → RGB numpy array) means another 3D library can replace it by changing only the `import pi3d_gyro as gyro3d` line.
+**Tabs:**
+- **Gyroscope:** 3D shape following the orientation, with C/R calibration.
+- **Compass:** north from the raw XY or `get_compass()`, with H hard-iron calibration and an offset slider.
+- **Magnetometer:** X/Y/Z arrows and |B|, with a warning near a magnet.
+- **Accelerometer:** Raw or Linear (gravity removed), with Zero / Auto-zero and an axis range choice.
+- **Track:** speed and track from the linear acceleration, with ZUPT, in board axes or north-up.
+
+Each tab turns on only the sensors it needs (`set_imu_config`), and reads only while it's showing.
 
 ## Issues
 
 ### Medium
 
-1. **The raw compass heading has no calibration or tilt correction** ([pihat_gyro.py:38-42](pihat_gyro.py:38))
-   On your board the raw XY readings are already good: |B| stays at 47.5–50 µT, and each quarter turn gives 82–102° instead of exactly 90°. The remaining ±10° comes from small offsets (hard-iron) and the board not being perfectly flat. Two improvements would help:
-   - **Simple calibration:** record the min/max of X and Y while turning the board one full circle, then subtract the centre `((min+max)/2)` before `atan2`. This could be done with one button.
-   - **Tilt correction:** use the accelerometer's roll and pitch to project X/Y/Z onto the horizontal plane before `atan2`. This is the standard method, and it means the board doesn't have to be flat.
+1. **Track accuracy is limited by the method**
+   Double integration of the acceleration drifts: an error of 0.01 g gives ~5 cm in 1 s and ~1.2 m in 5 s. ZUPT keeps the error to a few cm per move, but only with stops in between. Improvements:
+   - **Software:** one RTIMULib read per sample instead of three (see item 2), and a Kalman filter with ZUPT that also estimates the offset.
+   - **Hardware:** an extra sensor without drift: a USB optical mouse or an optical-flow sensor for a table, wheel encoders for a robot, or camera + ArUco markers for an absolute position in mm.
 
-2. **Moving a Gyroscope slider by hand behaves differently with a Sense HAT** ([pihat_gyro.py:321](pihat_gyro.py:321))
-   The sliders are a rotation applied before the sensor's. Moving one slider can also change the other two angles. C and R work exactly, but fine-tuning by hand isn't intuitive. If you want sliders that map 1:1, store C's correction as a separate rotation and apply the sliders on top as added offsets.
+2. **Three separate sensor reads per Track sample** ([pihat_gyro.py:518](pihat_gyro.py:518))
+   `get_orientation()`, `get_accelerometer_raw()` and `get_gyroscope_raw()` each make their own `IMURead()`. That's slower (about 60 Hz in the test, target 100 Hz), and the three values don't come from the same instant. Using RTIMULib directly (`IMURead()` once, then `getIMUData()`) gives everything from one read.
 
-3. **Gyroscope info labels may be cut off on the Pi** ([pihat_gyro.py:133](pihat_gyro.py:133))
-   `width=12` stays fixed, but `Pitch (Y): -123.4°` is 18 characters. The compass labels no longer have a fixed width, so they don't have this problem. Use the same approach here, or increase the width.
+3. **Bold titles still use `"TkDefaultFont 9 bold"`** ([pihat_gyro.py:130](pihat_gyro.py:130), [171](pihat_gyro.py:171), [246](pihat_gyro.py:246), [258](pihat_gyro.py:258), [285](pihat_gyro.py:285), [441](pihat_gyro.py:441), [463](pihat_gyro.py:463))
+   This is read as a font *family* called "TkDefaultFont" at size 9, so on the Pi the 7 section titles may come out a different size from the other labels. The fix is already in the code: `self.bold_font` (the default font in bold) is used for the |B| warning. The titles should use it too.
 
-4. **Bold title font may come out a different size on the Pi** ([pihat_gyro.py:111](pihat_gyro.py:111), [153](pihat_gyro.py:153))
-   `"TkDefaultFont 9 bold"` is read as a font *family* called "TkDefaultFont", not as the named default font. Fix:
-   ```python
-   bold = tkfont.nametofont("TkDefaultFont").copy(); bold.configure(weight="bold")
-   ```
+4. **Moving a Gyroscope slider by hand behaves differently with a Sense HAT**
+   The sliders are a rotation applied before the sensor's. Moving one slider can also change the other two angles. C and R work exactly.
 
-5. **ANGLE licence file is missing** (`sensehat/pi3d/`)
-   `libEGL.dll` / `libGLESv2.dll` are BSD-licensed ANGLE builds, and the repo is public on GitHub. Add the licence file from `pi3d_windll` (or ANGLE's own) next to the DLLs.
+5. **Gyroscope info labels may be cut off on the Pi** ([pihat_gyro.py:152](pihat_gyro.py:152))
+   `width=12` stays fixed, but `Pitch (Y): -123.4°` is 18 characters. The other tabs' info labels no longer have a fixed width.
+
+6. **ANGLE licence file is missing** (`sensehat/pi3d/`)
+   The committed DLLs are BSD-licensed ANGLE builds, and the repo is public. Add the licence file next to them.
 
 ### Low
 
-6. **The comment about sensors per tab is out of date** ([pihat_gyro.py:230-232](pihat_gyro.py:230))
-   It says "Gyroscope: gyroscope + accelerometer, without magnetometer", but the code sets `set_imu_config(True, True, True)`, which also turns the magnetometer on.
+7. **An error stops the Tk loops for good** ([pihat_gyro.py:368](pihat_gyro.py:368), [376](pihat_gyro.py:376), [571](pihat_gyro.py:571), [582](pihat_gyro.py:582))
+   An I2C error inside `render_loop`, `compass_loop`, `magnet_loop` or `accel_loop` ends that loop's `after()` chain, and the tab freezes. The Track thread already does this properly: it catches the error, stops, and shows a message.
 
-7. **Orientation takes a moment to settle after leaving the Compass tab**
-   On the Compass tab, the gyroscope and accelerometer are off, so RTIMULib keeps updating its estimate from the magnetometer alone. When you switch back to Gyroscope, the estimate needs a moment to recover, so the shape may drift briefly. Pressing **C** right after switching tabs can calibrate to an orientation that hasn't settled yet.
+8. **The Track path grows without limit** ([track.py:121](track.py:121))
+   A new point is added every 2 mm, and the whole path is copied and redrawn every 50 ms. That's fine for tens of metres, but if it's left running and drifting for a long time, the redraw slows down. A limit, e.g. the last 5,000 points, would solve it.
 
-8. **A label is misnamed** ([pihat_gyro.py:280-282](pihat_gyro.py:280))
-   `Raw XY heading` shows the angle `atan2(Y, X)`, while North with the Raw source is `360 − that angle`. Renaming it to `Raw XY angle` would avoid confusion.
+9. **H recording and Track can run together**
+   If you start H on the Compass tab and then press Start on the Track tab, the Track thread updates the min/max through `_read_magnet()` while the Tk thread can stop recording (`stop()`). It's a theoretical conflict between two threads; a lock in `HardIronCalibration` would remove it.
 
-9. **Shown values jump when pitch is near ±90°** ([pihat_gyro.py:30-35](pihat_gyro.py:30))
-   This is a limit of describing a rotation with three angles. The shape is still drawn correctly.
+10. **The orientation needs to settle after switching tabs**
+    The Compass, Magnetometer and Accelerometer (Raw) tabs turn off some sensors. When you go back to Gyroscope or Track, the orientation needs a moment. Pressing C or Start right away measures before it has settled.
 
-10. **An error stops the loops for good** ([pihat_gyro.py:241](pihat_gyro.py:241), [249](pihat_gyro.py:249))
-    An exception in `render_loop` or `compass_loop`, such as an I2C error from the Sense HAT, ends that loop's `after()` chain, and that tab freezes. A `try/finally` that always schedules the next call would keep it running.
+11. **The |B| warning uses the corrected value**
+    The field the sensor actually sees is the uncorrected one. The difference is the hard-iron offset (a few tens of µT on your board).
 
-11. **No check that the framebuffer is complete** ([pi3d_gyro.py:67-89](pi3d_gyro.py:67))
-    If a driver rejects it, the 3D view renders silently black. Check `glCheckFramebufferStatus(GL_FRAMEBUFFER) == 0x8CD5` after the attachments.
+12. **No error handling when saving the hard-iron calibration** ([compass.py:84](compass.py:84))
+    If the folder isn't writable, saving fails without any message in the window.
 
-12. **A new image is created every frame** ([pihat_gyro.py:330](pihat_gyro.py:330))
-    When the size hasn't changed, `self.tk_image.paste(...)` reuses the existing `PhotoImage`, which is cheaper on the Pi.
+13. **No check that the framebuffer is complete** ([pi3d_gyro.py:67-89](pi3d_gyro.py:67))
+    If a driver rejects it, the 3D view goes silently black. Check `glCheckFramebufferStatus` after the attachments.
 
-13. **Unneeded off-screen window move** ([pi3d_gyro.py:122](pi3d_gyro.py:122))
-    `resize(y=max_height)` is no longer needed, since the window is hidden or minimized and drawing is done off-screen.
+14. **A new image every frame** ([pihat_gyro.py:650](pihat_gyro.py:650))
+    `self.tk_image.paste(...)` would reuse the existing `PhotoImage` when the size hasn't changed.
 
-14. **Naming and leftovers**
-    - The class `Transparent3DCubeApp` now holds the whole multi-tab app. Something like `SenseHatApp` would fit better.
-    - `self.frame` in `pi3d_gyro.py` (the wireframe holder, [line 136](pi3d_gyro.py:136)) is easy to confuse with Tk frames. `self.wireframe` would be clearer.
-    - `self.sense.clear()` isn't needed.
-    - The `M` button has no command yet.
-    - The section comments are numbered 1, 2, 4, 3, 5 in code order.
-    - The Magnetometer tab is empty, but the Compass tab already shows the magnetometer values (raw X/Y/Z, |B|). When you fill it, those diagnostics could move there.
-    - `pi3d_windll-master.zip` is untracked in `sensehat/pi3d/`. Delete it or add it to `.gitignore`.
+15. **Leftovers**
+    - [pihat_gyro.py:97](pihat_gyro.py:97): the comment `# Κενό (προς το παρόν) tab` is above the Accelerometer tab, which is no longer empty.
+    - `M` ([line 115](pihat_gyro.py:115)) and `S` ([line 217](pihat_gyro.py:217)) have no command.
+    - The class `Transparent3DCubeApp` now holds the whole multi-tab app; something like `SenseHatApp` would fit better.
+    - `self.sense.clear()` ([line 73](pihat_gyro.py:73)) isn't needed.
+    - The `Raw XY heading` label shows the angle `atan2(Y, X)`, not North.
+    - Unneeded off-screen window move at [pi3d_gyro.py:122](pi3d_gyro.py:122).
+    - `pihat_gyro_hardiron.json` (written on the Pi) and `pi3d_windll-master.zip` aren't in `.gitignore`.
 
-15. **The 24 separate `pi3d.Lines` objects could be fewer** ([pi3d_gyro.py:162-216](pi3d_gyro.py:162))
-    `Lines(..., strip=False)` could draw all the edges as one object and each letter as one object. This is only a speed improvement.
+## Checked and correct
 
-## Fixed since earlier reviews
-
-- **Calibrating at a tilt:** the calibration is stored as a rotation, so later movements are exact.
-- **Windows DLLs:** committed in `sensehat/pi3d/`, so a fresh clone runs on Windows.
-- **3D module split:** `HIDE_PI3D_WINDOW` and its comment moved to `pi3d_gyro.py`, with corrected wording.
-- **CPU:** the 3D view isn't drawn while another tab is showing.
-- **Compass:** `get_compass()` gave bad headings on your board (84 → 126 → 101 → 47 for quarter turns), while the raw XY readings are clean. North now comes from the raw XY by default. The diagnostics confirmed the magnetometer hardware works (|B| ≈ 49 µT, constant).
+- **Module split:** each module has a small interface documented at the top. The 3D library can be swapped by changing `import pi3d_gyro as gyro3d`. Compass, X/Y/Z graphs, gravity removal and track are separate from the Tk layout.
+- **Orientation maths:** `euler_to_matrix` / `matrix_to_euler` follow RTIMULib's convention (Z-Y-X). Converting to a rotation and back returns the same angles, with an error below 10⁻¹³°. Calibration is stored as a rotation, so later movements are exact even at a tilt.
+- **Gravity removal:** `gravity_vector` agrees with RTIMULib's tilt formula (`roll = atan2(y, z)`, `pitch = atan2(−x, √(y²+z²))`). At rest the result is 0 at any tilt (tested at 2,000 random tilts, also with the 0…360 form of the angles).
+- **Zero / Auto-zero:** after Zero, a still board reads < 0.001 g. Auto-zero removes a constant leftover and lets a 0.2 g push through almost fully (0.195 g).
+- **Track:**
+  - `level_acceleration` is 0 at rest at any tilt.
+  - A simulated push (tilted board, 0.01 g leftover, noise) gave 50.6 cm for 49.0 cm.
+  - In the app, with the thread, an L-shaped movement gave F 49.0 / R 36.8 cm exactly as expected.
+  - Leaving the tab stops the thread, and an error stops it with a message.
+- **Compass:** the raw XY heading changes by ~90° per quarter turn on your board (where `get_compass()` didn't). After H, |B| is steady through a full turn.
+- **Interface:**
+  - The same design across the tabs: sunken frames, dark canvases, tool buttons on the left.
+  - The bottom frames are packed first, so only the canvases shrink when the window gets smaller.
+  - The H, Zero and Start buttons stay orange while active, even with the pointer over them.
 
 ## Platform notes
 
 - **Windows:**
-  - The ANGLE DLLs are in `sensehat/pi3d/`.
-  - `d3dcompiler_47.dll` comes from System32.
-  - ANGLE ignores `line_width`, so all lines are 1 pixel wide.
-- **Raspberry Pi (X11):** the pi3d window is minimized with `XIconifyWindow`.
+  - The ANGLE DLLs are in `sensehat/pi3d/`, and `d3dcompiler_47.dll` comes from System32.
+  - SDL2's message loop is turned off (it was crashing Tk), and the SDL context is GLES2 through ANGLE.
+  - Lines are 1 pixel wide (ANGLE ignores `line_width`).
+- **Raspberry Pi (X11):** the pi3d window is minimized, and drawing is done off-screen at the canvas size.
 - **Sense HAT:**
-  - RTIMULib's processing (`get_orientation` yaw, `get_compass`) needs calibration with `RTIMULibCal`. Copy the resulting `RTIMULib.ini` to `~/.config/sense_hat/`.
-  - Without calibration, yaw and `get_compass()` are unreliable. Roll and pitch are unaffected.
-
-## What's good
-
-- **Clean split:** Tk interface and sensors in `pihat_gyro.py`, 3D in `pi3d_gyro.py`. The `GyroScene` interface is small and documented at the top of the module.
-- **Orientation maths:** `euler_to_matrix` / `matrix_to_euler` follow the Sense HAT's angle convention. Converting to a rotation and back returns the same angles, with an error below 10⁻¹³°.
-- **Per-tab sensor setup:** `get_compass()` and `get_orientation()` don't interfere with each other.
-- **Compass reads:** every 20 ms for the measurements, while the display is refreshed every 100 ms to save CPU on the Pi.
-- **Diagnostics:** |B| and the raw XY angle separated a library problem from a hardware problem on the first try.
-- **Consistent design:** the same sunken frames, slider rows, dark canvas background and padding on both tabs.
-- **Layout:** the bottom frames are packed first, so only the canvas shrinks when the window gets smaller.
+  - Calibrate with `RTIMULibCal`: accelerometer (`a`) and magnetometer (`m`), then copy `RTIMULib.ini` to `~/.config/sense_hat/`.
+  - This improves the orientation, Linear mode and Track. The hard-iron calibration (H) only affects the raw magnetometer readings in this app.
+- **Settings to check on the Pi:**
+  - `GRAVITY_SIGNS` (acceleration.py): if an axis grows in Linear mode when you tilt the board.
+  - `LEFT_SIGN` (track.py): if the track comes out mirrored.
+  - `STILL_ACCEL` (track.py): if Track shows "Moving" while the board is still.
