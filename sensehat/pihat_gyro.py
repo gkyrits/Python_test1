@@ -12,6 +12,7 @@ import pi3d_gyro as gyro3d
 # Σχεδίαση πυξίδας (Compass) και διανυσμάτων X/Y/Z (Magnetometer, Accelerometer) σε Tk Canvas
 import compass
 import xyz_force
+import acceleration
 
 try:
     from sense_hat import SenseHat
@@ -233,6 +234,19 @@ class Transparent3DCubeApp:
         self.accel = self._build_vector_tab(accel_tab, "Accelerometer", "g", ACCEL_RANGE, 0.01, 2,
                                             range_choices=ACCEL_RANGE_CHOICES)
         self._show_accel_values(None)
+        # Raw = μέτρηση όπως είναι (με τη βαρύτητα), Linear = χωρίς βαρύτητα σε X, Y, Z
+        # (module acceleration, με την κλίση από gyroscope + accelerometer).
+        # Χωρίς Sense HAT δεν υπάρχει προσανατολισμός για την αφαίρεση, οπότε μόνο Raw.
+        self.accel_mode = tk.StringVar(value="raw")
+        mode_frame = tk.Frame(accel_tab, relief=tk.SUNKEN, borderwidth=2)
+        mode_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2), before=self.accel["frame"])
+        tk.Label(mode_frame, text="Mode", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 8))
+        for text, value in (("Raw", "raw"), ("Linear (gravity removed)", "linear")):
+            tk.Radiobutton(mode_frame, text=text, value=value, variable=self.accel_mode,
+                           command=lambda: self._on_tab_changed(None),
+                           padx=0, pady=0, borderwidth=0, highlightthickness=0,
+                           state=tk.DISABLED if self.sense is None else tk.NORMAL
+                           ).pack(side=tk.LEFT, padx=(4, 8), pady=1)
 
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.render_loop()
@@ -271,7 +285,8 @@ class Transparent3DCubeApp:
     def _on_tab_changed(self, event):
         # Αισθητήρες του IMU ανά tab: set_imu_config(compass, gyroscope, accelerometer)
         # Compass, Magnetometer: μόνο μαγνητόμετρο (όπως το κάνει και το sense.get_compass())
-        # Accelerometer: μόνο επιταχυνσιόμετρο
+        # Accelerometer: μόνο επιταχυνσιόμετρο (Raw), ή gyroscope + accelerometer (Linear,
+        #                για τον προσανατολισμό που αφαιρεί τη βαρύτητα)
         # Gyroscope: όλοι οι αισθητήρες (gyroscope + accelerometer + μαγνητόμετρο)
         if self.sense is None:
             return
@@ -279,7 +294,7 @@ class Transparent3DCubeApp:
         if tab is self.compass_tab or tab is self.magnet_tab:
             self.sense.set_imu_config(True, False, False)
         elif tab is self.accel_tab:
-            self.sense.set_imu_config(False, False, True)
+            self.sense.set_imu_config(False, self.accel_mode.get() == "linear", True)
         elif tab is self.gyro_tab:
             self.sense.set_imu_config(True, True, True)
 
@@ -400,6 +415,7 @@ class Transparent3DCubeApp:
 
         frame = tk.Frame(tab)
         frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
+        panel["frame"] = frame
         # Οι δύο canvas (X/Y και Z) από το module xyz_force
         panel["view"] = xyz_force.XYZForceView(frame, value_range, size=CANVAS_HEIGHT)
         if range_choices:
@@ -419,10 +435,13 @@ class Transparent3DCubeApp:
         self.root.after(50, self.magnet_loop)
 
     def accel_loop(self):
-        # Raw επιταχυνσιόμετρο σε g (Sense HAT) ή οι sliders, κάθε 50 ms
+        # Επιταχυνσιόμετρο σε g (Sense HAT) ή οι sliders, κάθε 50 ms.
+        # Linear: αφαίρεση της βαρύτητας με την κλίση από το get_orientation()
         if self._selected_tab() is self.accel_tab:
             if self.sense is not None:
                 raw = self.sense.get_accelerometer_raw()
+                if self.accel_mode.get() == "linear":
+                    raw = acceleration.remove_gravity(raw, self.sense.get_orientation())
             else:
                 raw = {axis: var.get() for axis, var in self.accel["vars"].items()}
             self._show_accel_values(raw)
@@ -440,7 +459,8 @@ class Transparent3DCubeApp:
         self._show_field(self.magnet["labels"]["total"], self.magnet["label_widgets"]["total"], "|B|", raw)
 
     def _show_accel_values(self, raw):
-        # |a| ≈ 1 g σε ηρεμία (μόνο η βαρύτητα), σε όποια θέση κι αν είναι η πλακέτα
+        # Raw: |a| ≈ 1 g σε ηρεμία (μόνο η βαρύτητα), σε όποια θέση κι αν είναι η πλακέτα.
+        # Linear: |a| ≈ 0 σε ηρεμία
         self._show_axis_values(self.accel, raw)
         total = "---" if raw is None else f"{xyz_force.magnitude(raw):.2f} g"
         self.accel["labels"]["total"].set(f"|a|: {total}")
