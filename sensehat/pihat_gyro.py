@@ -1,6 +1,4 @@
-import json
 import math
-import os
 import tkinter as tk
 from tkinter import messagebox, ttk
 import numpy as np
@@ -9,6 +7,10 @@ from PIL import Image, ImageTk
 # Module της 3D σκηνής: για άλλη 3D βιβλιοθήκη αλλάζει μόνο αυτό το import
 # (το module πρέπει να δίνει GyroScene με το ίδιο interface, βλ. pi3d_gyro.py)
 import pi3d_gyro as gyro3d
+
+# Σχεδίαση πυξίδας (Compass) και διανυσμάτων X/Y/Z (Magnetometer, Accelerometer) σε Tk Canvas
+import compass
+import xyz_force
 
 try:
     from sense_hat import SenseHat
@@ -37,46 +39,20 @@ def matrix_to_euler(m):
     return {"roll": math.degrees(roll), "pitch": math.degrees(pitch), "yaw": math.degrees(yaw)}
 
 
-def raw_heading(raw):
-    # Heading (0..360, αυξάνει δεξιόστροφα όπως η πυξίδα) από τα raw X/Y του
-    # μαγνητόμετρου. Η γωνία atan2(y, x) μικραίνει όταν η πλακέτα στρίβει δεξιόστροφα,
-    # γι' αυτό 360 - γωνία. Σωστό μόνο με την πλακέτα οριζόντια.
-    return (360.0 - math.degrees(math.atan2(raw["y"], raw["x"]))) % 360.0
-
-
 WINDOW_TITLE = "Sense Gyroscope"
 
 CANVAS_BG_COLOR = "light gray"
 CANVAS_WIDTH = 350
 CANVAS_HEIGHT = 250
-COMPASS_BG_COLOR = "#1a1a1a"  # ίδιο με το φόντο της 3D σκηνής
 MAGNET_RANGE = 100.0  # µT στο άκρο των αξόνων (γήινο πεδίο ~25-65 µT)
 ACCEL_RANGE = 2.0  # g στο άκρο των αξόνων (σε ηρεμία |a| ≈ 1 g, η βαρύτητα)
 ACCEL_RANGE_CHOICES = (0.5, 1.0, 1.5, 2.0)  # επιλογές κλίμακας (g) ξεχωριστά για X/Y και Z
-
-# Hard-iron calibration: αρχείο με τα offsets (µT) δίπλα στο script, και ελάχιστο
-# εύρος τιμών ανά άξονα στην καταγραφή για να θεωρηθεί ο άξονας βαθμονομημένος
-HARD_IRON_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pihat_gyro_hardiron.json")
-HARD_IRON_MIN_SPAN = 20.0
 
 # Προειδοποίηση έντασης πεδίου (µT) για πειράματα με μαγνήτη
 FIELD_WARN = 150.0
 FIELD_DANGER = 300.0
 FIELD_WARN_COLOR = "#d07000"  # σκούρο πορτοκαλί, ευανάγνωστο σε ανοιχτό φόντο
 
-
-def load_hard_iron():
-    try:
-        with open(HARD_IRON_FILE) as f:
-            data = json.load(f)
-        return {axis: float(data[axis]) for axis in ("x", "y", "z")}
-    except (OSError, ValueError, KeyError, TypeError):
-        return {"x": 0.0, "y": 0.0, "z": 0.0}
-
-
-def save_hard_iron(offsets):
-    with open(HARD_IRON_FILE, "w") as f:
-        json.dump(offsets, f, indent=2)
 
 # ΟΡΙΣΤΕ ΕΔΩ ΤΙΣ ΑΝΕΞΑΡΤΗΤΕΣ ΔΙΑΣΤΑΣΕΙΣ του σχήματος (μήκος, ύψος, βάθος)
 SHAPE_SIZE = (1.6, 0.2, 1.0)
@@ -176,7 +152,6 @@ class Transparent3DCubeApp:
 
         # 5. Tab Compass: από κάτω προς τα πάνω (pack με side=BOTTOM) το πλαίσιο με τον
         # slider, το info_frame, και από πάνω το compass_frame με τον canvas
-        self.heading = None  # τελική τιμή North (αισθητήρας + offset, ή ο slider)
         # Slider North: τιμή χωρίς Sense HAT, αλλιώς offset στο sense.get_compass()
         compass_control = tk.Frame(compass_tab, relief=tk.SUNKEN, borderwidth=2)
         compass_control.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
@@ -233,17 +208,16 @@ class Transparent3DCubeApp:
             button = tk.Button(compass_tools, text=text, width=2, height=2, padx=0, pady=0, command=command)
             button.pack(side=tk.TOP, pady=(10, 0))
             self.compass_buttons[text] = button
-        # Hard-iron offsets (µT) που αφαιρούνται από κάθε ανάγνωση του μαγνητόμετρου.
+        # Hard-iron calibration του μαγνητόμετρου (module compass, φορτώνει τα αποθηκευμένα offsets).
         # Χωρίς Sense HAT δεν υπάρχει αισθητήρας για calibration, οπότε το H είναι ανενεργό
-        self.hard_iron = load_hard_iron()
-        self.hard_iron_rec = None  # min/max ανά άξονα όσο γίνεται η καταγραφή
+        self.hard_iron = compass.HardIronCalibration()
         self.button_bg = self.compass_buttons["H"].cget("bg")
         if self.sense is None:
             self.compass_buttons["H"].config(state=tk.DISABLED)
-        self.compass_canvas = tk.Canvas(compass_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT,
-                                        bg=COMPASS_BG_COLOR, highlightthickness=0)
+        # Σχεδίαση της πυξίδας από το module compass
+        self.compass_canvas = tk.Canvas(compass_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT)
         self.compass_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.compass_canvas.bind("<Configure>", lambda event: self._draw_compass())
+        self.compass_view = compass.CompassView(self.compass_canvas)
 
         # 6. Tabs Magnetometer και Accelerometer: ίδιο design (βλ. _build_vector_tab)
         self.magnet = self._build_vector_tab(magnet_tab, "Magnetometer", "µT", MAGNET_RANGE, 0.1, 1)
@@ -319,14 +293,14 @@ class Transparent3DCubeApp:
             if self.sense is not None:
                 raw = self._read_magnet()
                 if self.compass_source.get() == "raw":
-                    north += raw_heading(raw)
+                    north += compass.raw_heading(raw)
                 else:
                     north += self.sense.get_compass()
-            self.heading = north % 360.0
+            self.compass_view.heading = north % 360.0
             self.compass_ticks += 1
             if self.compass_ticks % 2 == 0:
-                self._show_compass_values(self.heading, raw)
-                self._draw_compass()
+                self._show_compass_values(self.compass_view.heading, raw)
+                self.compass_view.draw()
         self.root.after(20, self.compass_loop)
 
     def _show_compass_values(self, heading, raw):
@@ -336,73 +310,31 @@ class Transparent3DCubeApp:
             self.compass_vars[axis].set(f"{axis.upper()}: {value}")
         # Διάγνωση: η ένταση του γήινου πεδίου είναι ~25-65 µT και μένει σταθερή όταν
         # η πλακέτα περιστρέφεται· το raw heading ισχύει μόνο με την πλακέτα οριζόντια
-        xy_angle = "---" if raw is None else f"{math.degrees(math.atan2(raw['y'], raw['x'])) % 360.0:.1f}°"
+        xy_angle = "---" if raw is None else f"{compass.xy_angle(raw):.1f}°"
         self._show_field(self.compass_vars["field"], self.compass_label_widgets["field"], "Field |B|", raw)
         self.compass_vars["raw_heading"].set(f"Raw XY heading: {xy_angle}")
 
-    def _draw_compass(self):
-        # Πυξίδα: η ροδέλα στρέφεται ώστε το N να δείχνει τον πραγματικό βορρά,
-        # το κίτρινο τρίγωνο πάνω είναι η κατεύθυνση της πλακέτας
-        c = self.compass_canvas
-        c.delete("all")
-        w, h = c.winfo_width(), c.winfo_height()
-        cx, cy = w / 2.0, h / 2.0
-        r = min(w, h) / 2.0 - 14
-        if r < 20:
-            return
-        rotation = -(self.heading or 0.0)
-
-        def point(angle, radius):
-            a = math.radians(angle + rotation)
-            return cx + radius * math.sin(a), cy - radius * math.cos(a)
-
-        c.create_oval(cx - r, cy - r, cx + r, cy + r, outline="white", width=2)
-        for deg in range(0, 360, 10):
-            length = 12 if deg % 30 == 0 else 6
-            c.create_line(*point(deg, r), *point(deg, r - length), fill="white")
-        for deg, text in ((0, "N"), (90, "E"), (180, "S"), (270, "W")):
-            c.create_text(*point(deg, r - 26), text=text, fill="red" if text == "N" else "white",
-                          font="TkDefaultFont 12 bold")
-        # Βελόνα: κόκκινο προς Βορρά, γκρι προς Νότο
-        needle = r - 42
-        c.create_polygon(*point(0, needle), *point(90, 6), *point(270, 6), fill="red", outline="")
-        c.create_polygon(*point(180, needle), *point(90, 6), *point(270, 6), fill="gray60", outline="")
-        c.create_oval(cx - 4, cy - 4, cx + 4, cy + 4, fill="white", outline="")
-        # Σταθερό σημάδι της κατεύθυνσης της πλακέτας
-        c.create_polygon(cx, cy - r + 2, cx - 7, cy - r - 12, cx + 7, cy - r - 12, fill="yellow", outline="")
-
     def _read_magnet(self):
-        # Ανάγνωση του μαγνητόμετρου (µT) διορθωμένη με τα hard-iron offsets.
-        # Όσο γίνεται καταγραφή (H), κρατάει min/max των αδιόρθωτων τιμών.
-        raw = self.sense.get_compass_raw()
-        if self.hard_iron_rec is not None:
-            for axis, (low, high) in self.hard_iron_rec.items():
-                self.hard_iron_rec[axis] = (min(low, raw[axis]), max(high, raw[axis]))
-        return {axis: raw[axis] - self.hard_iron[axis] for axis in ("x", "y", "z")}
+        # Ανάγνωση του μαγνητόμετρου (µT) διορθωμένη με τα hard-iron offsets (module compass)
+        return self.hard_iron.correct(self.sense.get_compass_raw())
 
     def toggle_hard_iron(self):
-        # 1ο πάτημα: έναρξη καταγραφής -> περιστροφή της πλακέτας σε πλήρη κύκλο
-        # (ιδανικά και με κλίσεις). 2ο πάτημα: offset = κέντρο (min+max)/2 ανά άξονα.
-        # Άξονες με μικρό εύρος (π.χ. Z όταν η πλακέτα έμεινε οριζόντια) κρατούν το παλιό offset.
+        # Κουμπί H: 1ο πάτημα έναρξη καταγραφής (περιστροφή της πλακέτας σε πλήρη κύκλο),
+        # 2ο πάτημα υπολογισμός και αποθήκευση των offsets (βλ. compass.HardIronCalibration)
         button = self.compass_buttons["H"]
-        if self.hard_iron_rec is None:
-            self.hard_iron_rec = {axis: (math.inf, -math.inf) for axis in ("x", "y", "z")}
+        if not self.hard_iron.recording:
+            self.hard_iron.start()
             button.config(relief=tk.SUNKEN, bg="orange")
             return
-        record, self.hard_iron_rec = self.hard_iron_rec, None
+        updated = self.hard_iron.stop()
         button.config(relief=tk.RAISED, bg=self.button_bg)
-        updated = [axis for axis, (low, high) in record.items() if high - low >= HARD_IRON_MIN_SPAN]
         if not updated:
             messagebox.showwarning("Hard-iron calibration",
                                    "Not enough rotation, the previous calibration is kept.\n"
                                    "Turn the board slowly through a full circle while recording.")
             return
-        for axis in updated:
-            low, high = record[axis]
-            self.hard_iron[axis] = (low + high) / 2.0
-        save_hard_iron(self.hard_iron)
         kept = [axis.upper() for axis in ("x", "y", "z") if axis not in updated]
-        offsets = ", ".join(f"{axis.upper()}: {self.hard_iron[axis]:.1f} µT" for axis in ("x", "y", "z"))
+        offsets = ", ".join(f"{axis.upper()}: {self.hard_iron.offsets[axis]:.1f} µT" for axis in ("x", "y", "z"))
         messagebox.showinfo("Hard-iron calibration",
                             f"Offsets: {offsets}" + (f"\nKept previous: {', '.join(kept)} (small range)" if kept else ""))
 
@@ -411,8 +343,7 @@ class Transparent3DCubeApp:
         # side=BOTTOM) οι sliders προσομοίωσης (μόνο χωρίς Sense HAT), το info_frame,
         # η επιλογή κλίμακας (αν δοθεί range_choices), και το frame με τους δύο canvas:
         # X/Y σε σταυρό και Z σε στενότερο canvas
-        panel = {"range_xy": value_range, "range_z": value_range, "unit": unit, "decimals": decimals,
-                 "vars": {}, "labels": {}, "label_widgets": {}, "raw": None}
+        panel = {"unit": unit, "decimals": decimals, "vars": {}, "labels": {}, "label_widgets": {}}
         if self.sense is None:
             control = tk.Frame(tab, relief=tk.SUNKEN, borderwidth=2)
             control.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
@@ -454,42 +385,36 @@ class Transparent3DCubeApp:
                 tk.Label(range_frame, text=unit).pack(side=tk.LEFT, padx=(2, 6))
 
                 def on_select(event, key=key, choice=choice):
-                    panel[key] = float(choice.get())
-                    self._draw_vector(panel)
+                    setattr(panel["view"], key, float(choice.get()))
+                    panel["view"].draw()
                 choice.bind("<<ComboboxSelected>>", on_select)
 
         frame = tk.Frame(tab)
         frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
-        panel["xy"] = tk.Canvas(frame, width=CANVAS_HEIGHT, height=CANVAS_HEIGHT,
-                                bg=COMPASS_BG_COLOR, highlightthickness=0)
-        panel["xy"].pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        panel["z"] = tk.Canvas(frame, width=80, height=CANVAS_HEIGHT,
-                               bg=COMPASS_BG_COLOR, highlightthickness=0)
-        panel["z"].pack(side=tk.LEFT, fill=tk.Y, padx=(2, 0))
-        for canvas in (panel["xy"], panel["z"]):
-            canvas.bind("<Configure>", lambda event: self._draw_vector(panel))
+        # Οι δύο canvas (X/Y και Z) από το module xyz_force
+        panel["view"] = xyz_force.XYZForceView(frame, value_range, size=CANVAS_HEIGHT)
         return panel
 
     def magnet_loop(self):
         # Raw μαγνητόμετρο (Sense HAT, με hard-iron διόρθωση) ή οι sliders, κάθε 50 ms
         if self._selected_tab() is self.magnet_tab:
             if self.sense is not None:
-                self.magnet["raw"] = self._read_magnet()
+                raw = self._read_magnet()
             else:
-                self.magnet["raw"] = {axis: var.get() for axis, var in self.magnet["vars"].items()}
-            self._show_magnet_values(self.magnet["raw"])
-            self._draw_vector(self.magnet)
+                raw = {axis: var.get() for axis, var in self.magnet["vars"].items()}
+            self._show_magnet_values(raw)
+            self.magnet["view"].draw(raw)
         self.root.after(50, self.magnet_loop)
 
     def accel_loop(self):
         # Raw επιταχυνσιόμετρο σε g (Sense HAT) ή οι sliders, κάθε 50 ms
         if self._selected_tab() is self.accel_tab:
             if self.sense is not None:
-                self.accel["raw"] = self.sense.get_accelerometer_raw()
+                raw = self.sense.get_accelerometer_raw()
             else:
-                self.accel["raw"] = {axis: var.get() for axis, var in self.accel["vars"].items()}
-            self._show_accel_values(self.accel["raw"])
-            self._draw_vector(self.accel)
+                raw = {axis: var.get() for axis, var in self.accel["vars"].items()}
+            self._show_accel_values(raw)
+            self.accel["view"].draw(raw)
         self.root.after(50, self.accel_loop)
 
     @staticmethod
@@ -505,7 +430,7 @@ class Transparent3DCubeApp:
     def _show_accel_values(self, raw):
         # |a| ≈ 1 g σε ηρεμία (μόνο η βαρύτητα), σε όποια θέση κι αν είναι η πλακέτα
         self._show_axis_values(self.accel, raw)
-        total = "---" if raw is None else f"{math.sqrt(raw['x'] ** 2 + raw['y'] ** 2 + raw['z'] ** 2):.2f} g"
+        total = "---" if raw is None else f"{xyz_force.magnitude(raw):.2f} g"
         self.accel["labels"]["total"].set(f"|a|: {total}")
 
     @staticmethod
@@ -517,70 +442,13 @@ class Transparent3DCubeApp:
             var.set(f"{title}: ---")
             label.config(fg="black")
             return
-        field = math.sqrt(raw["x"] ** 2 + raw["y"] ** 2 + raw["z"] ** 2)
+        field = xyz_force.magnitude(raw)
         if field > FIELD_DANGER:
             var.set(f"{title}: {field:.1f} µT  too close!")
             label.config(fg="red")
         else:
             var.set(f"{title}: {field:.1f} µT")
             label.config(fg=FIELD_WARN_COLOR if field > FIELD_WARN else "black")
-
-    @staticmethod
-    def _draw_vector(panel):
-        # Βέλη με μήκος ανάλογο της τιμής: X οριζόντια (δεξιά +), Y κάθετα (πάνω +),
-        # Z κάθετα στον δεύτερο canvas. Οι άξονες έχουν ίδιο μήκος στην οθόνη, με τιμή
-        # στο άκρο range_xy (X/Y) και range_z (Z). Γραμμές κλίμακας ανά range/4
-        # (μεγαλύτερες ανά range/2), τιμές πέρα από το range σταματούν στο άκρο.
-        raw = panel["raw"]
-        xy, zc = panel["xy"], panel["z"]
-        w, h = xy.winfo_width(), xy.winfo_height()
-        zw = zc.winfo_width()
-        margin = 22
-        reach = min(w, h) / 2.0 - margin  # μήκος μισού άξονα σε pixels
-        if reach <= 0:
-            return
-
-        def axis_scale(value_range):
-            step = value_range / 4.0
-            ticks = [(i * step, 5 if i % 2 == 0 else 3) for i in range(-4, 5) if i]
-            clamp = lambda v: max(-value_range, min(value_range, v))
-            return reach / value_range, ticks, clamp
-
-        # Canvas 1: σταυρός X/Y
-        range_xy = panel["range_xy"]
-        scale, ticks, clamp = axis_scale(range_xy)
-        xy.delete("all")
-        cx, cy = w / 2.0, h / 2.0
-        xy.create_line(cx - reach, cy, cx + reach, cy, fill="gray50")
-        xy.create_line(cx, cy - reach, cx, cy + reach, fill="gray50")
-        for t, size in ticks:
-            xy.create_line(cx + t * scale, cy - size, cx + t * scale, cy + size, fill="gray50")
-            xy.create_line(cx - size, cy - t * scale, cx + size, cy - t * scale, fill="gray50")
-        xy.create_text(cx + reach + 10, cy, text="X", fill="red", font="TkDefaultFont 10 bold")
-        xy.create_text(cx, cy - reach - 10, text="Y", fill="#00c000", font="TkDefaultFont 10 bold")
-        xy.create_text(cx + reach / 2.0, cy + 12, text=f"{range_xy / 2.0:g}",
-                       fill="gray60", font="TkDefaultFont 7")
-        if raw is not None:
-            xy.create_line(cx, cy, cx + clamp(raw["x"]) * scale, cy, fill="red", width=4,
-                           arrow=tk.LAST, arrowshape=(10, 12, 5))
-            xy.create_line(cx, cy, cx, cy - clamp(raw["y"]) * scale, fill="#00c000", width=4,
-                           arrow=tk.LAST, arrowshape=(10, 12, 5))
-
-        # Canvas 2: οριζόντια γραμμή μηδέν του Z, βέλος πάνω (+) ή κάτω (-)
-        range_z = panel["range_z"]
-        scale, ticks, clamp = axis_scale(range_z)
-        zc.delete("all")
-        zx, zy = zw / 2.0, zc.winfo_height() / 2.0
-        zc.create_line(4, zy, zw - 4, zy, fill="gray50")
-        zc.create_line(zx, zy - reach, zx, zy + reach, fill="gray30", dash=(2, 3))
-        for t, size in ticks:
-            zc.create_line(zx - size, zy - t * scale, zx + size, zy - t * scale, fill="gray50")
-        zc.create_text(zx, zy - reach - 10, text="Z", fill="#4080ff", font="TkDefaultFont 10 bold")
-        zc.create_text(zx + 16, zy - reach / 2.0, text=f"{range_z / 2.0:g}",
-                       fill="gray60", font="TkDefaultFont 7")
-        if raw is not None:
-            zc.create_line(zx, zy, zx, zy - clamp(raw["z"]) * scale, fill="#4080ff", width=4,
-                           arrow=tk.LAST, arrowshape=(10, 12, 5))
 
     def _render_gyro(self):
         # Χωρίς Sense HAT οι sliders δίνουν τις τιμές, αλλιώς είναι μια περιστροφή
