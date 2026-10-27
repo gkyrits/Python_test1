@@ -1,5 +1,6 @@
 import math
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import messagebox, ttk
 import numpy as np
 from PIL import Image, ImageTk
@@ -76,6 +77,10 @@ class Transparent3DCubeApp:
         self.scene = gyro3d.GyroScene(CANVAS_WIDTH, CANVAS_HEIGHT, shape_size=SHAPE_SIZE, title=WINDOW_TITLE)
 
         # Notebook με μικρά tabs (ίδια γραμματοσειρά με το υπόλοιπο GUI, μικρό ύψος tab)
+        # Έντονη εκδοχή της γραμματοσειράς του GUI (για τις προειδοποιήσεις |B|)
+        self.bold_font = tkfont.nametofont("TkDefaultFont").copy()
+        self.bold_font.configure(weight="bold")
+
         style = ttk.Style(root)
         style.configure("Small.TNotebook", tabmargins=(2, 2, 2, 0))
         style.configure("Small.TNotebook.Tab", font="TkDefaultFont", padding=(6, 0))
@@ -213,7 +218,8 @@ class Transparent3DCubeApp:
         # Hard-iron calibration του μαγνητόμετρου (module compass, φορτώνει τα αποθηκευμένα offsets).
         # Χωρίς Sense HAT δεν υπάρχει αισθητήρας για calibration, οπότε το H είναι ανενεργό
         self.hard_iron = compass.HardIronCalibration()
-        self.button_bg = self.compass_buttons["H"].cget("bg")
+        # Αρχικά χρώματα του H (bg, και activebackground που φαίνεται όσο το ποντίκι είναι πάνω του)
+        self.button_colors = {key: self.compass_buttons["H"].cget(key) for key in ("bg", "activebackground")}
         if self.sense is None:
             self.compass_buttons["H"].config(state=tk.DISABLED)
         # Σχεδίαση της πυξίδας από το module compass
@@ -326,10 +332,10 @@ class Transparent3DCubeApp:
         button = self.compass_buttons["H"]
         if not self.hard_iron.recording:
             self.hard_iron.start()
-            button.config(relief=tk.SUNKEN, bg="orange")
+            button.config(relief=tk.SUNKEN, bg="orange", activebackground="orange")
             return
         updated = self.hard_iron.stop()
-        button.config(relief=tk.RAISED, bg=self.button_bg)
+        button.config(relief=tk.RAISED, **self.button_colors)
         if not updated:
             messagebox.showwarning("Hard-iron calibration",
                                    "Not enough rotation, the previous calibration is kept.\n"
@@ -439,22 +445,24 @@ class Transparent3DCubeApp:
         total = "---" if raw is None else f"{xyz_force.magnitude(raw):.2f} g"
         self.accel["labels"]["total"].set(f"|a|: {total}")
 
-    @staticmethod
-    def _show_field(var, label, title, raw):
+    def _show_field(self, var, label, title, raw):
         # Ένταση πεδίου |B| με προειδοποίηση όταν ένας μαγνήτης είναι πολύ κοντά:
-        # πορτοκαλί πάνω από FIELD_WARN, κόκκινο με "too close!" πάνω από FIELD_DANGER
+        # πορτοκαλί πάνω από FIELD_WARN, κόκκινο με "too close!" πάνω από FIELD_DANGER,
+        # και στις δύο περιπτώσεις με έντονη γραμματοσειρά
         # (εκεί κοντινά ατσάλινα μέρη μπορεί να μαγνητιστούν -> νέο hard-iron offset)
-        if raw is None:
+        field = None if raw is None else xyz_force.magnitude(raw)
+        if field is None:
             var.set(f"{title}: ---")
-            label.config(fg="black")
-            return
-        field = xyz_force.magnitude(raw)
-        if field > FIELD_DANGER:
+        elif field > FIELD_DANGER:
             var.set(f"{title}: {field:.1f} µT  too close!")
-            label.config(fg="red")
         else:
             var.set(f"{title}: {field:.1f} µT")
-            label.config(fg=FIELD_WARN_COLOR if field > FIELD_WARN else "black")
+        if field is not None and field > FIELD_DANGER:
+            label.config(fg="red", font=self.bold_font)
+        elif field is not None and field > FIELD_WARN:
+            label.config(fg=FIELD_WARN_COLOR, font=self.bold_font)
+        else:
+            label.config(fg="black", font="TkDefaultFont")
 
     def _render_gyro(self):
         # Χωρίς Sense HAT οι sliders δίνουν τις τιμές, αλλιώς είναι μια περιστροφή
