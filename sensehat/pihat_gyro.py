@@ -46,7 +46,9 @@ CANVAS_WIDTH = 350
 CANVAS_HEIGHT = 250
 MAGNET_RANGE = 100.0  # µT στο άκρο των αξόνων (γήινο πεδίο ~25-65 µT)
 ACCEL_RANGE = 2.0  # g στο άκρο των αξόνων (σε ηρεμία |a| ≈ 1 g, η βαρύτητα)
-ACCEL_RANGE_CHOICES = (0.5, 1.0, 1.5, 2.0)  # επιλογές κλίμακας (g) ξεχωριστά για X/Y και Z
+# Επιλογές κλίμακας (g) και αρχική τιμή, ξεχωριστά για τον σταυρό X/Y και τον Z
+ACCEL_RANGE_CHOICES = {"range_xy": ((0.1, 0.5, 1.0, 1.5, 2.0), 1.0),
+                       "range_z": ((0.5, 1.0, 1.5, 2.0), 2.0)}
 
 # Προειδοποίηση έντασης πεδίου (µT) για πειράματα με μαγνήτη
 FIELD_WARN = 150.0
@@ -377,10 +379,11 @@ class Transparent3DCubeApp:
             range_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
             tk.Label(range_frame, text="Axes range", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 8))
             for key, text in (("range_xy", "X/Y:"), ("range_z", "Z:")):
+                values, default = range_choices[key]
                 tk.Label(range_frame, text=text).pack(side=tk.LEFT, padx=(4, 2))
-                choice = ttk.Combobox(range_frame, values=[f"{v:g}" for v in range_choices],
+                choice = ttk.Combobox(range_frame, values=[f"{v:g}" for v in values],
                                       width=4, state="readonly")
-                choice.set(f"{value_range:g}")
+                choice.set(f"{default:g}")
                 choice.pack(side=tk.LEFT, pady=1)
                 tk.Label(range_frame, text=unit).pack(side=tk.LEFT, padx=(2, 6))
 
@@ -393,6 +396,9 @@ class Transparent3DCubeApp:
         frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
         # Οι δύο canvas (X/Y και Z) από το module xyz_force
         panel["view"] = xyz_force.XYZForceView(frame, value_range, size=CANVAS_HEIGHT)
+        if range_choices:
+            for key, (values, default) in range_choices.items():
+                setattr(panel["view"], key, default)
         return panel
 
     def magnet_loop(self):
