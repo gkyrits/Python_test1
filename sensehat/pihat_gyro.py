@@ -243,10 +243,25 @@ class Transparent3DCubeApp:
         tk.Label(mode_frame, text="Mode", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 8))
         for text, value in (("Raw", "raw"), ("Linear (gravity removed)", "linear")):
             tk.Radiobutton(mode_frame, text=text, value=value, variable=self.accel_mode,
-                           command=lambda: self._on_tab_changed(None),
+                           command=self._on_accel_mode,
                            padx=0, pady=0, borderwidth=0, highlightthickness=0,
                            state=tk.DISABLED if self.sense is None else tk.NORMAL
                            ).pack(side=tk.LEFT, padx=(4, 8), pady=1)
+        # Διόρθωση υπολοίπου στο Linear (module acceleration): Zero = μέσος όρος ~1 s με την
+        # πλακέτα ακίνητη, Auto-zero = αργό φίλτρο που αφαιρεί συνεχώς ό,τι μένει σταθερό
+        self.accel_correction = acceleration.ResidualCorrection()
+        correction_frame = tk.Frame(self.accel["options"])
+        correction_frame.pack(side=tk.TOP, fill=tk.X)
+        tk.Label(correction_frame, text="Residual", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 8))
+        self.zero_button = tk.Button(correction_frame, text="Zero", padx=6, pady=0, command=self.zero_accel)
+        self.zero_button.pack(side=tk.LEFT, padx=(4, 8), pady=1)
+        self.zero_colors = {key: self.zero_button.cget(key) for key in ("bg", "activebackground")}
+        self.auto_zero_var = tk.BooleanVar(value=False)
+        self.auto_zero_check = tk.Checkbutton(correction_frame, text="Auto-zero", variable=self.auto_zero_var,
+                                              command=self._on_auto_zero, padx=0, pady=0,
+                                              borderwidth=0, highlightthickness=0)
+        self.auto_zero_check.pack(side=tk.LEFT, padx=(4, 8))
+        self._update_correction_controls()
 
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.render_loop()
@@ -427,6 +442,27 @@ class Transparent3DCubeApp:
                 setattr(panel["view"], key, default)
         return panel
 
+    def _on_accel_mode(self):
+        # Αλλαγή Raw/Linear: νέες ρυθμίσεις IMU, και το υπόλοιπο μετριέται από την αρχή
+        self.accel_correction.reset()
+        self.zero_button.config(**self.zero_colors)
+        self._update_correction_controls()
+        self._on_tab_changed(None)
+
+    def _update_correction_controls(self):
+        # Zero / Auto-zero έχουν νόημα μόνο στο Linear (και μόνο με Sense HAT)
+        state = tk.NORMAL if self.accel_mode.get() == "linear" else tk.DISABLED
+        self.zero_button.config(state=state)
+        self.auto_zero_check.config(state=state)
+
+    def zero_accel(self):
+        # Κουμπί Zero: μέσος όρος ~1 s (πορτοκαλί όσο μετράει), η πλακέτα πρέπει να μένει ακίνητη
+        self.accel_correction.start_zero()
+        self.zero_button.config(bg="orange", activebackground="orange")
+
+    def _on_auto_zero(self):
+        self.accel_correction.auto = self.auto_zero_var.get()
+
     def magnet_loop(self):
         # Raw μαγνητόμετρο (Sense HAT, με hard-iron διόρθωση) ή οι sliders, κάθε 50 ms
         if self._selected_tab() is self.magnet_tab:
@@ -446,6 +482,9 @@ class Transparent3DCubeApp:
                 raw = self.sense.get_accelerometer_raw()
                 if self.accel_mode.get() == "linear":
                     raw = acceleration.remove_gravity(raw, self.sense.get_orientation())
+                    raw = self.accel_correction.apply(raw)
+                    if not self.accel_correction.zeroing:
+                        self.zero_button.config(**self.zero_colors)
             else:
                 raw = {axis: var.get() for axis, var in self.accel["vars"].items()}
             self._show_accel_values(raw)
@@ -455,7 +494,7 @@ class Transparent3DCubeApp:
     @staticmethod
     def _show_axis_values(panel, raw):
         for axis in ("x", "y", "z"):
-            value = "---" if raw is None else f"{raw[axis]:.{panel['decimals']}f} {panel['unit']}"
+            value = "---" if raw is None else f"{round(raw[axis], panel['decimals']) + 0.0:.{panel['decimals']}f} {panel['unit']}"
             panel["labels"][axis].set(f"{axis.upper()}: {value}")
 
     def _show_magnet_values(self, raw):
