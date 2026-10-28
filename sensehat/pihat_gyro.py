@@ -268,26 +268,30 @@ class Transparent3DCubeApp:
 
         # 7. Tab Track: από κάτω προς τα πάνω (pack με side=BOTTOM) οι επιλογές, το info_frame,
         # και το frame με τον canvas της διαδρομής (module track: ταχύτητα και διαδρομή από τη
-        # γραμμική επιτάχυνση, με ZUPT, σε νήμα ~100 Hz)
+        # γραμμική επιτάχυνση, με ZUPT και διόρθωση drift σε κάθε στάση, σε νήμα)
         self.tracker = track.Tracker()
         self.track_sampler = track.TrackSampler(self._read_track_sample, self.tracker)
-        self.track_use_compass = False  # διαβάζεται από το νήμα, όχι Tk μεταβλητή
         track_options = tk.Frame(track_tab, relief=tk.SUNKEN, borderwidth=2)
         track_options.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
         state = tk.DISABLED if self.sense is None else tk.NORMAL
-        self.track_button = tk.Button(track_options, text="Start", width=6, padx=2, pady=0,
+        buttons_row = tk.Frame(track_options)
+        buttons_row.pack(fill=tk.X)
+        self.track_button = tk.Button(buttons_row, text="Start", width=6, padx=2, pady=0,
                                       command=self.toggle_track, state=state)
         self.track_button.pack(side=tk.LEFT, padx=(4, 4), pady=1)
         self.track_colors = {key: self.track_button.cget(key) for key in ("bg", "activebackground")}
-        tk.Button(track_options, text="Reset", width=6, padx=2, pady=0, command=self.reset_track,
+        tk.Button(buttons_row, text="Reset", width=6, padx=2, pady=0, command=self.reset_track,
                   state=state).pack(side=tk.LEFT, padx=(0, 8), pady=1)
-        # Board: άξονες της πλακέτας (πάνω = μπροστά), Compass: Βορράς πάνω με το raw XY heading
-        tk.Label(track_options, text="Heading", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 4))
+        # Board: άξονες της πλακέτας (πάνω = μπροστά, χωρίς στροφές), Gyro: πάνω = κατεύθυνση στο
+        # Start και οι στροφές από το gyroscope, Compass: Βορράς πάνω (μαγνητόμετρο με διόρθωση κλίσης)
+        heading_row = tk.Frame(track_options)
+        heading_row.pack(fill=tk.X)
+        tk.Label(heading_row, text="Heading", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 4))
         self.track_heading = tk.StringVar(value="board")
-        for text, value in (("Board", "board"), ("Compass", "compass")):
-            tk.Radiobutton(track_options, text=text, value=value, variable=self.track_heading,
+        for text, value in (("Board", "board"), ("Gyro", "gyro"), ("Compass", "compass")):
+            tk.Radiobutton(heading_row, text=text, value=value, variable=self.track_heading,
                            command=self._on_track_heading, padx=0, pady=0, borderwidth=0,
-                           highlightthickness=0, state=state).pack(side=tk.LEFT, padx=(4, 4))
+                           highlightthickness=0, state=state).pack(side=tk.LEFT, padx=(4, 4), pady=1)
 
         track_info = tk.Frame(track_tab, relief=tk.SUNKEN, borderwidth=2)
         track_info.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
@@ -516,13 +520,26 @@ class Transparent3DCubeApp:
         self.accel_correction.auto = self.auto_zero_var.get()
 
     def _read_track_sample(self):
-        # Καλείται από το νήμα του Track: επιτάχυνση (g), προσανατολισμός (roll/pitch για την
-        # κλίση), gyroscope (rad/s, για την ανίχνευση ακινησίας) και heading (ή None)
+        # Καλείται από το νήμα του Track: (επιτάχυνση g, προσανατολισμός μοίρες, gyroscope rad/s,
+        # μαγνητόμετρο µT με hard-iron διόρθωση ή None, χρόνος s ή None), ή None χωρίς νέο δείγμα.
+        # Αν γίνεται, ΜΙΑ ανάγνωση του RTIMULib για όλα (ίδια στιγμή, χρόνος του IMU, πιο
+        # γρήγορα), αντί για τρεις ξεχωριστές αναγνώσεις μέσω του sense_hat.
+        use_mag = self.tracker.heading_mode == "compass"
+        imu = getattr(self.sense, "_imu", None)
+        if imu is not None and hasattr(imu, "getIMUData"):
+            if not imu.IMURead():
+                return None
+            data = imu.getIMUData()
+            roll, pitch, yaw = (math.degrees(v) for v in data["fusionPose"])
+            mag = self.hard_iron.correct(dict(zip("xyz", data["compass"]))) if use_mag else None
+            return (dict(zip("xyz", data["accel"])), {"roll": roll, "pitch": pitch, "yaw": yaw},
+                    dict(zip("xyz", data["gyro"])), mag, data["timestamp"] / 1e6)
+        # Χωρίς πρόσβαση στο RTIMULib (π.χ. sense_emu): τρεις αναγνώσεις, χρόνος από το νήμα
         orientation = self.sense.get_orientation()
         accel = self.sense.get_accelerometer_raw()
         gyro = self.sense.get_gyroscope_raw()
-        heading = compass.raw_heading(self._read_magnet()) if self.track_use_compass else None
-        return accel, orientation, gyro, heading
+        mag = self._read_magnet() if use_mag else None
+        return accel, orientation, gyro, mag, None
 
     def toggle_track(self):
         # Start / Stop: πορτοκαλί όσο καταγράφει
@@ -541,8 +558,8 @@ class Transparent3DCubeApp:
         self.track_view.draw(self.tracker.snapshot())
 
     def _on_track_heading(self):
-        # Αλλαγή Board/Compass: η διαδρομή ξεκινάει από την αρχή στο νέο σύστημα αξόνων
-        self.track_use_compass = self.track_heading.get() == "compass"
+        # Αλλαγή Board/Gyro/Compass: η διαδρομή ξεκινάει από την αρχή στο νέο σύστημα αξόνων
+        self.tracker.heading_mode = self.track_heading.get()
         self.reset_track()
 
     def track_loop(self):
@@ -559,7 +576,7 @@ class Transparent3DCubeApp:
 
     def _show_track_values(self, snap):
         up, right = snap["position"]
-        names = ("N", "E") if snap["heading"] is not None else ("F", "R")
+        names = ("N", "E") if snap["heading_mode"] == "compass" else ("F", "R")
         self.track_vars["speed"].set(f"Speed: {snap['speed'] * 100:.1f} cm/s")
         self.track_vars["distance"].set(f"Dist: {snap['distance'] * 100:.1f} cm")
         self.track_vars["position"].set(f"{names[0]}: {up * 100:.1f}  {names[1]}: {right * 100:.1f} cm")

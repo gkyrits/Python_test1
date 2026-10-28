@@ -4,18 +4,27 @@
 μικρό υπόλοιπο σφάλμα μεγαλώνει γρήγορα (0.01 g -> ~5 cm σε 1 s, ~1.2 m σε 5 s), γι' αυτό:
 - ZUPT (zero velocity update): όταν η πλακέτα είναι ακίνητη η ταχύτητα γίνεται 0, οπότε
   το σφάλμα μαζεύεται μόνο για τη διάρκεια κάθε κίνησης
-- όσο είναι ακίνητη, μετριέται το υπόλοιπο (bias) και αφαιρείται στην κίνηση
+- διόρθωση drift σε κάθε στάση: η ταχύτητα που έμεινε τη στιγμή της στάσης είναι το σφάλμα
+  της κίνησης, που θεωρείται ότι μεγάλωσε γραμμικά, οπότε διορθώνεται προς τα πίσω όλο το
+  κομμάτι της διαδρομής εκείνης της κίνησης
+- όσο είναι ακίνητη, μετριέται το υπόλοιπο (bias) της επιτάχυνσης και του gyroscope
+- ολοκλήρωση με τραπέζιο (μέσος όρος προηγούμενου και τρέχοντος δείγματος)
 Καλά αποτελέσματα: σπρωξίματα σε τραπέζι με στάσεις ανάμεσα. Όχι: συνεχής κίνηση.
 
     tracker = Tracker()
-    sampler = TrackSampler(read_sample, tracker)   # νήμα ~100 Hz
+    tracker.heading_mode = "board" | "gyro" | "compass"
+    sampler = TrackSampler(read_sample, tracker)   # νήμα, όσο γρήγορα δίνει δείγματα ο αισθητήρας
     sampler.start() ... sampler.stop()
     view = TrackView(canvas)
     view.draw(tracker.snapshot())
 
-read_sample() επιστρέφει (accel σε g, orientation σε μοίρες, gyro σε rad/s, heading ή None),
-όλα με τη σύμβαση της Sense HAT. heading = μοίρες δεξιόστροφα από τον Βορρά της
-κατεύθυνσης της πλακέτας (άξονας X), ή None για διαδρομή στους άξονες της πλακέτας.
+read_sample() επιστρέφει (accel σε g, orientation σε μοίρες, gyro σε rad/s, mag σε µT ή None,
+timestamp σε s ή None), όλα με τη σύμβαση της Sense HAT, ή None αν δεν υπάρχει νέο δείγμα.
+
+Heading (σύστημα αξόνων του γραφήματος):
+- board:   άξονες της πλακέτας (πάνω = μπροστά). Η πλακέτα δεν πρέπει να στρίβει.
+- gyro:    πάνω = η κατεύθυνση της πλακέτας στο Start, οι στροφές μετριούνται με το gyroscope
+- compass: Βορράς πάνω, heading από το μαγνητόμετρο με διόρθωση κλίσης (tilt compensation)
 """
 import math
 import threading
@@ -28,113 +37,210 @@ G = 9.80665  # m/s² ανά g
 STILL_ACCEL = 0.03  # g
 STILL_GYRO = 0.15   # rad/s (~9°/s)
 STILL_TIME = 0.15   # s
-BIAS_TAU = 0.5      # s, σταθερά χρόνου για τη μέτρηση του υπολοίπου όσο είναι ακίνητη
+BIAS_TAU = 0.5      # s, σταθερά χρόνου για τη μέτρηση των υπολοίπων όσο είναι ακίνητη
+START_STILL = 0.5   # s μετά το Start/Reset που η πλακέτα θεωρείται ακίνητη (μέτρηση υπολοίπων),
+                    # ώστε να μετριέται και υπόλοιπο μεγαλύτερο από το STILL_ACCEL
 PATH_STEP = 0.002   # m, ελάχιστη απόσταση για νέο σημείο στη διαδρομή
+MAX_PATH = 5000     # μέγιστος αριθμός σημείων στη διαδρομή (τα παλαιότερα σβήνονται)
 
 # Αν στην πράξη η διαδρομή βγαίνει καθρεφτισμένη αριστερά/δεξιά, αλλάζει σε -1.0
 LEFT_SIGN = 1.0
+# Αν στο Gyro heading η διαδρομή στρίβει ανάποδα από την πλακέτα, αλλάζει σε -1.0
+YAW_SIGN = 1.0
+
+
+def level_vector(v, orientation):
+    # Διάνυσμα (x, y, z) της πλακέτας στο οριζόντιο σύστημα (μπροστά, πλάι, πάνω):
+    # αναιρεί roll και pitch (σύμβαση RTIMULib, Z-Y-X)
+    r = math.radians(orientation["roll"])
+    p = math.radians(orientation["pitch"])
+    vx, vy, vz = v["x"], v["y"], v["z"]
+    y1 = vy * math.cos(r) - vz * math.sin(r)
+    z1 = vy * math.sin(r) + vz * math.cos(r)
+    x2 = vx * math.cos(p) + z1 * math.sin(p)
+    z2 = -vx * math.sin(p) + z1 * math.cos(p)
+    return x2, y1, z2
 
 
 def level_acceleration(accel, orientation):
     # Επιτάχυνση (m/s²) σε οριζόντιο σύστημα: x = μπροστά (άξονας X της πλακέτας στο
-    # οριζόντιο επίπεδο), y = αριστερά, z = πάνω, χωρίς τη βαρύτητα. Αναιρεί roll και pitch
-    # (σύμβαση RTIMULib, Z-Y-X) ώστε να μη μετράει η κλίση της πλακέτας.
-    r = math.radians(orientation["roll"])
-    p = math.radians(orientation["pitch"])
-    ax, ay, az = accel["x"], accel["y"], accel["z"]
-    y1 = ay * math.cos(r) - az * math.sin(r)
-    z1 = ay * math.sin(r) + az * math.cos(r)
-    x2 = ax * math.cos(p) + z1 * math.sin(p)
-    z2 = -ax * math.sin(p) + z1 * math.cos(p)
-    return x2 * G, LEFT_SIGN * y1 * G, (z2 - 1.0) * G
+    # οριζόντιο επίπεδο), y = αριστερά, z = πάνω, χωρίς τη βαρύτητα, ώστε να μη μετράει
+    # η κλίση της πλακέτας
+    x, y, z = level_vector(accel, orientation)
+    return x * G, LEFT_SIGN * y * G, (z - 1.0) * G
+
+
+def tilt_compensated_heading(mag, orientation):
+    # Heading (0..360, δεξιόστροφα από τον Βορρά) από το μαγνητόμετρο, με το πεδίο
+    # προβεβλημένο στο οριζόντιο επίπεδο: σωστό και με την πλακέτα γερμένη. Με την
+    # πλακέτα οριζόντια δίνει το ίδιο με το compass.raw_heading.
+    x, y, _ = level_vector(mag, orientation)
+    return (360.0 - math.degrees(math.atan2(y, x))) % 360.0
 
 
 def to_output_frame(forward, left, heading):
     # (μπροστά, αριστερά) -> (πάνω, δεξιά) στο γράφημα: χωρίς heading οι άξονες της
-    # πλακέτας (πάνω = μπροστά), με heading (Βορράς, Ανατολή)
+    # πλακέτας (πάνω = μπροστά), με heading στρέφεται κατά heading μοίρες δεξιόστροφα
     if heading is None:
         return forward, -left
     h = math.radians(heading)
-    north = forward * math.cos(h) + left * math.sin(h)
-    east = forward * math.sin(h) - left * math.cos(h)
-    return north, east
+    up = forward * math.cos(h) + left * math.sin(h)
+    right = forward * math.sin(h) - left * math.cos(h)
+    return up, right
 
 
 class Tracker:
-    # Ταχύτητα και θέση στο οριζόντιο επίπεδο (m/s, m): "up" = μπροστά ή Βορράς,
-    # "right" = δεξιά ή Ανατολή. Ασφαλές για χρήση από το νήμα και το GUI (lock).
+    # Ταχύτητα και θέση στο οριζόντιο επίπεδο (m/s, m): "up" = μπροστά / Βορράς / αρχική
+    # κατεύθυνση, "right" = δεξιά. Ασφαλές για χρήση από το νήμα και το GUI (lock).
     def __init__(self):
         self.lock = threading.Lock()
+        self.heading_mode = "board"
         self.reset()
 
     def reset(self):
         with self.lock:
             self.velocity = [0.0, 0.0]
             self.position = [0.0, 0.0]
-            self.path = [(0.0, 0.0)]
+            self.path = [(0.0, 0.0, 0.0)]  # (up, right, χρόνος)
             self.distance = 0.0
             self.still = True
-            self.bias = [0.0, 0.0]
+            self.bias = [0.0, 0.0, 0.0]  # υπόλοιπο επιτάχυνσης (m/s²): πάνω, δεξιά στο γράφημα, κάθετα
+            self.yaw_bias = 0.0          # υπόλοιπο του gyroscope γύρω από τον κάθετο άξονα (rad/s)
+            self.gyro_heading = 0.0      # μοίρες, για heading_mode "gyro"
             self.heading = None
-            self.rate = 0.0  # δείγματα ανά δευτερόλεπτο
+            self.rate = 0.0              # δείγματα ανά δευτερόλεπτο
+            self.corrections = 0         # πόσες κινήσεις διορθώθηκαν (drift) στις στάσεις
             self._quiet_since = None
+            self._start_time = None
             self._last_time = None
+            self._last_accel = None
+            self._segment = None         # κίνηση σε εξέλιξη: χρόνος, δείκτης διαδρομής, απόσταση στην αρχή
 
-    def update(self, accel, orientation, gyro, heading, now):
+    def update(self, accel, orientation, gyro, mag, now):
         forward, left, up = level_acceleration(accel, orientation)
-        linear_g = math.sqrt(forward ** 2 + left ** 2 + up ** 2) / G
         rotation = math.sqrt(gyro["x"] ** 2 + gyro["y"] ** 2 + gyro["z"] ** 2)
-        a_up, a_right = to_output_frame(forward, left, heading)
+        yaw_rate = level_vector(gyro, orientation)[2]  # rad/s γύρω από τον κάθετο άξονα
         with self.lock:
-            self.heading = heading
             if self._last_time is None:
                 self._last_time = now
+                if self._start_time is None:
+                    self._start_time = now
                 return
             dt = now - self._last_time
             self._last_time = now
             if dt <= 0 or dt > 0.5:  # παύση ή πρώτο δείγμα μετά από διακοπή
+                self._last_accel = None
                 return
             self.rate += (1.0 / dt - self.rate) * 0.05
 
+            # Heading για το σύστημα του γραφήματος
+            if self.heading_mode == "compass" and mag is not None:
+                self.heading = tilt_compensated_heading(mag, orientation)
+            elif self.heading_mode == "gyro":
+                self.gyro_heading -= YAW_SIGN * math.degrees(yaw_rate - self.yaw_bias) * dt
+                self.heading = self.gyro_heading % 360.0
+            else:
+                self.heading = None
+            a_up, a_right = to_output_frame(forward, left, self.heading)
+
+            # Ανίχνευση ακινησίας, με την επιτάχυνση χωρίς το υπόλοιπο (αλλιώς ένα υπόλοιπο κοντά
+            # στο STILL_ACCEL θα έκανε την ανίχνευση να αναβοσβήνει)
+            linear_g = math.sqrt((a_up - self.bias[0]) ** 2 + (a_right - self.bias[1]) ** 2
+                                 + (up - self.bias[2]) ** 2) / G
             if linear_g < STILL_ACCEL and rotation < STILL_GYRO:
                 if self._quiet_since is None:
                     self._quiet_since = now
             else:
                 self._quiet_since = None
-            self.still = self._quiet_since is not None and now - self._quiet_since >= STILL_TIME
+            was_still = self.still
+            self.still = ((self._quiet_since is not None and now - self._quiet_since >= STILL_TIME)
+                          or now - self._start_time < START_STILL)
 
             if self.still:
-                # ZUPT: ταχύτητα 0, και μέτρηση του υπολοίπου για αφαίρεση στην επόμενη κίνηση
+                if not was_still:
+                    self._correct_segment(now)
+                # ZUPT: ταχύτητα 0, και μέτρηση των υπολοίπων για τις επόμενες κινήσεις
                 self.velocity = [0.0, 0.0]
                 alpha = dt / (BIAS_TAU + dt)
-                self.bias[0] += alpha * (a_up - self.bias[0])
-                self.bias[1] += alpha * (a_right - self.bias[1])
+                for i, a in enumerate((a_up, a_right, up)):
+                    self.bias[i] += alpha * (a - self.bias[i])
+                self.yaw_bias += alpha * (yaw_rate - self.yaw_bias)
+                self._last_accel = None
                 return
-            for i, a in enumerate((a_up - self.bias[0], a_right - self.bias[1])):
-                self.velocity[i] += a * dt
-            step = (self.velocity[0] * dt, self.velocity[1] * dt)
+
+            if was_still:
+                # Αρχή κίνησης: ξεκινάει ένα κομμάτι διαδρομής για διόρθωση στην επόμενη στάση
+                self._segment = (now - dt, len(self.path), self.distance)
+            accel_now = (a_up - self.bias[0], a_right - self.bias[1])
+            accel_prev = self._last_accel or accel_now
+            self._last_accel = accel_now
+            step = [0.0, 0.0]
+            for i in range(2):
+                v_prev = self.velocity[i]
+                self.velocity[i] += (accel_prev[i] + accel_now[i]) / 2.0 * dt  # τραπέζιο
+                step[i] = (v_prev + self.velocity[i]) / 2.0 * dt
             self.position[0] += step[0]
             self.position[1] += step[1]
             self.distance += math.hypot(*step)
             last = self.path[-1]
             if math.hypot(self.position[0] - last[0], self.position[1] - last[1]) >= PATH_STEP:
-                self.path.append(tuple(self.position))
+                self._add_point(now)
+
+    def _add_point(self, now):
+        self.path.append((self.position[0], self.position[1], now))
+        if len(self.path) > MAX_PATH:
+            del self.path[0]
+            if self._segment is not None:
+                start_time, start_index, start_distance = self._segment
+                self._segment = (start_time, max(0, start_index - 1), start_distance)
+
+    def _correct_segment(self, now):
+        # Στάση: η ταχύτητα που έμεινε είναι το σφάλμα της κίνησης. Αν μεγάλωσε γραμμικά από
+        # την αρχή της κίνησης (σταθερό υπόλοιπο επιτάχυνσης), το σφάλμα θέσης τη στιγμή t
+        # είναι v_err * (t - t0)² / (2T). Αφαιρείται από κάθε σημείο της κίνησης.
+        if self._segment is None:
+            return
+        start_time, start_index, start_distance = self._segment
+        self._segment = None
+        duration = now - start_time
+        if duration <= 0:
+            return
+        v_err = list(self.velocity)
+
+        def corrected(up, right, t):
+            k = (t - start_time) ** 2 / (2.0 * duration)
+            return up - v_err[0] * k, right - v_err[1] * k
+
+        for i in range(start_index, len(self.path)):
+            up, right, t = self.path[i]
+            self.path[i] = corrected(up, right, t) + (t,)
+        self.position = list(corrected(self.position[0], self.position[1], now))
+        self._add_point(now)
+        # Απόσταση της κίνησης από τα διορθωμένα σημεία
+        distance = start_distance
+        for i in range(max(start_index, 1), len(self.path)):
+            distance += math.hypot(self.path[i][0] - self.path[i - 1][0], self.path[i][1] - self.path[i - 1][1])
+        self.distance = distance
+        self.corrections += 1
 
     def snapshot(self):
         # Αντίγραφο της κατάστασης για το GUI
         with self.lock:
-            return {"path": list(self.path) + [tuple(self.position)], "position": tuple(self.position),
-                    "speed": math.hypot(*self.velocity), "distance": self.distance,
-                    "still": self.still, "heading": self.heading, "rate": self.rate}
+            return {"path": [(p[0], p[1]) for p in self.path] + [tuple(self.position)],
+                    "position": tuple(self.position), "speed": math.hypot(*self.velocity),
+                    "distance": self.distance, "still": self.still, "heading": self.heading,
+                    "heading_mode": self.heading_mode, "rate": self.rate,
+                    "corrections": self.corrections}
 
 
 class TrackSampler:
-    # Νήμα που διαβάζει τον αισθητήρα (~rate Hz) και τροφοδοτεί τον Tracker. Η ολοκλήρωση
-    # χρειάζεται όλα τα δείγματα, γι' αυτό δεν γίνεται στο (αργό) loop του Tk.
-    def __init__(self, read_sample, tracker, rate=100.0):
+    # Νήμα που διαβάζει τον αισθητήρα και τροφοδοτεί τον Tracker. Η ολοκλήρωση χρειάζεται
+    # όλα τα δείγματα, γι' αυτό δεν γίνεται στο (αργό) loop του Tk. Όταν το read_sample
+    # επιστρέφει None (κανένα νέο δείγμα), περιμένει poll δευτερόλεπτα και ξαναδοκιμάζει.
+    def __init__(self, read_sample, tracker, poll=0.002):
         self.read_sample = read_sample
         self.tracker = tracker
-        self.period = 1.0 / rate
+        self.poll = poll
         self.error = None
         self._running = False
         self._thread = None
@@ -158,21 +264,19 @@ class TrackSampler:
             self._thread = None
 
     def _run(self):
-        next_time = time.monotonic()
         while self._running:
             try:
-                accel, orientation, gyro, heading = self.read_sample()
-                self.tracker.update(accel, orientation, gyro, heading, time.monotonic())
+                sample = self.read_sample()
+                if sample is None:
+                    time.sleep(self.poll)
+                    continue
+                accel, orientation, gyro, mag, timestamp = sample
+                now = time.monotonic() if timestamp is None else timestamp
+                self.tracker.update(accel, orientation, gyro, mag, now)
             except Exception as e:  # π.χ. σφάλμα I2C: σταματάει και το δείχνει το GUI
                 self.error = e
                 self._running = False
                 return
-            next_time += self.period
-            delay = next_time - time.monotonic()
-            if delay > 0:
-                time.sleep(delay)
-            else:
-                next_time = time.monotonic()
 
 
 def _nice_step(span):
@@ -249,10 +353,14 @@ class TrackView:
 
         # Προσανατολισμός του γραφήματος: Βορράς πάνω (heading) ή μπροστά πάνω (πλακέτα)
         heading = snap["heading"]
+        mode = snap.get("heading_mode", "board")
         if heading is None:
             c.create_text(w - 6, 6, text="▲ board forward", anchor="ne", fill="gray60", font="TkDefaultFont 8")
         else:
-            c.create_text(w - 6, 6, text="N ▲", anchor="ne", fill="red", font="TkDefaultFont 9 bold")
+            if mode == "gyro":
+                c.create_text(w - 6, 6, text="▲ start direction", anchor="ne", fill="gray60", font="TkDefaultFont 8")
+            else:
+                c.create_text(w - 6, 6, text="N ▲", anchor="ne", fill="red", font="TkDefaultFont 9 bold")
             # Κατεύθυνση της πλακέτας στο σημείο όπου βρίσκεται
             a = math.radians(heading)
             c.create_line(x, y, x + 18 * math.sin(a), y - 18 * math.cos(a), fill="yellow", width=2,
