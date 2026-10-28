@@ -59,56 +59,46 @@ START_STILL = 1.0   # s μετά το Start/Reset που η πλακέτα θε�
 PATH_STEP = 0.002   # m, ελάχιστη απόσταση για νέο σημείο στη διαδρομή
 MAX_PATH = 5000     # μέγιστος αριθμός σημείων στη διαδρομή (τα παλαιότερα σβήνονται)
 
-# Αν στην πράξη η διαδρομή βγαίνει καθρεφτισμένη αριστερά/δεξιά, αλλάζει σε -1.0
-LEFT_SIGN = 1.0
+# Ποιες μετρήσεις του επιταχυνσιόμετρου δίνουν "μπροστά" και "δεξιά", ως (δείκτης x=0/y=1 στο
+# οριζόντιο επίπεδο, πρόσημο). Διαπιστώθηκε στο Pi: η μέτρηση y μεγαλώνει όταν η πλακέτα
+# επιταχύνει προς τα μπροστά, και η x μικραίνει όταν επιταχύνει προς τα δεξιά (το RTIMULib δίνει
+# σε ηρεμία z = +1 g, δηλαδή την κατεύθυνση της βαρύτητας). "Μπροστά" = η κατεύθυνση που δείχνει
+# η πυξίδα (compass.raw_heading). Με X μπροστά η διαδρομή ήταν στραμμένη 90° και καθρεφτισμένη.
+FORWARD_AXIS = (1, 1.0)
+RIGHT_AXIS = (0, -1.0)
+# Άξονες του μαγνητόμετρου στο σύστημα του επιταχυνσιόμετρου, ως (άξονας, πρόσημο) για x, y, z.
+# Στο μαγνητόμετρο μπροστά = +X και δεξιά = +Y (όπως στο compass.raw_heading), οπότε με το
+# FORWARD_AXIS / RIGHT_AXIS: x = -y_mag, y = +x_mag. Με οριζόντια πλακέτα το heading βγαίνει
+# ίδιο με το compass.raw_heading· το πρόσημο του z επηρεάζει μόνο τη διόρθωση κλίσης (δεν έχει
+# ελεγχθεί στο Pi: αν με γερμένη πλακέτα το Compass heading αλλάζει πολύ, δοκιμάστε -1.0).
+MAG_AXES = (("y", -1.0), ("x", 1.0), ("z", 1.0))
 # Αν στο Gyro heading η διαδρομή στρίβει ανάποδα από την πλακέτα, αλλάζει σε -1.0
 YAW_SIGN = 1.0
 
 
-def level_vector(v, orientation):
-    # Διάνυσμα (x, y, z) της πλακέτας στο οριζόντιο σύστημα (μπροστά, πλάι, πάνω):
-    # αναιρεί roll και pitch (σύμβαση RTIMULib, Z-Y-X)
-    r = math.radians(orientation["roll"])
-    p = math.radians(orientation["pitch"])
-    vx, vy, vz = v["x"], v["y"], v["z"]
-    y1 = vy * math.cos(r) - vz * math.sin(r)
-    z1 = vy * math.sin(r) + vz * math.cos(r)
-    x2 = vx * math.cos(p) + z1 * math.sin(p)
-    z2 = -vx * math.sin(p) + z1 * math.cos(p)
-    return x2, y1, z2
+def board_frame(level):
+    # (μπροστά, δεξιά) της πλακέτας από ένα οριζόντιο διάνυσμα (x, y, ...) του επιταχυνσιόμετρου
+    return (FORWARD_AXIS[1] * level[FORWARD_AXIS[0]], RIGHT_AXIS[1] * level[RIGHT_AXIS[0]])
 
 
-def level_acceleration(accel, orientation):
-    # Επιτάχυνση (m/s²) σε οριζόντιο σύστημα: x = μπροστά (άξονας X της πλακέτας στο
-    # οριζόντιο επίπεδο), y = αριστερά, z = πάνω, χωρίς τη βαρύτητα, ώστε να μη μετράει
-    # η κλίση της πλακέτας
-    x, y, z = level_vector(accel, orientation)
-    return x * G, LEFT_SIGN * y * G, (z - 1.0) * G
+def mag_to_accel_frame(mag):
+    # Μαγνητόμετρο (dict x, y, z) στο σύστημα αξόνων του επιταχυνσιόμετρου
+    return np.array([sign * mag[axis] for axis, sign in MAG_AXES])
 
 
-def tilt_compensated_heading(mag, orientation):
-    # Heading (0..360, δεξιόστροφα από τον Βορρά) από το μαγνητόμετρο, με το πεδίο
-    # προβεβλημένο στο οριζόντιο επίπεδο: σωστό και με την πλακέτα γερμένη. Με την
-    # πλακέτα οριζόντια δίνει το ίδιο με το compass.raw_heading.
-    x, y, _ = level_vector(mag, orientation)
-    return (360.0 - math.degrees(math.atan2(y, x))) % 360.0
-
-
-def to_output_frame(forward, left, heading):
-    # (μπροστά, αριστερά) -> (πάνω, δεξιά) στο γράφημα: χωρίς heading οι άξονες της
-    # πλακέτας (πάνω = μπροστά), με heading στρέφεται κατά heading μοίρες δεξιόστροφα
+def to_output_frame(forward, right, heading):
+    # (μπροστά, δεξιά) της πλακέτας -> (πάνω, δεξιά) στο γράφημα: χωρίς heading οι άξονες της
+    # πλακέτας (πάνω = μπροστά), με heading στρέφεται κατά heading μοίρες δεξιόστροφα (Βορράς πάνω)
     if heading is None:
-        return forward, -left
+        return forward, right
     h = math.radians(heading)
-    up = forward * math.cos(h) + left * math.sin(h)
-    right = forward * math.sin(h) - left * math.cos(h)
-    return up, right
+    return forward * math.cos(h) - right * math.sin(h), forward * math.sin(h) + right * math.cos(h)
 
 
 def attitude_from_gravity(a):
     # Πίνακας (πλακέτα -> οριζόντιο σύστημα μπροστά/πλάι/πάνω) από τη μέτρηση της βαρύτητας
     # με την πλακέτα ακίνητη: roll = atan2(y, z), pitch = atan2(-x, sqrt(y² + z²)) όπως στο
-    # RTIMULib. Το αποτέλεσμα στέλνει το a ακριβώς στο (0, 0, |a|). Ίδιος με το level_vector.
+    # RTIMULib. Το αποτέλεσμα στέλνει το a ακριβώς στο (0, 0, |a|).
     r = math.atan2(a[1], a[2])
     p = math.atan2(-a[0], math.hypot(a[1], a[2]))
     cr, sr, cp, sp = math.cos(r), math.sin(r), math.cos(p), math.sin(p)
@@ -190,15 +180,16 @@ class Tracker:
                 self.attitude = rotate_by_gyro(self.attitude, gyro_c, dt)
             level = self.attitude @ np.asarray(acc_b)
             g_ref = math.sqrt(sum(v * v for v in self.gravity))
-            forward, left, up = level[0] * G, LEFT_SIGN * level[1] * G, (level[2] - g_ref) * G
+            forward, right = (v * G for v in board_frame(level))
+            up = (level[2] - g_ref) * G
             yaw_rate = float((self.attitude @ np.asarray(gyro_c))[2])  # γύρω από τον κάθετο άξονα
 
             # Heading για το σύστημα του γραφήματος. Πυξίδα: μαγνητόμετρο στο οριζόντιο με τη δική
             # μας κλίση, + το Compass offset
             compass_heading = None
             if mag is not None:
-                mag_level = self.attitude @ np.array([mag["x"], mag["y"], mag["z"]])
-                compass_heading = (360.0 - math.degrees(math.atan2(mag_level[1], mag_level[0]))
+                mag_forward, mag_right = board_frame(self.attitude @ mag_to_accel_frame(mag))
+                compass_heading = (-math.degrees(math.atan2(mag_right, mag_forward))
                                    + self.heading_offset) % 360.0
             if self.heading_mode == "compass" and compass_heading is not None:
                 self.heading = compass_heading
@@ -218,7 +209,7 @@ class Tracker:
             full = self._window[-1][0] - self._window[0][0] >= STILL_TIME * 0.8
             accel_std = max(_std([w[i] for w in self._window]) for i in (1, 2, 3))
             gyro_std = max(_std([w[i] for w in self._window]) for i in (4, 5, 6))
-            accel_g = math.sqrt(forward ** 2 + left ** 2 + up ** 2) / G
+            accel_g = math.sqrt(forward ** 2 + right ** 2 + up ** 2) / G
             gyro_abs = math.sqrt(sum(g * g for g in gyro_c))
             self.diagnostics = {"accel_std": accel_std, "gyro_std": gyro_std, "accel": accel_g, "gyro": gyro_abs}
             steady = full and accel_std < STILL_ACCEL_STD and gyro_std < STILL_GYRO_STD
@@ -252,7 +243,7 @@ class Tracker:
                 # γράφημα στρέφεται κατά το heading αυτής της στιγμής.
                 self._segment = (now - dt, len(self.path), self.distance)
                 self._segment_heading = self.heading
-            accel_now = to_output_frame(forward, left, self._segment_heading)
+            accel_now = to_output_frame(forward, right, self._segment_heading)
             accel_prev = self._last_accel or accel_now
             self._last_accel = accel_now
             step = [0.0, 0.0]
