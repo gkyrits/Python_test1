@@ -7,7 +7,10 @@
 - διόρθωση drift σε κάθε στάση: η ταχύτητα που έμεινε τη στιγμή της στάσης είναι το σφάλμα
   της κίνησης, που θεωρείται ότι μεγάλωσε γραμμικά, οπότε διορθώνεται προς τα πίσω όλο το
   κομμάτι της διαδρομής εκείνης της κίνησης
-- όσο είναι ακίνητη, μετριέται το υπόλοιπο (bias) της επιτάχυνσης και του gyroscope
+- δική του κλίση (attitude), όχι του RTIMULib: σε κάθε στάση από τον μέσο όρο του
+  επιταχυνσιόμετρου (μετράει μόνο βαρύτητα, οπότε η βαρύτητα αφαιρείται ακριβώς, μαζί με
+  offset και σφάλμα κλίμακας του αισθητήρα), και στην κίνηση από το gyroscope
+- όσο είναι ακίνητη, μετριέται το υπόλοιπο (bias) του gyroscope
 - ολοκλήρωση με τραπέζιο (μέσος όρος προηγούμενου και τρέχοντος δείγματος)
 Καλά αποτελέσματα: σπρωξίματα σε τραπέζι με στάσεις ανάμεσα. Όχι: συνεχής κίνηση.
 
@@ -20,6 +23,8 @@
 
 read_sample() επιστρέφει (accel σε g, orientation σε μοίρες, gyro σε rad/s, mag σε µT ή None,
 timestamp σε s ή None), όλα με τη σύμβαση της Sense HAT, ή None αν δεν υπάρχει νέο δείγμα.
+Το orientation (του RTIMULib) δεν χρησιμοποιείται από τον Tracker: αργεί να συγκλίνει
+(π.χ. ~13° λάθος στο Start -> 0.23 g βαρύτητα που δεν αφαιρείται).
 
 Heading (σύστημα αξόνων του γραφήματος):
 - board:   άξονες της πλακέτας (πάνω = μπροστά). Η πλακέτα δεν πρέπει να στρίβει.
@@ -30,6 +35,8 @@ import math
 import threading
 import time
 from collections import deque
+
+import numpy as np
 
 G = 9.80665  # m/s² ανά g
 
@@ -44,9 +51,9 @@ STILL_GYRO_STD = 0.03    # rad/s
 STILL_ACCEL = 0.03       # g, μετά την αφαίρεση του υπολοίπου
 STILL_GYRO = 0.1         # rad/s (~6°/s), μετά την αφαίρεση του υπολοίπου
 LONG_STILL = 1.0         # s
-BIAS_TAU = 0.5      # s, σταθερά χρόνου για τη μέτρηση των υπολοίπων όσο είναι ακίνητη
-START_STILL = 1.0   # s μετά το Start/Reset που η πλακέτα θεωρείται ακίνητη (μέτρηση υπολοίπων),
-                    # ώστε να μετριέται και υπόλοιπο μεγαλύτερο από το STILL_ACCEL
+BIAS_TAU = 0.5      # s, σταθερά χρόνου για τη μέτρηση (μέσος όρος) όσο είναι ακίνητη
+START_STILL = 1.0   # s μετά το Start/Reset που η πλακέτα θεωρείται ακίνητη (μέτρηση κλίσης,
+                    # βαρύτητας και υπολοίπου του gyroscope)
 PATH_STEP = 0.002   # m, ελάχιστη απόσταση για νέο σημείο στη διαδρομή
 MAX_PATH = 5000     # μέγιστος αριθμός σημείων στη διαδρομή (τα παλαιότερα σβήνονται)
 
@@ -96,6 +103,29 @@ def to_output_frame(forward, left, heading):
     return up, right
 
 
+def attitude_from_gravity(a):
+    # Πίνακας (πλακέτα -> οριζόντιο σύστημα μπροστά/πλάι/πάνω) από τη μέτρηση της βαρύτητας
+    # με την πλακέτα ακίνητη: roll = atan2(y, z), pitch = atan2(-x, sqrt(y² + z²)) όπως στο
+    # RTIMULib. Το αποτέλεσμα στέλνει το a ακριβώς στο (0, 0, |a|). Ίδιος με το level_vector.
+    r = math.atan2(a[1], a[2])
+    p = math.atan2(-a[0], math.hypot(a[1], a[2]))
+    cr, sr, cp, sp = math.cos(r), math.sin(r), math.cos(p), math.sin(p)
+    return np.array([[cp, sr * sp, cr * sp],
+                     [0.0, cr, -sr],
+                     [-sp, sr * cp, cr * cp]])
+
+
+def rotate_by_gyro(attitude, omega, dt):
+    # Νέα κλίση μετά από περιστροφή omega (rad/s, άξονες της πλακέτας) για dt (Rodrigues)
+    angle = math.sqrt(omega[0] ** 2 + omega[1] ** 2 + omega[2] ** 2) * dt
+    if angle < 1e-12:
+        return attitude
+    k = np.asarray(omega) * dt / angle
+    kx = np.array([[0.0, -k[2], k[1]], [k[2], 0.0, -k[0]], [-k[1], k[0], 0.0]])
+    rotation = np.eye(3) + math.sin(angle) * kx + (1.0 - math.cos(angle)) * (kx @ kx)
+    return attitude @ rotation
+
+
 def _std(values):
     mean = sum(values) / len(values)
     return math.sqrt(sum((v - mean) ** 2 for v in values) / len(values))
@@ -116,8 +146,10 @@ class Tracker:
             self.path = [(0.0, 0.0, 0.0)]  # (up, right, χρόνος)
             self.distance = 0.0
             self.still = True
-            self.bias = [0.0, 0.0, 0.0]  # υπόλοιπο επιτάχυνσης (m/s²): μπροστά, αριστερά, πάνω (οριζόντιο σύστημα)
+            self.gravity = None              # μέσος όρος του επιταχυνσιόμετρου στις στάσεις (g, άξονες πλακέτας)
+            self.attitude = np.eye(3)        # πλακέτα -> οριζόντιο σύστημα (μπροστά, πλάι, πάνω)
             self.gyro_bias = [0.0, 0.0, 0.0]  # υπόλοιπο του gyroscope (rad/s), άξονες της πλακέτας
+            self._segment_heading = None     # heading στην αρχή της κίνησης
             self.gyro_heading = 0.0      # μοίρες, για heading_mode "gyro"
             self.heading = None
             self.rate = 0.0              # δείγματα ανά δευτερόλεπτο
@@ -131,13 +163,16 @@ class Tracker:
             self._segment = None         # κίνηση σε εξέλιξη: χρόνος, δείκτης διαδρομής, απόσταση στην αρχή
 
     def update(self, accel, orientation, gyro, mag, now):
-        level = level_acceleration(accel, orientation)
+        acc_b = (accel["x"], accel["y"], accel["z"])
         gyro_raw = (gyro["x"], gyro["y"], gyro["z"])
         with self.lock:
             if self._last_time is None:
                 self._last_time = now
                 if self._start_time is None:
                     self._start_time = now
+                if self.gravity is None:
+                    self.gravity = list(acc_b)
+                    self.attitude = attitude_from_gravity(acc_b)
                 return
             dt = now - self._last_time
             self._last_time = now
@@ -146,26 +181,31 @@ class Tracker:
                 return
             self.rate += (1.0 / dt - self.rate) * 0.05
 
-            # Τιμές χωρίς τα υπόλοιπα (offsets) που μετρήθηκαν στις στάσεις
-            forward, left, up = (level[i] - self.bias[i] for i in range(3))
+            # Gyroscope χωρίς το υπόλοιπο. Στην κίνηση η κλίση ακολουθεί το gyroscope.
             gyro_c = [gyro_raw[i] - self.gyro_bias[i] for i in range(3)]
-            yaw_rate = level_vector(dict(zip("xyz", gyro_c)), orientation)[2]  # γύρω από τον κάθετο άξονα
+            if not self.still:
+                self.attitude = rotate_by_gyro(self.attitude, gyro_c, dt)
+            level = self.attitude @ np.asarray(acc_b)
+            g_ref = math.sqrt(sum(v * v for v in self.gravity))
+            forward, left, up = level[0] * G, LEFT_SIGN * level[1] * G, (level[2] - g_ref) * G
+            yaw_rate = float((self.attitude @ np.asarray(gyro_c))[2])  # γύρω από τον κάθετο άξονα
 
-            # Heading για το σύστημα του γραφήματος
+            # Heading για το σύστημα του γραφήματος (μαγνητόμετρο στο οριζόντιο με τη δική μας κλίση)
             if self.heading_mode == "compass" and mag is not None:
-                self.heading = tilt_compensated_heading(mag, orientation)
+                mag_level = self.attitude @ np.array([mag["x"], mag["y"], mag["z"]])
+                self.heading = (360.0 - math.degrees(math.atan2(mag_level[1], mag_level[0]))) % 360.0
             elif self.heading_mode == "gyro":
                 self.gyro_heading -= YAW_SIGN * math.degrees(yaw_rate) * dt
                 self.heading = self.gyro_heading % 360.0
             else:
                 self.heading = None
 
-            # Ανίχνευση ακινησίας
-            self._window.append((now,) + level + gyro_raw)
+            # Ανίχνευση ακινησίας (από τις τιμές του αισθητήρα, ανεξάρτητα από offsets)
+            self._window.append((now,) + acc_b + gyro_raw)
             while self._window and self._window[0][0] < now - STILL_TIME:
                 self._window.popleft()
             full = self._window[-1][0] - self._window[0][0] >= STILL_TIME * 0.8
-            accel_std = max(_std([w[i] for w in self._window]) for i in (1, 2, 3)) / G
+            accel_std = max(_std([w[i] for w in self._window]) for i in (1, 2, 3))
             gyro_std = max(_std([w[i] for w in self._window]) for i in (4, 5, 6))
             accel_g = math.sqrt(forward ** 2 + left ** 2 + up ** 2) / G
             gyro_abs = math.sqrt(sum(g * g for g in gyro_c))
@@ -184,19 +224,24 @@ class Tracker:
             if self.still:
                 if not was_still:
                     self._correct_segment(now)
-                # ZUPT: ταχύτητα 0, και μέτρηση των υπολοίπων για τις επόμενες κινήσεις
+                # ZUPT: ταχύτητα 0. Μέσος όρος βαρύτητας -> κλίση (η βαρύτητα αφαιρείται ακριβώς),
+                # και υπόλοιπο του gyroscope.
                 self.velocity = [0.0, 0.0]
                 alpha = dt / (BIAS_TAU + dt)
                 for i in range(3):
-                    self.bias[i] += alpha * (level[i] - self.bias[i])
+                    self.gravity[i] += alpha * (acc_b[i] - self.gravity[i])
                     self.gyro_bias[i] += alpha * (gyro_raw[i] - self.gyro_bias[i])
+                self.attitude = attitude_from_gravity(self.gravity)
                 self._last_accel = None
                 return
 
             if was_still:
-                # Αρχή κίνησης: ξεκινάει ένα κομμάτι διαδρομής για διόρθωση στην επόμενη στάση
+                # Αρχή κίνησης: ξεκινάει ένα κομμάτι διαδρομής για διόρθωση στην επόμενη στάση. Η κλίση
+                # από εδώ ακολουθεί το gyroscope ως προς την κατεύθυνση της πλακέτας τώρα, οπότε το
+                # γράφημα στρέφεται κατά το heading αυτής της στιγμής.
                 self._segment = (now - dt, len(self.path), self.distance)
-            accel_now = to_output_frame(forward, left, self.heading)
+                self._segment_heading = self.heading
+            accel_now = to_output_frame(forward, left, self._segment_heading)
             accel_prev = self._last_accel or accel_now
             self._last_accel = accel_now
             step = [0.0, 0.0]
