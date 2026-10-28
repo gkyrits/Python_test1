@@ -29,16 +29,23 @@ Heading (σύστημα αξόνων του γραφήματος):
 import math
 import threading
 import time
+from collections import deque
 
 G = 9.80665  # m/s² ανά g
 
-# Ανίχνευση ακινησίας (ZUPT): |γραμμική επιτάχυνση| και |περιστροφή| κάτω από τα όρια
-# για STILL_TIME δευτερόλεπτα
-STILL_ACCEL = 0.03  # g
-STILL_GYRO = 0.15   # rad/s (~9°/s)
-STILL_TIME = 0.15   # s
+# Ανίχνευση ακινησίας (ZUPT), ανεξάρτητη από τα υπόλοιπα (offsets) των αισθητήρων:
+# - "σταθερή": σε παράθυρο STILL_TIME η επιτάχυνση και η περιστροφή σχεδόν δεν αλλάζουν
+#   (τυπική απόκλιση κάτω από STILL_ACCEL_STD / STILL_GYRO_STD), όσο μεγάλο κι αν είναι το offset
+# - ακίνητη = σταθερή ΚΑΙ μικρές τιμές μετά την αφαίρεση των υπολοίπων (STILL_ACCEL / STILL_GYRO),
+#   ή σταθερή για πάνω από LONG_STILL (ξαναμαθαίνει υπόλοιπο που άλλαξε, αλλιώς θα κολλούσε σε "Moving")
+STILL_TIME = 0.2         # s, παράθυρο για την τυπική απόκλιση
+STILL_ACCEL_STD = 0.01   # g
+STILL_GYRO_STD = 0.03    # rad/s
+STILL_ACCEL = 0.03       # g, μετά την αφαίρεση του υπολοίπου
+STILL_GYRO = 0.1         # rad/s (~6°/s), μετά την αφαίρεση του υπολοίπου
+LONG_STILL = 1.0         # s
 BIAS_TAU = 0.5      # s, σταθερά χρόνου για τη μέτρηση των υπολοίπων όσο είναι ακίνητη
-START_STILL = 0.5   # s μετά το Start/Reset που η πλακέτα θεωρείται ακίνητη (μέτρηση υπολοίπων),
+START_STILL = 1.0   # s μετά το Start/Reset που η πλακέτα θεωρείται ακίνητη (μέτρηση υπολοίπων),
                     # ώστε να μετριέται και υπόλοιπο μεγαλύτερο από το STILL_ACCEL
 PATH_STEP = 0.002   # m, ελάχιστη απόσταση για νέο σημείο στη διαδρομή
 MAX_PATH = 5000     # μέγιστος αριθμός σημείων στη διαδρομή (τα παλαιότερα σβήνονται)
@@ -89,6 +96,11 @@ def to_output_frame(forward, left, heading):
     return up, right
 
 
+def _std(values):
+    mean = sum(values) / len(values)
+    return math.sqrt(sum((v - mean) ** 2 for v in values) / len(values))
+
+
 class Tracker:
     # Ταχύτητα και θέση στο οριζόντιο επίπεδο (m/s, m): "up" = μπροστά / Βορράς / αρχική
     # κατεύθυνση, "right" = δεξιά. Ασφαλές για χρήση από το νήμα και το GUI (lock).
@@ -104,22 +116,23 @@ class Tracker:
             self.path = [(0.0, 0.0, 0.0)]  # (up, right, χρόνος)
             self.distance = 0.0
             self.still = True
-            self.bias = [0.0, 0.0, 0.0]  # υπόλοιπο επιτάχυνσης (m/s²): πάνω, δεξιά στο γράφημα, κάθετα
-            self.yaw_bias = 0.0          # υπόλοιπο του gyroscope γύρω από τον κάθετο άξονα (rad/s)
+            self.bias = [0.0, 0.0, 0.0]  # υπόλοιπο επιτάχυνσης (m/s²): μπροστά, αριστερά, πάνω (οριζόντιο σύστημα)
+            self.gyro_bias = [0.0, 0.0, 0.0]  # υπόλοιπο του gyroscope (rad/s), άξονες της πλακέτας
             self.gyro_heading = 0.0      # μοίρες, για heading_mode "gyro"
             self.heading = None
             self.rate = 0.0              # δείγματα ανά δευτερόλεπτο
             self.corrections = 0         # πόσες κινήσεις διορθώθηκαν (drift) στις στάσεις
-            self._quiet_since = None
+            self._window = deque()       # (χρόνος, μπροστά, αριστερά, πάνω, gx, gy, gz) για STILL_TIME
+            self._steady_since = None
+            self.diagnostics = {"accel_std": 0.0, "gyro_std": 0.0, "accel": 0.0, "gyro": 0.0}
             self._start_time = None
             self._last_time = None
             self._last_accel = None
             self._segment = None         # κίνηση σε εξέλιξη: χρόνος, δείκτης διαδρομής, απόσταση στην αρχή
 
     def update(self, accel, orientation, gyro, mag, now):
-        forward, left, up = level_acceleration(accel, orientation)
-        rotation = math.sqrt(gyro["x"] ** 2 + gyro["y"] ** 2 + gyro["z"] ** 2)
-        yaw_rate = level_vector(gyro, orientation)[2]  # rad/s γύρω από τον κάθετο άξονα
+        level = level_acceleration(accel, orientation)
+        gyro_raw = (gyro["x"], gyro["y"], gyro["z"])
         with self.lock:
             if self._last_time is None:
                 self._last_time = now
@@ -133,27 +146,39 @@ class Tracker:
                 return
             self.rate += (1.0 / dt - self.rate) * 0.05
 
+            # Τιμές χωρίς τα υπόλοιπα (offsets) που μετρήθηκαν στις στάσεις
+            forward, left, up = (level[i] - self.bias[i] for i in range(3))
+            gyro_c = [gyro_raw[i] - self.gyro_bias[i] for i in range(3)]
+            yaw_rate = level_vector(dict(zip("xyz", gyro_c)), orientation)[2]  # γύρω από τον κάθετο άξονα
+
             # Heading για το σύστημα του γραφήματος
             if self.heading_mode == "compass" and mag is not None:
                 self.heading = tilt_compensated_heading(mag, orientation)
             elif self.heading_mode == "gyro":
-                self.gyro_heading -= YAW_SIGN * math.degrees(yaw_rate - self.yaw_bias) * dt
+                self.gyro_heading -= YAW_SIGN * math.degrees(yaw_rate) * dt
                 self.heading = self.gyro_heading % 360.0
             else:
                 self.heading = None
-            a_up, a_right = to_output_frame(forward, left, self.heading)
 
-            # Ανίχνευση ακινησίας, με την επιτάχυνση χωρίς το υπόλοιπο (αλλιώς ένα υπόλοιπο κοντά
-            # στο STILL_ACCEL θα έκανε την ανίχνευση να αναβοσβήνει)
-            linear_g = math.sqrt((a_up - self.bias[0]) ** 2 + (a_right - self.bias[1]) ** 2
-                                 + (up - self.bias[2]) ** 2) / G
-            if linear_g < STILL_ACCEL and rotation < STILL_GYRO:
-                if self._quiet_since is None:
-                    self._quiet_since = now
+            # Ανίχνευση ακινησίας
+            self._window.append((now,) + level + gyro_raw)
+            while self._window and self._window[0][0] < now - STILL_TIME:
+                self._window.popleft()
+            full = self._window[-1][0] - self._window[0][0] >= STILL_TIME * 0.8
+            accel_std = max(_std([w[i] for w in self._window]) for i in (1, 2, 3)) / G
+            gyro_std = max(_std([w[i] for w in self._window]) for i in (4, 5, 6))
+            accel_g = math.sqrt(forward ** 2 + left ** 2 + up ** 2) / G
+            gyro_abs = math.sqrt(sum(g * g for g in gyro_c))
+            self.diagnostics = {"accel_std": accel_std, "gyro_std": gyro_std, "accel": accel_g, "gyro": gyro_abs}
+            steady = full and accel_std < STILL_ACCEL_STD and gyro_std < STILL_GYRO_STD
+            if steady:
+                if self._steady_since is None:
+                    self._steady_since = now
             else:
-                self._quiet_since = None
+                self._steady_since = None
+            small = accel_g < STILL_ACCEL and gyro_abs < STILL_GYRO
             was_still = self.still
-            self.still = ((self._quiet_since is not None and now - self._quiet_since >= STILL_TIME)
+            self.still = ((steady and small) or (steady and now - self._steady_since >= LONG_STILL)
                           or now - self._start_time < START_STILL)
 
             if self.still:
@@ -162,16 +187,16 @@ class Tracker:
                 # ZUPT: ταχύτητα 0, και μέτρηση των υπολοίπων για τις επόμενες κινήσεις
                 self.velocity = [0.0, 0.0]
                 alpha = dt / (BIAS_TAU + dt)
-                for i, a in enumerate((a_up, a_right, up)):
-                    self.bias[i] += alpha * (a - self.bias[i])
-                self.yaw_bias += alpha * (yaw_rate - self.yaw_bias)
+                for i in range(3):
+                    self.bias[i] += alpha * (level[i] - self.bias[i])
+                    self.gyro_bias[i] += alpha * (gyro_raw[i] - self.gyro_bias[i])
                 self._last_accel = None
                 return
 
             if was_still:
                 # Αρχή κίνησης: ξεκινάει ένα κομμάτι διαδρομής για διόρθωση στην επόμενη στάση
                 self._segment = (now - dt, len(self.path), self.distance)
-            accel_now = (a_up - self.bias[0], a_right - self.bias[1])
+            accel_now = to_output_frame(forward, left, self.heading)
             accel_prev = self._last_accel or accel_now
             self._last_accel = accel_now
             step = [0.0, 0.0]
@@ -230,7 +255,7 @@ class Tracker:
                     "position": tuple(self.position), "speed": math.hypot(*self.velocity),
                     "distance": self.distance, "still": self.still, "heading": self.heading,
                     "heading_mode": self.heading_mode, "rate": self.rate,
-                    "corrections": self.corrections}
+                    "corrections": self.corrections, "diagnostics": dict(self.diagnostics)}
 
 
 class TrackSampler:
@@ -342,6 +367,17 @@ class TrackView:
             k += 1
         c.create_text(6, h - 6, text=f"grid {_format_length(step)}", anchor="sw", fill="gray60",
                       font="TkDefaultFont 8")
+        # Διάγνωση της ανίχνευσης ακινησίας: απόκλιση (σ) και τιμές χωρίς υπόλοιπο, με τα όρια.
+        # Πορτοκαλί η τιμή που κρατάει την πλακέτα σε "Moving" όταν είναι πάνω από το όριο.
+        diag = snap.get("diagnostics")
+        if diag:
+            items = (("σa", diag["accel_std"], STILL_ACCEL_STD, "g", 3), ("σω", diag["gyro_std"], STILL_GYRO_STD, "", 3),
+                     ("|a|", diag["accel"], STILL_ACCEL, "g", 3), ("|ω|", diag["gyro"], STILL_GYRO, "", 2))
+            for row, (name, value, limit, unit, digits) in enumerate(items):
+                c.create_text(6, 6 + row * 12, text=f"{name} {value:.{digits}f}/{limit:g}{unit}", anchor="nw",
+                              fill="#d07000" if value >= limit else "gray60", font="TkDefaultFont 8")
+            c.create_text(6, 6 + 4 * 12, text=f"{snap.get('rate', 0):.0f} Hz", anchor="nw", fill="gray60",
+                          font="TkDefaultFont 8")
 
         # Αρχή, διαδρομή, τρέχουσα θέση
         x0, y0 = to_screen(0.0, 0.0)
