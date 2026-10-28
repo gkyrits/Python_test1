@@ -28,8 +28,10 @@ timestamp σε s ή None), όλα με τη σύμβαση της Sense HAT, ή 
 
 Heading (σύστημα αξόνων του γραφήματος):
 - board:   άξονες της πλακέτας (πάνω = μπροστά). Η πλακέτα δεν πρέπει να στρίβει.
-- gyro:    πάνω = η κατεύθυνση της πλακέτας στο Start, οι στροφές μετριούνται με το gyroscope
+- gyro:    Βορράς πάνω: αρχική κατεύθυνση από την πυξίδα στο Start, μετά οι στροφές από το
+           gyroscope (δεν επηρεάζεται από μέταλλα/μαγνήτες κατά την κίνηση)
 - compass: Βορράς πάνω, heading από το μαγνητόμετρο με διόρθωση κλίσης (tilt compensation)
+Και στα δύο προστίθεται το heading_offset (το Compass offset της πηγής Raw XY).
 """
 import math
 import threading
@@ -137,6 +139,7 @@ class Tracker:
     def __init__(self):
         self.lock = threading.Lock()
         self.heading_mode = "board"
+        self.heading_offset = 0.0  # μοίρες, προστίθεται στο heading της πυξίδας (Compass offset)
         self.reset()
 
     def reset(self):
@@ -150,7 +153,7 @@ class Tracker:
             self.attitude = np.eye(3)        # πλακέτα -> οριζόντιο σύστημα (μπροστά, πλάι, πάνω)
             self.gyro_bias = [0.0, 0.0, 0.0]  # υπόλοιπο του gyroscope (rad/s), άξονες της πλακέτας
             self._segment_heading = None     # heading στην αρχή της κίνησης
-            self.gyro_heading = 0.0      # μοίρες, για heading_mode "gyro"
+            self.gyro_heading = None     # μοίρες, για heading_mode "gyro" (αρχή από την πυξίδα)
             self.heading = None
             self.rate = 0.0              # δείγματα ανά δευτερόλεπτο
             self.corrections = 0         # πόσες κινήσεις διορθώθηκαν (drift) στις στάσεις
@@ -190,11 +193,19 @@ class Tracker:
             forward, left, up = level[0] * G, LEFT_SIGN * level[1] * G, (level[2] - g_ref) * G
             yaw_rate = float((self.attitude @ np.asarray(gyro_c))[2])  # γύρω από τον κάθετο άξονα
 
-            # Heading για το σύστημα του γραφήματος (μαγνητόμετρο στο οριζόντιο με τη δική μας κλίση)
-            if self.heading_mode == "compass" and mag is not None:
+            # Heading για το σύστημα του γραφήματος. Πυξίδα: μαγνητόμετρο στο οριζόντιο με τη δική
+            # μας κλίση, + το Compass offset
+            compass_heading = None
+            if mag is not None:
                 mag_level = self.attitude @ np.array([mag["x"], mag["y"], mag["z"]])
-                self.heading = (360.0 - math.degrees(math.atan2(mag_level[1], mag_level[0]))) % 360.0
+                compass_heading = (360.0 - math.degrees(math.atan2(mag_level[1], mag_level[0]))
+                                   + self.heading_offset) % 360.0
+            if self.heading_mode == "compass" and compass_heading is not None:
+                self.heading = compass_heading
             elif self.heading_mode == "gyro":
+                if self.gyro_heading is None:
+                    # Αρχική κατεύθυνση από την πυξίδα (αν υπάρχει), μετά μόνο το gyroscope
+                    self.gyro_heading = compass_heading if compass_heading is not None else 0.0
                 self.gyro_heading -= YAW_SIGN * math.degrees(yaw_rate) * dt
                 self.heading = self.gyro_heading % 360.0
             else:
@@ -438,10 +449,8 @@ class TrackView:
         if heading is None:
             c.create_text(w - 6, 6, text="▲ board forward", anchor="ne", fill="gray60", font="TkDefaultFont 8")
         else:
-            if mode == "gyro":
-                c.create_text(w - 6, 6, text="▲ start direction", anchor="ne", fill="gray60", font="TkDefaultFont 8")
-            else:
-                c.create_text(w - 6, 6, text="N ▲", anchor="ne", fill="red", font="TkDefaultFont 9 bold")
+            label = "N ▲ (gyro)" if mode == "gyro" else "N ▲"
+            c.create_text(w - 6, 6, text=label, anchor="ne", fill="red", font="TkDefaultFont 9 bold")
             # Κατεύθυνση της πλακέτας στο σημείο όπου βρίσκεται
             a = math.radians(heading)
             c.create_line(x, y, x + 18 * math.sin(a), y - 18 * math.cos(a), fill="yellow", width=2,

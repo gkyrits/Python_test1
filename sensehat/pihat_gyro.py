@@ -173,14 +173,18 @@ class Transparent3DCubeApp:
         # Πηγή του North: Raw = από τα raw X/Y του μαγνητόμετρου (πλακέτα οριζόντια),
         # get_compass() = από το fusion του RTIMULib (θέλει calibration με RTIMULibCal)
         self.compass_source = tk.StringVar(value="raw")
+        # Compass offset ανά πηγή (module compass), από το αρχείο που αποθηκεύει το κουμπί S
+        self.compass_offsets = compass.CompassOffsets()
         source_frame = tk.Frame(compass_control)
         source_frame.grid(row=0, column=1, columnspan=2, sticky=tk.E, padx=2)
         for text, value in (("Raw XY", "raw"), ("sense compass", "fusion")):
             tk.Radiobutton(source_frame, text=text, value=value, variable=self.compass_source,
+                           command=self._on_compass_source,
                            padx=0, pady=0, borderwidth=0, highlightthickness=0,
                            state=tk.DISABLED if self.sense is None else tk.NORMAL
                            ).pack(side=tk.LEFT, padx=(6, 0))
-        self.north_var = tk.DoubleVar(value=0.0)
+        # Με Sense HAT ο slider είναι το offset της επιλεγμένης πηγής, χωρίς Sense HAT η τιμή North
+        self.north_var = tk.DoubleVar(value=0.0 if self.sense is None else self.compass_offsets.values["raw"])
         north_label = tk.Label(compass_control, text="0.0°", width=7, anchor=tk.E)
         tk.Label(compass_control, text="North", anchor=tk.W).grid(row=1, column=0, sticky=tk.W, padx=2)
         tk.Scale(compass_control, variable=self.north_var, from_=-180, to=180, resolution=0.1,
@@ -188,6 +192,8 @@ class Transparent3DCubeApp:
                  ).grid(row=1, column=1, sticky=tk.EW, padx=2)
         self.north_var.trace_add("write", lambda *_: north_label.config(
             text=f"{round(self.north_var.get(), 1) + 0.0:.1f}°"))
+        self.north_var.trace_add("write", lambda *_: self._on_compass_offset())
+        north_label.config(text=f"{round(self.north_var.get(), 1) + 0.0:.1f}°")
         north_label.grid(row=1, column=2, padx=2)
 
         compass_info = tk.Frame(compass_tab, relief=tk.SUNKEN, borderwidth=2)
@@ -214,7 +220,8 @@ class Transparent3DCubeApp:
         compass_tools.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 2))
         self.compass_buttons = {}
         # H = hard-iron calibration του μαγνητόμετρου (πάτημα: έναρξη, περιστροφή, πάτημα: αποθήκευση)
-        compass_commands = {"H": self.toggle_hard_iron, "S": None}
+        # S = αποθήκευση των Compass offsets (Raw XY και sense compass)
+        compass_commands = {"H": self.toggle_hard_iron, "S": self.save_compass_offsets}
         for text, command in compass_commands.items():
             button = tk.Button(compass_tools, text=text, width=2, height=2, padx=0, pady=0, command=command)
             button.pack(side=tk.TOP, pady=(10, 0))
@@ -226,6 +233,7 @@ class Transparent3DCubeApp:
         self.button_colors = {key: self.compass_buttons["H"].cget(key) for key in ("bg", "activebackground")}
         if self.sense is None:
             self.compass_buttons["H"].config(state=tk.DISABLED)
+            self.compass_buttons["S"].config(state=tk.DISABLED)
         # Σχεδίαση της πυξίδας από το module compass
         self.compass_canvas = tk.Canvas(compass_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT)
         self.compass_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -270,6 +278,8 @@ class Transparent3DCubeApp:
         # και το frame με τον canvas της διαδρομής (module track: ταχύτητα και διαδρομή από τη
         # γραμμική επιτάχυνση, με ZUPT και διόρθωση drift σε κάθε στάση, σε νήμα)
         self.tracker = track.Tracker()
+        # Το Track διαβάζει το μαγνητόμετρο απευθείας (όπως η πηγή Raw XY), οπότε παίρνει εκείνο το offset
+        self.tracker.heading_offset = self.compass_offsets.values["raw"] if self.sense is not None else 0.0
         self.track_sampler = track.TrackSampler(self._read_track_sample, self.tracker)
         track_options = tk.Frame(track_tab, relief=tk.SUNKEN, borderwidth=2)
         track_options.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
@@ -412,6 +422,29 @@ class Transparent3DCubeApp:
         # Ανάγνωση του μαγνητόμετρου (µT) διορθωμένη με τα hard-iron offsets (module compass)
         return self.hard_iron.correct(self.sense.get_compass_raw())
 
+    def _on_compass_source(self):
+        # Αλλαγή πηγής: ο slider δείχνει το offset της νέας πηγής
+        self.north_var.set(self.compass_offsets.values[self.compass_source.get()])
+
+    def _on_compass_offset(self):
+        # Ο slider άλλαξε: κρατάει το offset της επιλεγμένης πηγής, και το Raw XY πάει και στο Track
+        if self.sense is None:
+            return
+        self.compass_offsets.values[self.compass_source.get()] = self.north_var.get()
+        if hasattr(self, "tracker"):
+            self.tracker.heading_offset = self.compass_offsets.values["raw"]
+
+    def save_compass_offsets(self):
+        # Κουμπί S: αποθήκευση και των δύο offsets, φορτώνονται ξανά στην επόμενη εκκίνηση
+        try:
+            self.compass_offsets.save()
+        except OSError as e:
+            messagebox.showerror("Compass offset", f"Could not save: {e}")
+            return
+        values = self.compass_offsets.values
+        messagebox.showinfo("Compass offset", f"Saved: Raw XY {values['raw']:.1f}°, "
+                                              f"sense compass {values['fusion']:.1f}°")
+
     def toggle_hard_iron(self):
         # Κουμπί H: 1ο πάτημα έναρξη καταγραφής (περιστροφή της πλακέτας σε πλήρη κύκλο),
         # 2ο πάτημα υπολογισμός και αποθήκευση των offsets (βλ. compass.HardIronCalibration)
@@ -524,7 +557,7 @@ class Transparent3DCubeApp:
         # μαγνητόμετρο µT με hard-iron διόρθωση ή None, χρόνος s ή None), ή None χωρίς νέο δείγμα.
         # Αν γίνεται, ΜΙΑ ανάγνωση του RTIMULib για όλα (ίδια στιγμή, χρόνος του IMU, πιο
         # γρήγορα), αντί για τρεις ξεχωριστές αναγνώσεις μέσω του sense_hat.
-        use_mag = self.tracker.heading_mode == "compass"
+        use_mag = self.tracker.heading_mode in ("gyro", "compass")  # Gyro: αρχική κατεύθυνση από την πυξίδα
         imu = getattr(self.sense, "_imu", None)
         if imu is not None and hasattr(imu, "getIMUData"):
             if not imu.IMURead():
@@ -576,7 +609,7 @@ class Transparent3DCubeApp:
 
     def _show_track_values(self, snap):
         up, right = snap["position"]
-        names = ("N", "E") if snap["heading_mode"] == "compass" else ("F", "R")
+        names = ("N", "E") if snap["heading_mode"] in ("gyro", "compass") else ("F", "R")
         self.track_vars["speed"].set(f"Speed: {snap['speed'] * 100:.1f} cm/s")
         self.track_vars["distance"].set(f"Dist: {snap['distance'] * 100:.1f} cm")
         self.track_vars["position"].set(f"{names[0]}: {up * 100:.1f}  {names[1]}: {right * 100:.1f} cm")

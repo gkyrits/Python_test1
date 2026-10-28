@@ -21,6 +21,31 @@ HARD_IRON_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pihat
 HARD_IRON_MIN_SPAN = 20.0
 AXES = ("x", "y", "z")
 
+# Compass offset (μοίρες) ανά πηγή του North: "raw" (raw XY) και "fusion" (sense compass)
+COMPASS_OFFSET_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pihat_gyro_compass.json")
+SOURCES = ("raw", "fusion")
+
+
+class CompassOffsets:
+    # Offsets που προστίθενται στο North ώστε να δείχνει τον πραγματικό βορρά, ένα για κάθε
+    # πηγή (διαφέρουν, γιατί raw XY και RTIMULib μετράνε με διαφορετικό τρόπο).
+    # Φορτώνονται από το αρχείο στη δημιουργία, αποθηκεύονται με save().
+    def __init__(self, path=COMPASS_OFFSET_FILE):
+        self.path = path
+        self.values = self._load()
+
+    def _load(self):
+        try:
+            with open(self.path) as f:
+                data = json.load(f)
+            return {source: float(data.get(source, 0.0)) for source in SOURCES}
+        except (OSError, ValueError, TypeError, AttributeError):
+            return {source: 0.0 for source in SOURCES}
+
+    def save(self):
+        with open(self.path, "w") as f:
+            json.dump(self.values, f, indent=2)
+
 
 def raw_heading(raw):
     # Heading (0..360, αυξάνει δεξιόστροφα όπως η πυξίδα) από τα raw X/Y του
