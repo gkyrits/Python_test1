@@ -42,6 +42,38 @@ def remove_gravity(accel, orientation):
     return {axis: accel[axis] - gravity[axis] for axis in AXES}
 
 
+class GravityCheck:
+    # Έλεγχος βαθμονόμησης: με την πλακέτα ακίνητη το επιταχυνσιόμετρο μετράει μόνο τη
+    # βαρύτητα, άρα |a| ≈ 1 g σε κάθε θέση. Αν διαφέρει πάνω από tolerance (π.χ. 0.42 g από
+    # λάθος AccelCalMin/Max στο RTIMULib.ini), ok = False. Κρίνεται μόνο όταν η πλακέτα είναι
+    # ακίνητη (μικρή απόκλιση του |a| στα τελευταία window δείγματα), αλλιώς κρατάει το προηγούμενο.
+    def __init__(self, tolerance=0.1, window=10, steady_std=0.01):
+        self.tolerance = tolerance
+        self.window = window
+        self.steady_std = steady_std
+        self.ok = True
+        self.magnitude = None  # μέσος όρος |a| (g) την τελευταία φορά που ήταν ακίνητη
+        self._values = []
+
+    def update(self, accel):
+        self._values.append(math.sqrt(sum(accel[axis] ** 2 for axis in AXES)))
+        if len(self._values) > self.window:
+            del self._values[0]
+        if len(self._values) < self.window:
+            return self.ok
+        mean = sum(self._values) / len(self._values)
+        std = math.sqrt(sum((v - mean) ** 2 for v in self._values) / len(self._values))
+        if std < self.steady_std:
+            self.magnitude = mean
+            self.ok = abs(mean - 1.0) <= self.tolerance
+        return self.ok
+
+    def reset(self):
+        self.ok = True
+        self.magnitude = None
+        self._values = []
+
+
 class ResidualCorrection:
     # Αφαιρεί το υπόλοιπο (bias) που μένει στη γραμμική επιτάχυνση με την πλακέτα ακίνητη.
     # - start_zero(): μέσος όρος για zero_time δευτερόλεπτα -> bias (η πλακέτα πρέπει να μένει ακίνητη)

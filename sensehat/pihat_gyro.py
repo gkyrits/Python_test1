@@ -248,7 +248,7 @@ class Transparent3DCubeApp:
         # Raw = μέτρηση όπως είναι (με τη βαρύτητα), Linear = χωρίς βαρύτητα σε X, Y, Z
         # (module acceleration, με την κλίση από gyroscope + accelerometer).
         # Χωρίς Sense HAT δεν υπάρχει προσανατολισμός για την αφαίρεση, οπότε μόνο Raw.
-        self.accel_mode = tk.StringVar(value="raw" if self.sense is None else "linear")
+        self.accel_mode = tk.StringVar(value="raw")
         mode_frame = tk.Frame(self.accel["options"])
         mode_frame.pack(side=tk.TOP, fill=tk.X)
         tk.Label(mode_frame, text="Mode", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 8))
@@ -261,6 +261,8 @@ class Transparent3DCubeApp:
         # Διόρθωση υπολοίπου στο Linear (module acceleration): Zero = μέσος όρος ~1 s με την
         # πλακέτα ακίνητη, Auto-zero = αργό φίλτρο που αφαιρεί συνεχώς ό,τι μένει σταθερό
         self.accel_correction = acceleration.ResidualCorrection()
+        # Έλεγχος βαθμονόμησης στο Raw: |a| ≈ 1 g με την πλακέτα ακίνητη (module acceleration)
+        self.gravity_check = acceleration.GravityCheck()
         correction_frame = tk.Frame(self.accel["options"])
         correction_frame.pack(side=tk.TOP, fill=tk.X)
         tk.Label(correction_frame, text="Residual", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 8))
@@ -534,6 +536,7 @@ class Transparent3DCubeApp:
     def _on_accel_mode(self):
         # Αλλαγή Raw/Linear: νέες ρυθμίσεις IMU, και το υπόλοιπο μετριέται από την αρχή
         self.accel_correction.reset()
+        self.gravity_check.reset()
         self.zero_button.config(**self.zero_colors)
         self._update_correction_controls()
         self._on_tab_changed(None)
@@ -635,6 +638,8 @@ class Transparent3DCubeApp:
         if self._selected_tab() is self.accel_tab:
             if self.sense is not None:
                 raw = self.sense.get_accelerometer_raw()
+                if self.accel_mode.get() == "raw":
+                    self.gravity_check.update(raw)
                 if self.accel_mode.get() == "linear":
                     raw = acceleration.remove_gravity(raw, self.sense.get_orientation())
                     raw = self.accel_correction.apply(raw)
@@ -661,7 +666,12 @@ class Transparent3DCubeApp:
         # Linear: |a| ≈ 0 σε ηρεμία
         self._show_axis_values(self.accel, raw)
         total = "---" if raw is None else f"{xyz_force.magnitude(raw):.2f} g"
-        self.accel["labels"]["total"].set(f"|a|: {total}")
+        # Raw με Sense HAT: προειδοποίηση αν με την πλακέτα ακίνητη το |a| δεν είναι ≈ 1 g
+        warn = (raw is not None and self.sense is not None and self.accel_mode.get() == "raw"
+                and not self.gravity_check.ok)
+        self.accel["labels"]["total"].set(f"|a|: {total}" + ("  check calibration!" if warn else ""))
+        self.accel["label_widgets"]["total"].config(fg=FIELD_WARN_COLOR if warn else "black",
+                                                    font=self.bold_font if warn else "TkDefaultFont")
 
     def _show_field(self, var, label, title, raw):
         # Ένταση πεδίου |B| με προειδοποίηση όταν ένας μαγνήτης είναι πολύ κοντά:
