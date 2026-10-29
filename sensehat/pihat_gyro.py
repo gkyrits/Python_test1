@@ -63,68 +63,84 @@ FIELD_WARN_COLOR = "#d07000"  # σκούρο πορτοκαλί, ευανάγν�
 SHAPE_SIZE = (1.6, 0.2, 1.0)
 
 
-class Transparent3DCubeApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title(WINDOW_TITLE)
+def tool_column(parent, commands):
+    # Στήλη με τα μικρά κουμπιά (M/R/C, H/S) αριστερά από τον canvas. Επιστρέφει {κείμενο: κουμπί}.
+    column = tk.Frame(parent)
+    column.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 2))
+    buttons = {}
+    for text, command in commands.items():
+        button = tk.Button(column, text=text, width=2, height=2, padx=0, pady=0, command=command)
+        button.pack(side=tk.TOP, pady=(10, 0))
+        buttons[text] = button
+    return buttons
 
-        if SenseHat is not None:
-            self.sense = SenseHat()
-            self.sense.clear()
-        else:
-            self.sense = None
+
+def sunken_frame(parent):
+    # Πλαίσιο με βυθισμένο περίγραμμα στο κάτω μέρος του tab (pack με side=BOTTOM: το πρώτο
+    # που φτιάχνεται μπαίνει πιο κάτω)
+    frame = tk.Frame(parent, relief=tk.SUNKEN, borderwidth=2)
+    frame.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
+    return frame
+
+
+def button_colors(button):
+    # Αρχικά χρώματα κουμπιού (bg, και activebackground που φαίνεται όσο το ποντίκι είναι πάνω του),
+    # για επαναφορά μετά το πορτοκαλί "ενεργό"
+    return {key: button.cget(key) for key in ("bg", "activebackground")}
+
+
+class Tab:
+    # Βάση για τα tabs του notebook. Κάθε tab:
+    # - φτιάχνει το design του στο self.frame
+    # - update(): καλείται κάθε period ms όσο το tab φαίνεται (False = η εφαρμογή έκλεισε)
+    # - imu_config(): οι αισθητήρες του IMU (compass, gyroscope, accelerometer) που χρειάζεται
+    # - hide(): όταν φεύγει κανείς από το tab, close(): στο κλείσιμο της εφαρμογής
+    title = ""
+    period = 50  # ms
+
+    def __init__(self, app):
+        self.app = app
+        self.sense = app.sense
+        self.frame = tk.Frame(app.notebook)
+        app.notebook.add(self.frame, text=self.title)
+
+    def update(self):
+        return True
+
+    def imu_config(self):
+        return None
+
+    def hide(self):
+        pass
+
+    def close(self):
+        pass
+
+
+class GyroscopeTab(Tab):
+    # 3D σχήμα που ακολουθεί τον προσανατολισμό (Sense HAT) ή τους sliders
+    title = "Gyroscope"
+    period = 15
+
+    def __init__(self, app):
+        super().__init__(app)
         self.sensor = None  # τελευταία ανάγνωση του αισθητήρα (για το calibrate)
 
-        # 1. Η 3D σκηνή (σχήμα, άξονες, γράμματα) από το module gyro3d
+        # Η 3D σκηνή (σχήμα, άξονες, γράμματα) από το module gyro3d
         self.scene = gyro3d.GyroScene(CANVAS_WIDTH, CANVAS_HEIGHT, shape_size=SHAPE_SIZE, title=WINDOW_TITLE)
 
-        # Notebook με μικρά tabs (ίδια γραμματοσειρά με το υπόλοιπο GUI, μικρό ύψος tab)
-        # Έντονη εκδοχή της γραμματοσειράς του GUI (για τις προειδοποιήσεις |B|)
-        self.bold_font = tkfont.nametofont("TkDefaultFont").copy()
-        self.bold_font.configure(weight="bold")
-
-        style = ttk.Style(root)
-        style.configure("Small.TNotebook", tabmargins=(2, 2, 2, 0))
-        style.configure("Small.TNotebook.Tab", font="TkDefaultFont", padding=(6, 0))
-        notebook = ttk.Notebook(root, style="Small.TNotebook")
-        notebook.pack(fill=tk.BOTH, expand=True)
-        gyro_tab = tk.Frame(notebook)
-        notebook.add(gyro_tab, text="Gyroscope")
-        compass_tab = tk.Frame(notebook)
-        notebook.add(compass_tab, text="Compass")
-        magnet_tab = tk.Frame(notebook)
-        notebook.add(magnet_tab, text="Magnetometer")
-        # Κενό (προς το παρόν) tab
-        accel_tab = tk.Frame(notebook)
-        notebook.add(accel_tab, text="Accelerometer")
-        track_tab = tk.Frame(notebook)
-        notebook.add(track_tab, text="Track")
-        notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
-        self.notebook, self.gyro_tab, self.compass_tab = notebook, gyro_tab, compass_tab
-        self.magnet_tab, self.accel_tab, self.track_tab = magnet_tab, accel_tab, track_tab
-
-        # 2. Στήσιμο του Tkinter GUI Canvas (στο tab Gyroscope)
-        # Ο canvas ακολουθεί το μέγεθος του παραθύρου, και η 3D σκηνή τον canvas
-        # shape_frame: αριστερά το tool_frame με τα κουμπιά, δεξιά ο canvas
+        # shape_frame: αριστερά τα κουμπιά, δεξιά ο canvas
         # (pack στο τέλος, μετά τα πλαίσια του κάτω μέρους, ώστε να παίρνει τον χώρο που μένει)
-        shape_frame = tk.Frame(gyro_tab)
-        tool_frame = tk.Frame(shape_frame)
-        tool_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 2))
-        self.tool_buttons = {}
+        shape_frame = tk.Frame(self.frame)
         # R = reset offsets, C = calibrate (το σχήμα γίνεται 0,0,0)
-        tool_commands = {"M": None, "R": self.reset_offsets, "C": self.calibrate}
-        for text, command in tool_commands.items():
-            button = tk.Button(tool_frame, text=text, width=2, height=2, padx=0, pady=0, command=command)
-            button.pack(side=tk.TOP, pady=(10, 0))
-            self.tool_buttons[text] = button
-        self.canvas = tk.Canvas(shape_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT, bg=CANVAS_BG_COLOR, highlightthickness=0)
+        self.buttons = tool_column(shape_frame, {"M": None, "R": self.reset_offsets, "C": self.calibrate})
+        self.canvas = tk.Canvas(shape_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT, bg=CANVAS_BG_COLOR,
+                                highlightthickness=0)
 
         self.angle_titles = {"roll": "Roll (X)", "pitch": "Pitch (Y)", "yaw": "Yaw (Z)"}
 
-        # 4. Πλαίσιο με sliders: τιμές προσανατολισμού χωρίς Sense HAT, αλλιώς offsets
-        # (pack πρώτο με side=BOTTOM ώστε να βρίσκεται κάτω από το info_frame)
-        control_frame = tk.Frame(gyro_tab, relief=tk.SUNKEN, borderwidth=2)
-        control_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
+        # Πλαίσιο με sliders: τιμές προσανατολισμού χωρίς Sense HAT, αλλιώς offsets
+        control_frame = sunken_frame(self.frame)
         control_frame.columnconfigure(1, weight=1)
         title = "Orientation values" if self.sense is None else "Orientation offsets"
         tk.Label(control_frame, text=title, font="TkDefaultFont 9 bold").grid(
@@ -142,10 +158,8 @@ class Transparent3DCubeApp:
             value_label.grid(row=row, column=2, padx=2)
             self.scale_vars[name] = var
 
-        # 3. Πλαίσιο με τις τρέχουσες τιμές Roll / Pitch / Yaw κάτω από τον canvas
-        # (pack πριν τον canvas, ώστε να μένει ορατό όταν μικραίνει το παράθυρο)
-        info_frame = tk.Frame(gyro_tab, relief=tk.SUNKEN, borderwidth=2)
-        info_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
+        # Πλαίσιο με τις τρέχουσες τιμές Roll / Pitch / Yaw κάτω από τον canvas
+        info_frame = sunken_frame(self.frame)
         self.angle_vars = {}
         for name, title in self.angle_titles.items():
             var = tk.StringVar(value=f"{title}: ---")
@@ -157,180 +171,11 @@ class Transparent3DCubeApp:
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.view_size = (CANVAS_WIDTH, CANVAS_HEIGHT)
         self.canvas.bind("<Configure>", self._on_canvas_resize)
-
         self.canvas_image_id = self.canvas.create_image(0, 0, anchor=tk.NW)
         self.tk_image = None
 
-        # 5. Tab Compass: από κάτω προς τα πάνω (pack με side=BOTTOM) το πλαίσιο με τον
-        # slider, το info_frame, και από πάνω το compass_frame με τον canvas
-        # Slider North: τιμή χωρίς Sense HAT, αλλιώς offset στο sense.get_compass()
-        compass_control = tk.Frame(compass_tab, relief=tk.SUNKEN, borderwidth=2)
-        compass_control.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
-        compass_control.columnconfigure(1, weight=1)
-        title = "Compass value" if self.sense is None else "Compass offset"
-        tk.Label(compass_control, text=title, font="TkDefaultFont 9 bold").grid(
-            row=0, column=0, columnspan=2, sticky=tk.W, padx=2)
-        # Πηγή του North: Raw = από τα raw X/Y του μαγνητόμετρου (πλακέτα οριζόντια),
-        # get_compass() = από το fusion του RTIMULib (θέλει calibration με RTIMULibCal)
-        self.compass_source = tk.StringVar(value="raw")
-        # Compass offset ανά πηγή (module compass), από το αρχείο που αποθηκεύει το κουμπί S
-        self.compass_offsets = compass.CompassOffsets()
-        source_frame = tk.Frame(compass_control)
-        source_frame.grid(row=0, column=1, columnspan=2, sticky=tk.E, padx=2)
-        for text, value in (("Raw XY", "raw"), ("sense compass", "fusion")):
-            tk.Radiobutton(source_frame, text=text, value=value, variable=self.compass_source,
-                           command=self._on_compass_source,
-                           padx=0, pady=0, borderwidth=0, highlightthickness=0,
-                           state=tk.DISABLED if self.sense is None else tk.NORMAL
-                           ).pack(side=tk.LEFT, padx=(6, 0))
-        # Με Sense HAT ο slider είναι το offset της επιλεγμένης πηγής, χωρίς Sense HAT η τιμή North
-        self.north_var = tk.DoubleVar(value=0.0 if self.sense is None else self.compass_offsets.values["raw"])
-        north_label = tk.Label(compass_control, text="0.0°", width=7, anchor=tk.E)
-        tk.Label(compass_control, text="North", anchor=tk.W).grid(row=1, column=0, sticky=tk.W, padx=2)
-        tk.Scale(compass_control, variable=self.north_var, from_=-180, to=180, resolution=0.1,
-                 orient=tk.HORIZONTAL, showvalue=False, width=10, sliderlength=15, borderwidth=1
-                 ).grid(row=1, column=1, sticky=tk.EW, padx=2)
-        self.north_var.trace_add("write", lambda *_: north_label.config(
-            text=f"{round(self.north_var.get(), 1) + 0.0:.1f}°"))
-        self.north_var.trace_add("write", lambda *_: self._on_compass_offset())
-        north_label.config(text=f"{round(self.north_var.get(), 1) + 0.0:.1f}°")
-        north_label.grid(row=1, column=2, padx=2)
-
-        compass_info = tk.Frame(compass_tab, relief=tk.SUNKEN, borderwidth=2)
-        compass_info.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
-        # Γραμμή 1: North + raw X/Y/Z. Γραμμή 2 (διάγνωση): ένταση πεδίου και
-        # heading υπολογισμένο απευθείας από τα raw X/Y (χωρίς το fusion του RTIMULib)
-        self.compass_vars = {}
-        self.compass_label_widgets = {}
-        for names in (("north", "x", "y", "z"), ("field", "raw_heading")):
-            row = tk.Frame(compass_info)
-            row.pack(fill=tk.X)
-            for name in names:
-                var = tk.StringVar()
-                label = tk.Label(row, textvariable=var, anchor=tk.W, font="TkDefaultFont")
-                label.pack(side=tk.LEFT, padx=(4, 6), pady=0)
-                self.compass_vars[name] = var
-                self.compass_label_widgets[name] = label
-        self._show_compass_values(None, None)
-        self.compass_ticks = 0
-        # compass_frame: αριστερά το tool frame με τα κουμπιά (όπως στο Gyroscope), δεξιά ο canvas
-        compass_frame = tk.Frame(compass_tab)
-        compass_frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
-        compass_tools = tk.Frame(compass_frame)
-        compass_tools.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 2))
-        self.compass_buttons = {}
-        # H = hard-iron calibration του μαγνητόμετρου (πάτημα: έναρξη, περιστροφή, πάτημα: αποθήκευση)
-        # S = αποθήκευση των Compass offsets (Raw XY και sense compass)
-        compass_commands = {"H": self.toggle_hard_iron, "S": self.save_compass_offsets}
-        for text, command in compass_commands.items():
-            button = tk.Button(compass_tools, text=text, width=2, height=2, padx=0, pady=0, command=command)
-            button.pack(side=tk.TOP, pady=(10, 0))
-            self.compass_buttons[text] = button
-        # Hard-iron calibration του μαγνητόμετρου (module compass, φορτώνει τα αποθηκευμένα offsets).
-        # Χωρίς Sense HAT δεν υπάρχει αισθητήρας για calibration, οπότε το H είναι ανενεργό
-        self.hard_iron = compass.HardIronCalibration()
-        # Αρχικά χρώματα του H (bg, και activebackground που φαίνεται όσο το ποντίκι είναι πάνω του)
-        self.button_colors = {key: self.compass_buttons["H"].cget(key) for key in ("bg", "activebackground")}
-        if self.sense is None:
-            self.compass_buttons["H"].config(state=tk.DISABLED)
-            self.compass_buttons["S"].config(state=tk.DISABLED)
-        # Σχεδίαση της πυξίδας από το module compass
-        self.compass_canvas = tk.Canvas(compass_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT)
-        self.compass_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.compass_view = compass.CompassView(self.compass_canvas)
-
-        # 6. Tabs Magnetometer και Accelerometer: ίδιο design (βλ. _build_vector_tab)
-        self.magnet = self._build_vector_tab(magnet_tab, "Magnetometer", "µT", MAGNET_RANGE, 0.1, 1)
-        self._show_magnet_values(None)
-        self.accel = self._build_vector_tab(accel_tab, "Accelerometer", "g", ACCEL_RANGE, 0.01, 2,
-                                            range_choices=ACCEL_RANGE_CHOICES)
-        self._show_accel_values(None)
-        # Raw = μέτρηση όπως είναι (με τη βαρύτητα), Linear = χωρίς βαρύτητα σε X, Y, Z
-        # (module acceleration, με την κλίση από gyroscope + accelerometer).
-        # Χωρίς Sense HAT δεν υπάρχει προσανατολισμός για την αφαίρεση, οπότε μόνο Raw.
-        self.accel_mode = tk.StringVar(value="raw")
-        mode_frame = tk.Frame(self.accel["options"])
-        mode_frame.pack(side=tk.TOP, fill=tk.X)
-        tk.Label(mode_frame, text="Mode", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 8))
-        for text, value in (("Raw", "raw"), ("Linear (gravity removed)", "linear")):
-            tk.Radiobutton(mode_frame, text=text, value=value, variable=self.accel_mode,
-                           command=self._on_accel_mode,
-                           padx=0, pady=0, borderwidth=0, highlightthickness=0,
-                           state=tk.DISABLED if self.sense is None else tk.NORMAL
-                           ).pack(side=tk.LEFT, padx=(4, 8), pady=1)
-        # Διόρθωση υπολοίπου στο Linear (module acceleration): Zero = μέσος όρος ~1 s με την
-        # πλακέτα ακίνητη, Auto-zero = αργό φίλτρο που αφαιρεί συνεχώς ό,τι μένει σταθερό
-        self.accel_correction = acceleration.ResidualCorrection()
-        # Έλεγχος βαθμονόμησης στο Raw: |a| ≈ 1 g με την πλακέτα ακίνητη (module acceleration)
-        self.gravity_check = acceleration.GravityCheck()
-        correction_frame = tk.Frame(self.accel["options"])
-        correction_frame.pack(side=tk.TOP, fill=tk.X)
-        tk.Label(correction_frame, text="Residual", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 8))
-        self.zero_button = tk.Button(correction_frame, text="Zero", padx=6, pady=0, command=self.zero_accel)
-        self.zero_button.pack(side=tk.LEFT, padx=(4, 8), pady=1)
-        self.zero_colors = {key: self.zero_button.cget(key) for key in ("bg", "activebackground")}
-        self.auto_zero_var = tk.BooleanVar(value=False)
-        self.auto_zero_check = tk.Checkbutton(correction_frame, text="Auto-zero", variable=self.auto_zero_var,
-                                              command=self._on_auto_zero, padx=0, pady=0,
-                                              borderwidth=0, highlightthickness=0)
-        self.auto_zero_check.pack(side=tk.LEFT, padx=(4, 8))
-        self._update_correction_controls()
-
-        # 7. Tab Track: από κάτω προς τα πάνω (pack με side=BOTTOM) οι επιλογές, το info_frame,
-        # και το frame με τον canvas της διαδρομής (module track: ταχύτητα και διαδρομή από τη
-        # γραμμική επιτάχυνση, με ZUPT και διόρθωση drift σε κάθε στάση, σε νήμα)
-        self.tracker = track.Tracker()
-        # Το Track διαβάζει το μαγνητόμετρο απευθείας (όπως η πηγή Raw XY), οπότε παίρνει εκείνο το offset
-        self.tracker.heading_offset = self.compass_offsets.values["raw"] if self.sense is not None else 0.0
-        self.track_sampler = track.TrackSampler(self._read_track_sample, self.tracker)
-        track_options = tk.Frame(track_tab, relief=tk.SUNKEN, borderwidth=2)
-        track_options.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
-        state = tk.DISABLED if self.sense is None else tk.NORMAL
-        buttons_row = tk.Frame(track_options)
-        buttons_row.pack(fill=tk.X)
-        self.track_button = tk.Button(buttons_row, text="Start", width=6, padx=2, pady=0,
-                                      command=self.toggle_track, state=state)
-        self.track_button.pack(side=tk.LEFT, padx=(4, 4), pady=1)
-        self.track_colors = {key: self.track_button.cget(key) for key in ("bg", "activebackground")}
-        tk.Button(buttons_row, text="Reset", width=6, padx=2, pady=0, command=self.reset_track,
-                  state=state).pack(side=tk.LEFT, padx=(0, 8), pady=1)
-        # Board: άξονες της πλακέτας (πάνω = μπροστά, χωρίς στροφές), Gyro: πάνω = κατεύθυνση στο
-        # Start και οι στροφές από το gyroscope, Compass: Βορράς πάνω (μαγνητόμετρο με διόρθωση κλίσης)
-        heading_row = tk.Frame(track_options)
-        heading_row.pack(fill=tk.X)
-        tk.Label(heading_row, text="Heading", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 4))
-        self.track_heading = tk.StringVar(value="board")
-        for text, value in (("Board", "board"), ("Gyro", "gyro"), ("Compass", "compass")):
-            tk.Radiobutton(heading_row, text=text, value=value, variable=self.track_heading,
-                           command=self._on_track_heading, padx=0, pady=0, borderwidth=0,
-                           highlightthickness=0, state=state).pack(side=tk.LEFT, padx=(4, 4), pady=1)
-
-        track_info = tk.Frame(track_tab, relief=tk.SUNKEN, borderwidth=2)
-        track_info.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
-        self.track_vars = {}
-        self.track_label_widgets = {}
-        for name in ("speed", "distance", "position", "state"):
-            var = tk.StringVar()
-            label = tk.Label(track_info, textvariable=var, anchor=tk.W, font="TkDefaultFont")
-            label.pack(side=tk.LEFT, padx=(4, 6), pady=0)
-            self.track_vars[name] = var
-            self.track_label_widgets[name] = label
-        self._show_track_values(self.tracker.snapshot())
-
-        track_frame = tk.Frame(track_tab)
-        track_frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
-        track_canvas = tk.Canvas(track_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT)
-        track_canvas.pack(fill=tk.BOTH, expand=True)
-        self.track_view = track.TrackView(track_canvas)
-        if self.sense is None:
-            self.track_view.message = "Track needs a Sense HAT"
-
-        self.root.protocol("WM_DELETE_WINDOW", self.close)
-        self.render_loop()
-        self.compass_loop()
-        self.magnet_loop()
-        self.accel_loop()
-        self.track_loop()
+    def imu_config(self):
+        return True, True, True
 
     def calibrate(self):
         # Offset = η αντίστροφη περιστροφή της τρέχουσας θέσης του αισθητήρα, ώστε
@@ -353,209 +198,453 @@ class Transparent3DCubeApp:
     def _on_canvas_resize(self, event):
         self.view_size = (max(event.width, 1), max(event.height, 1))
 
+    def update(self):
+        # Χωρίς Sense HAT οι sliders δίνουν τις τιμές, αλλιώς είναι μια περιστροφή
+        # offset που εφαρμόζεται πριν από αυτή του αισθητήρα: R = R_offset · R_sensor
+        orientation = {name: var.get() for name, var in self.scale_vars.items()}
+        if self.sense is not None:
+            self.sensor = self.sense.get_orientation()
+            orientation = matrix_to_euler(euler_to_matrix(orientation) @ euler_to_matrix(self.sensor))
+
+        image = self.scene.render(orientation, self.view_size)
+        if image is None:  # η 3D σκηνή έκλεισε
+            self.app.close()
+            return False
+
+        for name, var in self.angle_vars.items():
+            var.set(f"{self.angle_titles[name]}: {round(orientation[name], 1) + 0.0:4.1f}°")
+        self.tk_image = ImageTk.PhotoImage(Image.fromarray(image))
+        self.canvas.itemconfig(self.canvas_image_id, image=self.tk_image)
+        return True
+
     def close(self):
-        self.track_sampler.stop()
         self.scene.close()
-        self.root.destroy()
 
-    def _selected_tab(self):
-        return self.notebook.nametowidget(self.notebook.select())
 
-    def _on_tab_changed(self, event):
-        # Αισθητήρες του IMU ανά tab: set_imu_config(compass, gyroscope, accelerometer)
-        # Compass, Magnetometer: μόνο μαγνητόμετρο (όπως το κάνει και το sense.get_compass())
-        # Accelerometer: μόνο επιταχυνσιόμετρο (Raw), ή gyroscope + accelerometer (Linear,
-        #                για τον προσανατολισμό που αφαιρεί τη βαρύτητα)
-        # Gyroscope, Track: όλοι οι αισθητήρες (gyroscope + accelerometer + μαγνητόμετρο)
-        # Το Track σταματάει όταν φεύγει κανείς από το tab: το νήμα του διαβάζει τον
-        # αισθητήρα και δεν πρέπει να τρέχει μαζί με τα loops των άλλων tabs
+class CompassTab(Tab):
+    # Πυξίδα: North από τα raw X/Y του μαγνητόμετρου ή το get_compass(), με Compass offset
+    # ανά πηγή (S για αποθήκευση) και hard-iron calibration (H)
+    title = "Compass"
+    period = 20  # ανάγνωση κάθε 20 ms, οθόνη κάθε 2η φορά
+
+    def __init__(self, app):
+        super().__init__(app)
+        offsets = app.compass_offsets
+
+        # Από κάτω προς τα πάνω: το πλαίσιο με τον slider, το info_frame, και το compass_frame
+        # Slider North: τιμή χωρίς Sense HAT, αλλιώς offset στο North της επιλεγμένης πηγής
+        compass_control = sunken_frame(self.frame)
+        compass_control.columnconfigure(1, weight=1)
+        title = "Compass value" if self.sense is None else "Compass offset"
+        tk.Label(compass_control, text=title, font="TkDefaultFont 9 bold").grid(
+            row=0, column=0, columnspan=2, sticky=tk.W, padx=2)
+        # Πηγή του North: Raw = από τα raw X/Y του μαγνητόμετρου (πλακέτα οριζόντια),
+        # sense compass = get_compass() από το fusion του RTIMULib (θέλει calibration με RTIMULibCal)
+        self.source = tk.StringVar(value="raw")
+        source_frame = tk.Frame(compass_control)
+        source_frame.grid(row=0, column=1, columnspan=2, sticky=tk.E, padx=2)
+        for text, value in (("Raw XY", "raw"), ("sense compass", "fusion")):
+            tk.Radiobutton(source_frame, text=text, value=value, variable=self.source,
+                           command=self._on_source,
+                           padx=0, pady=0, borderwidth=0, highlightthickness=0,
+                           state=tk.DISABLED if self.sense is None else tk.NORMAL
+                           ).pack(side=tk.LEFT, padx=(6, 0))
+        # Με Sense HAT ο slider είναι το offset της επιλεγμένης πηγής, χωρίς Sense HAT η τιμή North
+        self.north_var = tk.DoubleVar(value=0.0 if self.sense is None else offsets.values["raw"])
+        north_label = tk.Label(compass_control, text="0.0°", width=7, anchor=tk.E)
+        tk.Label(compass_control, text="North", anchor=tk.W).grid(row=1, column=0, sticky=tk.W, padx=2)
+        tk.Scale(compass_control, variable=self.north_var, from_=-180, to=180, resolution=0.1,
+                 orient=tk.HORIZONTAL, showvalue=False, width=10, sliderlength=15, borderwidth=1
+                 ).grid(row=1, column=1, sticky=tk.EW, padx=2)
+        self.north_var.trace_add("write", lambda *_: north_label.config(
+            text=f"{round(self.north_var.get(), 1) + 0.0:.1f}°"))
+        self.north_var.trace_add("write", lambda *_: self._on_offset())
+        north_label.config(text=f"{round(self.north_var.get(), 1) + 0.0:.1f}°")
+        north_label.grid(row=1, column=2, padx=2)
+
+        # Γραμμή 1: North + raw X/Y/Z. Γραμμή 2 (διάγνωση): ένταση πεδίου και
+        # heading υπολογισμένο απευθείας από τα raw X/Y (χωρίς το fusion του RTIMULib)
+        compass_info = sunken_frame(self.frame)
+        self.vars = {}
+        self.label_widgets = {}
+        for names in (("north", "x", "y", "z"), ("field", "raw_heading")):
+            row = tk.Frame(compass_info)
+            row.pack(fill=tk.X)
+            for name in names:
+                var = tk.StringVar()
+                label = tk.Label(row, textvariable=var, anchor=tk.W, font="TkDefaultFont")
+                label.pack(side=tk.LEFT, padx=(4, 6), pady=0)
+                self.vars[name] = var
+                self.label_widgets[name] = label
+        self._show_values(None, None)
+        self.ticks = 0
+
+        # compass_frame: αριστερά τα κουμπιά (όπως στο Gyroscope), δεξιά ο canvas
+        compass_frame = tk.Frame(self.frame)
+        compass_frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
+        # H = hard-iron calibration του μαγνητόμετρου (πάτημα: έναρξη, περιστροφή, πάτημα: αποθήκευση)
+        # S = αποθήκευση των Compass offsets (Raw XY και sense compass)
+        self.buttons = tool_column(compass_frame, {"H": self.toggle_hard_iron, "S": self.save_offsets})
+        self.hard_iron_colors = button_colors(self.buttons["H"])
+        # Χωρίς Sense HAT δεν υπάρχει αισθητήρας για calibration ή offset
         if self.sense is None:
-            return
-        tab = self._selected_tab()
-        if tab is not self.track_tab:
-            self._stop_track()
-        if tab is self.compass_tab or tab is self.magnet_tab:
-            self.sense.set_imu_config(True, False, False)
-        elif tab is self.accel_tab:
-            self.sense.set_imu_config(False, self.accel_mode.get() == "linear", True)
-        elif tab is self.gyro_tab or tab is self.track_tab:
-            self.sense.set_imu_config(True, True, True)
+            self.buttons["H"].config(state=tk.DISABLED)
+            self.buttons["S"].config(state=tk.DISABLED)
+        # Σχεδίαση της πυξίδας από το module compass
+        canvas = tk.Canvas(compass_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.view = compass.CompassView(canvas)
 
-    def render_loop(self):
-        # Σχεδιάζει μόνο όταν φαίνεται το tab Gyroscope (λιγότερη CPU, και δεν
-        # διαβάζει get_orientation() όσο το Compass έχει το IMU σε compass-only)
-        if self._selected_tab() is self.gyro_tab:
-            if not self._render_gyro():
-                return
-        self.root.after(15, self.render_loop)
+    def imu_config(self):
+        return True, False, False  # μόνο μαγνητόμετρο (όπως το κάνει και το sense.get_compass())
 
-    def compass_loop(self):
+    def update(self):
         # Χωρίς Sense HAT ο slider δίνει την τιμή North, αλλιώς προστίθεται ως offset.
         # Ανάγνωση κάθε 20 ms (το fusion του RTIMULib συγκλίνει με κάθε ανάγνωση),
         # αλλά ενημέρωση οθόνης κάθε 2η φορά (40 ms) για λιγότερη CPU
-        if self._selected_tab() is self.compass_tab:
-            north = self.north_var.get()
-            raw = None
-            if self.sense is not None:
-                raw = self._read_magnet()
-                if self.compass_source.get() == "raw":
-                    north += compass.raw_heading(raw)
-                else:
-                    north += self.sense.get_compass()
-            self.compass_view.heading = north % 360.0
-            self.compass_ticks += 1
-            if self.compass_ticks % 2 == 0:
-                self._show_compass_values(self.compass_view.heading, raw)
-                self.compass_view.draw()
-        self.root.after(20, self.compass_loop)
+        north = self.north_var.get()
+        raw = None
+        if self.sense is not None:
+            raw = self.app.read_magnet()
+            if self.source.get() == "raw":
+                north += compass.raw_heading(raw)
+            else:
+                north += self.sense.get_compass()
+        self.view.heading = north % 360.0
+        self.ticks += 1
+        if self.ticks % 2 == 0:
+            self._show_values(self.view.heading, raw)
+            self.view.draw()
+        return True
 
-    def _show_compass_values(self, heading, raw):
-        self.compass_vars["north"].set("North: ---" if heading is None else f"North: {round(heading, 1) % 360.0:.1f}°")
+    def _show_values(self, heading, raw):
+        self.vars["north"].set("North: ---" if heading is None else f"North: {round(heading, 1) % 360.0:.1f}°")
         for axis in ("x", "y", "z"):
             value = "---" if raw is None else f"{raw[axis]:.1f} µT"
-            self.compass_vars[axis].set(f"{axis.upper()}: {value}")
+            self.vars[axis].set(f"{axis.upper()}: {value}")
         # Διάγνωση: η ένταση του γήινου πεδίου είναι ~25-65 µT και μένει σταθερή όταν
         # η πλακέτα περιστρέφεται· το raw heading ισχύει μόνο με την πλακέτα οριζόντια
         xy_angle = "---" if raw is None else f"{compass.xy_angle(raw):.1f}°"
-        self._show_field(self.compass_vars["field"], self.compass_label_widgets["field"], "Field |B|", raw)
-        self.compass_vars["raw_heading"].set(f"Raw XY heading: {xy_angle}")
+        self.app.show_field(self.vars["field"], self.label_widgets["field"], "Field |B|", raw)
+        self.vars["raw_heading"].set(f"Raw XY heading: {xy_angle}")
 
-    def _read_magnet(self):
-        # Ανάγνωση του μαγνητόμετρου (µT) διορθωμένη με τα hard-iron offsets (module compass)
-        return self.hard_iron.correct(self.sense.get_compass_raw())
-
-    def _on_compass_source(self):
+    def _on_source(self):
         # Αλλαγή πηγής: ο slider δείχνει το offset της νέας πηγής
-        self.north_var.set(self.compass_offsets.values[self.compass_source.get()])
+        self.north_var.set(self.app.compass_offsets.values[self.source.get()])
 
-    def _on_compass_offset(self):
-        # Ο slider άλλαξε: κρατάει το offset της επιλεγμένης πηγής, και το Raw XY πάει και στο Track
+    def _on_offset(self):
+        # Ο slider άλλαξε: κρατάει το offset της επιλεγμένης πηγής (το Raw XY πάει και στο Track)
         if self.sense is None:
             return
-        self.compass_offsets.values[self.compass_source.get()] = self.north_var.get()
-        if hasattr(self, "tracker"):
-            self.tracker.heading_offset = self.compass_offsets.values["raw"]
+        self.app.compass_offsets.values[self.source.get()] = self.north_var.get()
+        self.app.compass_offsets_changed()
 
-    def save_compass_offsets(self):
+    def save_offsets(self):
         # Κουμπί S: αποθήκευση και των δύο offsets, φορτώνονται ξανά στην επόμενη εκκίνηση
+        offsets = self.app.compass_offsets
         try:
-            self.compass_offsets.save()
+            offsets.save()
         except OSError as e:
             messagebox.showerror("Compass offset", f"Could not save: {e}")
             return
-        values = self.compass_offsets.values
-        messagebox.showinfo("Compass offset", f"Saved: Raw XY {values['raw']:.1f}°, "
-                                              f"sense compass {values['fusion']:.1f}°")
+        messagebox.showinfo("Compass offset", f"Saved: Raw XY {offsets.values['raw']:.1f}°, "
+                                              f"sense compass {offsets.values['fusion']:.1f}°")
 
     def toggle_hard_iron(self):
         # Κουμπί H: 1ο πάτημα έναρξη καταγραφής (περιστροφή της πλακέτας σε πλήρη κύκλο),
         # 2ο πάτημα υπολογισμός και αποθήκευση των offsets (βλ. compass.HardIronCalibration)
-        button = self.compass_buttons["H"]
-        if not self.hard_iron.recording:
-            self.hard_iron.start()
+        hard_iron = self.app.hard_iron
+        button = self.buttons["H"]
+        if not hard_iron.recording:
+            hard_iron.start()
             button.config(relief=tk.SUNKEN, bg="orange", activebackground="orange")
             return
-        updated = self.hard_iron.stop()
-        button.config(relief=tk.RAISED, **self.button_colors)
+        updated = hard_iron.stop()
+        button.config(relief=tk.RAISED, **self.hard_iron_colors)
         if not updated:
             messagebox.showwarning("Hard-iron calibration",
                                    "Not enough rotation, the previous calibration is kept.\n"
                                    "Turn the board slowly through a full circle while recording.")
             return
         kept = [axis.upper() for axis in ("x", "y", "z") if axis not in updated]
-        offsets = ", ".join(f"{axis.upper()}: {self.hard_iron.offsets[axis]:.1f} µT" for axis in ("x", "y", "z"))
+        offsets = ", ".join(f"{axis.upper()}: {hard_iron.offsets[axis]:.1f} µT" for axis in ("x", "y", "z"))
         messagebox.showinfo("Hard-iron calibration",
                             f"Offsets: {offsets}" + (f"\nKept previous: {', '.join(kept)} (small range)" if kept else ""))
 
-    def _build_vector_tab(self, tab, title, unit, value_range, resolution, decimals, range_choices=None):
-        # Κοινό design για Magnetometer και Accelerometer: από κάτω προς τα πάνω (pack με
-        # side=BOTTOM) οι sliders προσομοίωσης (μόνο χωρίς Sense HAT), το πλαίσιο επιλογών
-        # (αν δοθεί range_choices), το info_frame, και το frame με τους δύο canvas:
-        # X/Y σε σταυρό και Z σε στενότερο canvas
-        panel = {"unit": unit, "decimals": decimals, "vars": {}, "labels": {}, "label_widgets": {}}
+
+class VectorTab(Tab):
+    # Κοινό design για Magnetometer και Accelerometer: από κάτω προς τα πάνω (pack με
+    # side=BOTTOM) οι sliders προσομοίωσης (μόνο χωρίς Sense HAT), το πλαίσιο επιλογών
+    # (αν δοθεί range_choices), το info_frame, και το frame με τους δύο canvas:
+    # X/Y σε σταυρό και Z σε στενότερο canvas (module xyz_force)
+    unit = ""
+    value_range = 1.0
+    resolution = 0.1
+    decimals = 1
+    range_choices = None
+
+    def __init__(self, app):
+        super().__init__(app)
+        unit, decimals, value_range = self.unit, self.decimals, self.value_range
+        self.vars = {}           # sliders προσομοίωσης (χωρίς Sense HAT)
+        self.labels = {}         # x, y, z, total
+        self.label_widgets = {}
+        self.options = None      # πλαίσιο επιλογών (αν υπάρχει range_choices)
+
         if self.sense is None:
-            control = tk.Frame(tab, relief=tk.SUNKEN, borderwidth=2)
-            control.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
+            control = sunken_frame(self.frame)
             control.columnconfigure(1, weight=1)
-            tk.Label(control, text=f"{title} values", font="TkDefaultFont 9 bold").grid(
+            tk.Label(control, text=f"{self.title} values", font="TkDefaultFont 9 bold").grid(
                 row=0, column=0, columnspan=3, sticky=tk.W, padx=2)
             for row, axis in enumerate(("x", "y", "z"), start=1):
                 var = tk.DoubleVar(value=0.0)
                 value_label = tk.Label(control, text=f"{0:.{decimals}f} {unit}", width=9, anchor=tk.E)
                 tk.Label(control, text=axis.upper(), anchor=tk.W).grid(row=row, column=0, sticky=tk.W, padx=2)
-                tk.Scale(control, variable=var, from_=-value_range, to=value_range, resolution=resolution,
+                tk.Scale(control, variable=var, from_=-value_range, to=value_range, resolution=self.resolution,
                          orient=tk.HORIZONTAL, showvalue=False, width=10, sliderlength=15, borderwidth=1
                          ).grid(row=row, column=1, sticky=tk.EW, padx=2)
                 var.trace_add("write", lambda *_, v=var, lbl=value_label: lbl.config(
                     text=f"{round(v.get(), decimals) + 0.0:.{decimals}f} {unit}"))
                 value_label.grid(row=row, column=2, padx=2)
-                panel["vars"][axis] = var
+                self.vars[axis] = var
 
-        if range_choices:
+        if self.range_choices:
             # Πλαίσιο επιλογών: γραμμή με τη μέγιστη τιμή στο άκρο των αξόνων, ξεχωριστά
-            # για τον σταυρό X/Y και τον Z (επιπλέον γραμμές μπαίνουν στο panel["options"])
-            options = tk.Frame(tab, relief=tk.SUNKEN, borderwidth=2)
-            options.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
-            range_frame = tk.Frame(options)
+            # για τον σταυρό X/Y και τον Z (επιπλέον γραμμές μπαίνουν στο self.options)
+            self.options = sunken_frame(self.frame)
+            range_frame = tk.Frame(self.options)
             range_frame.pack(side=tk.BOTTOM, fill=tk.X)
-            panel["options"] = options
             tk.Label(range_frame, text="Axes range", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 8))
             for key, text in (("range_xy", "X/Y:"), ("range_z", "Z:")):
-                values, default = range_choices[key]
+                values, default = self.range_choices[key]
                 tk.Label(range_frame, text=text).pack(side=tk.LEFT, padx=(4, 2))
-                choice = ttk.Combobox(range_frame, values=[f"{v:g}" for v in values],
-                                      width=4, state="readonly")
+                choice = ttk.Combobox(range_frame, values=[f"{v:g}" for v in values], width=4, state="readonly")
                 choice.set(f"{default:g}")
                 choice.pack(side=tk.LEFT, pady=1)
                 tk.Label(range_frame, text=unit).pack(side=tk.LEFT, padx=(2, 6))
 
                 def on_select(event, key=key, choice=choice):
-                    setattr(panel["view"], key, float(choice.get()))
-                    panel["view"].draw()
+                    setattr(self.view, key, float(choice.get()))
+                    self.view.draw()
                 choice.bind("<<ComboboxSelected>>", on_select)
 
-        info = tk.Frame(tab, relief=tk.SUNKEN, borderwidth=2)
-        info.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
+        info = sunken_frame(self.frame)
         for name in ("x", "y", "z", "total"):
             var = tk.StringVar()
             label = tk.Label(info, textvariable=var, anchor=tk.W, font="TkDefaultFont")
             label.pack(side=tk.LEFT, padx=(4, 6), pady=0)
-            panel["labels"][name] = var
-            panel["label_widgets"][name] = label
+            self.labels[name] = var
+            self.label_widgets[name] = label
 
-        frame = tk.Frame(tab)
-        frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
-        panel["frame"] = frame
-        # Οι δύο canvas (X/Y και Z) από το module xyz_force
-        panel["view"] = xyz_force.XYZForceView(frame, value_range, size=CANVAS_HEIGHT)
-        if range_choices:
-            for key, (values, default) in range_choices.items():
-                setattr(panel["view"], key, default)
-        return panel
+        canvas_frame = tk.Frame(self.frame)
+        canvas_frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
+        self.view = xyz_force.XYZForceView(canvas_frame, value_range, size=CANVAS_HEIGHT)
+        if self.range_choices:
+            for key, (values, default) in self.range_choices.items():
+                setattr(self.view, key, default)
 
-    def _on_accel_mode(self):
+    def slider_values(self):
+        return {axis: var.get() for axis, var in self.vars.items()}
+
+    def show_axis_values(self, raw):
+        for axis in ("x", "y", "z"):
+            value = "---" if raw is None else f"{round(raw[axis], self.decimals) + 0.0:.{self.decimals}f} {self.unit}"
+            self.labels[axis].set(f"{axis.upper()}: {value}")
+
+
+class MagnetometerTab(VectorTab):
+    # Raw μαγνητόμετρο (με hard-iron διόρθωση) σε µT, με προειδοποίηση |B| κοντά σε μαγνήτη
+    title = "Magnetometer"
+    unit = "µT"
+    value_range = MAGNET_RANGE
+    resolution = 0.1
+    decimals = 1
+
+    def __init__(self, app):
+        super().__init__(app)
+        self.show_values(None)
+
+    def imu_config(self):
+        return True, False, False  # μόνο μαγνητόμετρο
+
+    def update(self):
+        # Raw μαγνητόμετρο (Sense HAT, με hard-iron διόρθωση) ή οι sliders, κάθε 50 ms
+        raw = self.app.read_magnet() if self.sense is not None else self.slider_values()
+        self.show_values(raw)
+        self.view.draw(raw)
+        return True
+
+    def show_values(self, raw):
+        self.show_axis_values(raw)
+        self.app.show_field(self.labels["total"], self.label_widgets["total"], "|B|", raw)
+
+
+class AccelerometerTab(VectorTab):
+    # Επιταχυνσιόμετρο σε g: Raw (με τη βαρύτητα, και έλεγχο βαθμονόμησης) ή Linear
+    # (χωρίς βαρύτητα, με Zero / Auto-zero), και επιλογή κλίμακας αξόνων
+    title = "Accelerometer"
+    unit = "g"
+    value_range = ACCEL_RANGE
+    resolution = 0.01
+    decimals = 2
+    range_choices = ACCEL_RANGE_CHOICES
+
+    def __init__(self, app):
+        # Raw = μέτρηση όπως είναι (με τη βαρύτητα), Linear = χωρίς βαρύτητα σε X, Y, Z
+        # (module acceleration, με την κλίση από gyroscope + accelerometer).
+        # Χωρίς Sense HAT δεν υπάρχει προσανατολισμός για την αφαίρεση, οπότε μόνο Raw.
+        self.mode = None
+        super().__init__(app)
+        self.mode = tk.StringVar(value="raw")
+        # Διόρθωση υπολοίπου στο Linear: Zero = μέσος όρος ~1 s με την πλακέτα ακίνητη,
+        # Auto-zero = αργό φίλτρο που αφαιρεί συνεχώς ό,τι μένει σταθερό
+        self.correction = acceleration.ResidualCorrection()
+        # Έλεγχος βαθμονόμησης στο Raw: |a| ≈ 1 g με την πλακέτα ακίνητη
+        self.gravity_check = acceleration.GravityCheck()
+
+        mode_frame = tk.Frame(self.options)
+        mode_frame.pack(side=tk.TOP, fill=tk.X)
+        tk.Label(mode_frame, text="Mode", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 8))
+        for text, value in (("Raw", "raw"), ("Linear (gravity removed)", "linear")):
+            tk.Radiobutton(mode_frame, text=text, value=value, variable=self.mode, command=self._on_mode,
+                           padx=0, pady=0, borderwidth=0, highlightthickness=0,
+                           state=tk.DISABLED if self.sense is None else tk.NORMAL
+                           ).pack(side=tk.LEFT, padx=(4, 8), pady=1)
+        correction_frame = tk.Frame(self.options)
+        correction_frame.pack(side=tk.TOP, fill=tk.X)
+        tk.Label(correction_frame, text="Residual", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 8))
+        self.zero_button = tk.Button(correction_frame, text="Zero", padx=6, pady=0, command=self.zero)
+        self.zero_button.pack(side=tk.LEFT, padx=(4, 8), pady=1)
+        self.zero_colors = button_colors(self.zero_button)
+        self.auto_zero_var = tk.BooleanVar(value=False)
+        self.auto_zero_check = tk.Checkbutton(correction_frame, text="Auto-zero", variable=self.auto_zero_var,
+                                              command=self._on_auto_zero, padx=0, pady=0,
+                                              borderwidth=0, highlightthickness=0)
+        self.auto_zero_check.pack(side=tk.LEFT, padx=(4, 8))
+        self._update_correction_controls()
+        self.show_values(None)
+
+    def linear(self):
+        return self.mode is not None and self.mode.get() == "linear"
+
+    def imu_config(self):
+        # Raw: μόνο επιταχυνσιόμετρο. Linear: + gyroscope, για τον προσανατολισμό
+        return False, self.linear(), True
+
+    def update(self):
+        # Επιταχυνσιόμετρο σε g (Sense HAT) ή οι sliders, κάθε 50 ms.
+        # Linear: αφαίρεση της βαρύτητας με την κλίση από το get_orientation()
+        if self.sense is not None:
+            raw = self.sense.get_accelerometer_raw()
+            if self.linear():
+                raw = acceleration.remove_gravity(raw, self.sense.get_orientation())
+                raw = self.correction.apply(raw)
+                if not self.correction.zeroing:
+                    self.zero_button.config(**self.zero_colors)
+            else:
+                self.gravity_check.update(raw)
+        else:
+            raw = self.slider_values()
+        self.show_values(raw)
+        self.view.draw(raw)
+        return True
+
+    def show_values(self, raw):
+        # Raw: |a| ≈ 1 g σε ηρεμία (μόνο η βαρύτητα), σε όποια θέση κι αν είναι η πλακέτα.
+        # Linear: |a| ≈ 0 σε ηρεμία
+        self.show_axis_values(raw)
+        total = "---" if raw is None else f"{xyz_force.magnitude(raw):.2f} g"
+        # Raw με Sense HAT: προειδοποίηση αν με την πλακέτα ακίνητη το |a| δεν είναι ≈ 1 g
+        warn = (raw is not None and self.sense is not None and not self.linear()
+                and not self.gravity_check.ok)
+        self.labels["total"].set(f"|a|: {total}" + ("  check calibration!" if warn else ""))
+        self.label_widgets["total"].config(fg=FIELD_WARN_COLOR if warn else "black",
+                                           font=self.app.bold_font if warn else "TkDefaultFont")
+
+    def _on_mode(self):
         # Αλλαγή Raw/Linear: νέες ρυθμίσεις IMU, και το υπόλοιπο μετριέται από την αρχή
-        self.accel_correction.reset()
+        self.correction.reset()
         self.gravity_check.reset()
         self.zero_button.config(**self.zero_colors)
         self._update_correction_controls()
-        self._on_tab_changed(None)
+        self.app.apply_imu_config()
 
     def _update_correction_controls(self):
         # Zero / Auto-zero έχουν νόημα μόνο στο Linear (και μόνο με Sense HAT)
-        state = tk.NORMAL if self.accel_mode.get() == "linear" else tk.DISABLED
+        state = tk.NORMAL if self.linear() else tk.DISABLED
         self.zero_button.config(state=state)
         self.auto_zero_check.config(state=state)
 
-    def zero_accel(self):
+    def zero(self):
         # Κουμπί Zero: μέσος όρος ~1 s (πορτοκαλί όσο μετράει), η πλακέτα πρέπει να μένει ακίνητη
-        self.accel_correction.start_zero()
+        self.correction.start_zero()
         self.zero_button.config(bg="orange", activebackground="orange")
 
     def _on_auto_zero(self):
-        self.accel_correction.auto = self.auto_zero_var.get()
+        self.correction.auto = self.auto_zero_var.get()
 
-    def _read_track_sample(self):
+
+class TrackTab(Tab):
+    # Ταχύτητα και διαδρομή από τη γραμμική επιτάχυνση (module track: ZUPT, διόρθωση drift
+    # σε κάθε στάση, δική του κλίση), με τη μέτρηση σε νήμα και την οθόνη κάθε 50 ms
+    title = "Track"
+    period = 50
+
+    def __init__(self, app):
+        super().__init__(app)
+        self.tracker = track.Tracker()
+        # Το Track διαβάζει το μαγνητόμετρο απευθείας (όπως η πηγή Raw XY), οπότε παίρνει εκείνο το offset
+        self.set_heading_offset()
+        self.sampler = track.TrackSampler(self._read_sample, self.tracker)
+
+        # Από κάτω προς τα πάνω: οι επιλογές, το info_frame, και το frame με τον canvas
+        options = sunken_frame(self.frame)
+        state = tk.DISABLED if self.sense is None else tk.NORMAL
+        buttons_row = tk.Frame(options)
+        buttons_row.pack(fill=tk.X)
+        self.start_button = tk.Button(buttons_row, text="Start", width=6, padx=2, pady=0,
+                                      command=self.toggle, state=state)
+        self.start_button.pack(side=tk.LEFT, padx=(4, 4), pady=1)
+        self.start_colors = button_colors(self.start_button)
+        tk.Button(buttons_row, text="Reset", width=6, padx=2, pady=0, command=self.reset,
+                  state=state).pack(side=tk.LEFT, padx=(0, 8), pady=1)
+        # Board: άξονες της πλακέτας (πάνω = μπροστά, χωρίς στροφές), Gyro: Βορράς πάνω, αρχή από την
+        # πυξίδα και στροφές από το gyroscope, Compass: Βορράς πάνω (μαγνητόμετρο με διόρθωση κλίσης)
+        heading_row = tk.Frame(options)
+        heading_row.pack(fill=tk.X)
+        tk.Label(heading_row, text="Heading", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 4))
+        self.heading = tk.StringVar(value="board")
+        for text, value in (("Board", "board"), ("Gyro", "gyro"), ("Compass", "compass")):
+            tk.Radiobutton(heading_row, text=text, value=value, variable=self.heading,
+                           command=self._on_heading, padx=0, pady=0, borderwidth=0,
+                           highlightthickness=0, state=state).pack(side=tk.LEFT, padx=(4, 4), pady=1)
+
+        info = sunken_frame(self.frame)
+        self.vars = {}
+        self.label_widgets = {}
+        for name in ("speed", "distance", "position", "state"):
+            var = tk.StringVar()
+            label = tk.Label(info, textvariable=var, anchor=tk.W, font="TkDefaultFont")
+            label.pack(side=tk.LEFT, padx=(4, 6), pady=0)
+            self.vars[name] = var
+            self.label_widgets[name] = label
+        self._show_values(self.tracker.snapshot())
+
+        track_frame = tk.Frame(self.frame)
+        track_frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
+        canvas = tk.Canvas(track_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT)
+        canvas.pack(fill=tk.BOTH, expand=True)
+        self.view = track.TrackView(canvas)
+        if self.sense is None:
+            self.view.message = "Track needs a Sense HAT"
+
+    def imu_config(self):
+        return True, True, True
+
+    def set_heading_offset(self):
+        self.tracker.heading_offset = self.app.compass_offsets.values["raw"] if self.sense is not None else 0.0
+
+    def _read_sample(self):
         # Καλείται από το νήμα του Track: (επιτάχυνση g, προσανατολισμός μοίρες, gyroscope rad/s,
         # μαγνητόμετρο µT με hard-iron διόρθωση ή None, χρόνος s ή None), ή None χωρίς νέο δείγμα.
         # Αν γίνεται, ΜΙΑ ανάγνωση του RTIMULib για όλα (ίδια στιγμή, χρόνος του IMU, πιο
@@ -567,113 +656,144 @@ class Transparent3DCubeApp:
                 return None
             data = imu.getIMUData()
             roll, pitch, yaw = (math.degrees(v) for v in data["fusionPose"])
-            mag = self.hard_iron.correct(dict(zip("xyz", data["compass"]))) if use_mag else None
+            mag = self.app.hard_iron.correct(dict(zip("xyz", data["compass"]))) if use_mag else None
             return (dict(zip("xyz", data["accel"])), {"roll": roll, "pitch": pitch, "yaw": yaw},
                     dict(zip("xyz", data["gyro"])), mag, data["timestamp"] / 1e6)
         # Χωρίς πρόσβαση στο RTIMULib (π.χ. sense_emu): τρεις αναγνώσεις, χρόνος από το νήμα
         orientation = self.sense.get_orientation()
         accel = self.sense.get_accelerometer_raw()
         gyro = self.sense.get_gyroscope_raw()
-        mag = self._read_magnet() if use_mag else None
+        mag = self.app.read_magnet() if use_mag else None
         return accel, orientation, gyro, mag, None
 
-    def toggle_track(self):
+    def toggle(self):
         # Start / Stop: πορτοκαλί όσο καταγράφει
-        if self.track_sampler.running:
-            self._stop_track()
+        if self.sampler.running:
+            self.stop()
         else:
-            self.track_sampler.start()
-            self.track_button.config(text="Stop", bg="orange", activebackground="orange")
+            self.sampler.start()
+            self.start_button.config(text="Stop", bg="orange", activebackground="orange")
 
-    def _stop_track(self):
-        self.track_sampler.stop()
-        self.track_button.config(text="Start", **self.track_colors)
+    def stop(self):
+        self.sampler.stop()
+        self.start_button.config(text="Start", **self.start_colors)
 
-    def reset_track(self):
+    def reset(self):
         self.tracker.reset()
-        self.track_view.draw(self.tracker.snapshot())
+        self.view.draw(self.tracker.snapshot())
 
-    def _on_track_heading(self):
+    def _on_heading(self):
         # Αλλαγή Board/Gyro/Compass: η διαδρομή ξεκινάει από την αρχή στο νέο σύστημα αξόνων
-        self.tracker.heading_mode = self.track_heading.get()
-        self.reset_track()
+        self.tracker.heading_mode = self.heading.get()
+        self.reset()
 
-    def track_loop(self):
+    def update(self):
         # Οθόνη του Track κάθε 50 ms (η μέτρηση γίνεται στο νήμα)
-        if self._selected_tab() is self.track_tab and self.sense is not None:
-            if self.track_sampler.error is not None:
-                messagebox.showerror("Track", f"Sensor read failed: {self.track_sampler.error}")
-                self.track_sampler.error = None
-                self._stop_track()
-            snapshot = self.tracker.snapshot()
-            self._show_track_values(snapshot)
-            self.track_view.draw(snapshot)
-        self.root.after(50, self.track_loop)
+        if self.sense is None:
+            return True
+        if self.sampler.error is not None:
+            messagebox.showerror("Track", f"Sensor read failed: {self.sampler.error}")
+            self.sampler.error = None
+            self.stop()
+        snapshot = self.tracker.snapshot()
+        self._show_values(snapshot)
+        self.view.draw(snapshot)
+        return True
 
-    def _show_track_values(self, snap):
+    def _show_values(self, snap):
         up, right = snap["position"]
         names = ("N", "E") if snap["heading_mode"] in ("gyro", "compass") else ("F", "R")
-        self.track_vars["speed"].set(f"Speed: {snap['speed'] * 100:.1f} cm/s")
-        self.track_vars["distance"].set(f"Dist: {snap['distance'] * 100:.1f} cm")
-        self.track_vars["position"].set(f"{names[0]}: {up * 100:.1f}  {names[1]}: {right * 100:.1f} cm")
-        moving = self.track_sampler.running and not snap["still"]
-        self.track_vars["state"].set("Moving" if moving else "Still")
-        self.track_label_widgets["state"].config(fg="#d07000" if moving else "black",
-                                                 font=self.bold_font if moving else "TkDefaultFont")
+        self.vars["speed"].set(f"Speed: {snap['speed'] * 100:.1f} cm/s")
+        self.vars["distance"].set(f"Dist: {snap['distance'] * 100:.1f} cm")
+        self.vars["position"].set(f"{names[0]}: {up * 100:.1f}  {names[1]}: {right * 100:.1f} cm")
+        moving = self.sampler.running and not snap["still"]
+        self.vars["state"].set("Moving" if moving else "Still")
+        self.label_widgets["state"].config(fg="#d07000" if moving else "black",
+                                           font=self.app.bold_font if moving else "TkDefaultFont")
 
-    def magnet_loop(self):
-        # Raw μαγνητόμετρο (Sense HAT, με hard-iron διόρθωση) ή οι sliders, κάθε 50 ms
-        if self._selected_tab() is self.magnet_tab:
-            if self.sense is not None:
-                raw = self._read_magnet()
-            else:
-                raw = {axis: var.get() for axis, var in self.magnet["vars"].items()}
-            self._show_magnet_values(raw)
-            self.magnet["view"].draw(raw)
-        self.root.after(50, self.magnet_loop)
+    def hide(self):
+        # Το νήμα διαβάζει τον αισθητήρα και δεν πρέπει να τρέχει μαζί με τα άλλα tabs
+        self.stop()
 
-    def accel_loop(self):
-        # Επιταχυνσιόμετρο σε g (Sense HAT) ή οι sliders, κάθε 50 ms.
-        # Linear: αφαίρεση της βαρύτητας με την κλίση από το get_orientation()
-        if self._selected_tab() is self.accel_tab:
-            if self.sense is not None:
-                raw = self.sense.get_accelerometer_raw()
-                if self.accel_mode.get() == "raw":
-                    self.gravity_check.update(raw)
-                if self.accel_mode.get() == "linear":
-                    raw = acceleration.remove_gravity(raw, self.sense.get_orientation())
-                    raw = self.accel_correction.apply(raw)
-                    if not self.accel_correction.zeroing:
-                        self.zero_button.config(**self.zero_colors)
-            else:
-                raw = {axis: var.get() for axis, var in self.accel["vars"].items()}
-            self._show_accel_values(raw)
-            self.accel["view"].draw(raw)
-        self.root.after(50, self.accel_loop)
+    def close(self):
+        self.sampler.stop()
 
-    @staticmethod
-    def _show_axis_values(panel, raw):
-        for axis in ("x", "y", "z"):
-            value = "---" if raw is None else f"{round(raw[axis], panel['decimals']) + 0.0:.{panel['decimals']}f} {panel['unit']}"
-            panel["labels"][axis].set(f"{axis.upper()}: {value}")
 
-    def _show_magnet_values(self, raw):
-        self._show_axis_values(self.magnet, raw)
-        self._show_field(self.magnet["labels"]["total"], self.magnet["label_widgets"]["total"], "|B|", raw)
+class PiHatGyroApp:
+    # Το παράθυρο: Sense HAT, notebook με τα tabs, κοινά calibrations (hard-iron, Compass
+    # offsets), αισθητήρες του IMU ανά tab και το loop κάθε tab
+    def __init__(self, root):
+        self.root = root
+        self.root.title(WINDOW_TITLE)
 
-    def _show_accel_values(self, raw):
-        # Raw: |a| ≈ 1 g σε ηρεμία (μόνο η βαρύτητα), σε όποια θέση κι αν είναι η πλακέτα.
-        # Linear: |a| ≈ 0 σε ηρεμία
-        self._show_axis_values(self.accel, raw)
-        total = "---" if raw is None else f"{xyz_force.magnitude(raw):.2f} g"
-        # Raw με Sense HAT: προειδοποίηση αν με την πλακέτα ακίνητη το |a| δεν είναι ≈ 1 g
-        warn = (raw is not None and self.sense is not None and self.accel_mode.get() == "raw"
-                and not self.gravity_check.ok)
-        self.accel["labels"]["total"].set(f"|a|: {total}" + ("  check calibration!" if warn else ""))
-        self.accel["label_widgets"]["total"].config(fg=FIELD_WARN_COLOR if warn else "black",
-                                                    font=self.bold_font if warn else "TkDefaultFont")
+        if SenseHat is not None:
+            self.sense = SenseHat()
+            self.sense.clear()
+        else:
+            self.sense = None
 
-    def _show_field(self, var, label, title, raw):
+        # Έντονη εκδοχή της γραμματοσειράς του GUI (για τις προειδοποιήσεις)
+        self.bold_font = tkfont.nametofont("TkDefaultFont").copy()
+        self.bold_font.configure(weight="bold")
+
+        # Κοινά για Compass, Magnetometer και Track (module compass, από τα αρχεία τους):
+        # hard-iron calibration του μαγνητόμετρου (H) και Compass offset ανά πηγή (S)
+        self.hard_iron = compass.HardIronCalibration()
+        self.compass_offsets = compass.CompassOffsets()
+
+        # Notebook με μικρά tabs (ίδια γραμματοσειρά με το υπόλοιπο GUI, μικρό ύψος tab)
+        style = ttk.Style(root)
+        style.configure("Small.TNotebook", tabmargins=(2, 2, 2, 0))
+        style.configure("Small.TNotebook.Tab", font="TkDefaultFont", padding=(6, 0))
+        self.notebook = ttk.Notebook(root, style="Small.TNotebook")
+        self.notebook.pack(fill=tk.BOTH, expand=True)
+
+        self.gyro_tab = GyroscopeTab(self)
+        self.compass_tab = CompassTab(self)
+        self.magnet_tab = MagnetometerTab(self)
+        self.accel_tab = AccelerometerTab(self)
+        self.track_tab = TrackTab(self)
+        self.tabs = (self.gyro_tab, self.compass_tab, self.magnet_tab, self.accel_tab, self.track_tab)
+
+        self.notebook.bind("<<NotebookTabChanged>>", lambda event: self.apply_imu_config())
+        self.root.protocol("WM_DELETE_WINDOW", self.close)
+        for tab in self.tabs:
+            self._run(tab)
+
+    def _run(self, tab):
+        # Loop του tab: update() κάθε tab.period ms, μόνο όσο το tab φαίνεται
+        # (λιγότερη CPU, και κάθε tab διαβάζει μόνο με τους δικούς του αισθητήρες ενεργούς)
+        if self.selected_tab() is tab and tab.update() is False:
+            return  # η εφαρμογή έκλεισε
+        self.root.after(tab.period, lambda: self._run(tab))
+
+    def selected_tab(self):
+        widget = self.notebook.nametowidget(self.notebook.select())
+        return next((tab for tab in self.tabs if tab.frame is widget), None)
+
+    def apply_imu_config(self):
+        # Αισθητήρες του IMU για το tab που φαίνεται: set_imu_config(compass, gyroscope, accelerometer).
+        # Τα υπόλοιπα tabs παίρνουν hide() (π.χ. το Track σταματάει το νήμα του).
+        if self.sense is None:
+            return
+        current = self.selected_tab()
+        for tab in self.tabs:
+            if tab is not current:
+                tab.hide()
+        config = current.imu_config() if current is not None else None
+        if config is not None:
+            self.sense.set_imu_config(*config)
+
+    def read_magnet(self):
+        # Ανάγνωση του μαγνητόμετρου (µT) διορθωμένη με τα hard-iron offsets (module compass)
+        return self.hard_iron.correct(self.sense.get_compass_raw())
+
+    def compass_offsets_changed(self):
+        # Το Compass offset της πηγής Raw XY ισχύει και για το heading του Track
+        if hasattr(self, "track_tab"):
+            self.track_tab.set_heading_offset()
+
+    def show_field(self, var, label, title, raw):
         # Ένταση πεδίου |B| με προειδοποίηση όταν ένας μαγνήτης είναι πολύ κοντά:
         # πορτοκαλί πάνω από FIELD_WARN, κόκκινο με "too close!" πάνω από FIELD_DANGER,
         # και στις δύο περιπτώσεις με έντονη γραμματοσειρά
@@ -692,26 +812,13 @@ class Transparent3DCubeApp:
         else:
             label.config(fg="black", font="TkDefaultFont")
 
-    def _render_gyro(self):
-        # Χωρίς Sense HAT οι sliders δίνουν τις τιμές, αλλιώς είναι μια περιστροφή
-        # offset που εφαρμόζεται πριν από αυτή του αισθητήρα: R = R_offset · R_sensor
-        orientation = {name: var.get() for name, var in self.scale_vars.items()}
-        if self.sense is not None:
-            self.sensor = self.sense.get_orientation()
-            orientation = matrix_to_euler(euler_to_matrix(orientation) @ euler_to_matrix(self.sensor))
+    def close(self):
+        for tab in self.tabs:
+            tab.close()
+        self.root.destroy()
 
-        image = self.scene.render(orientation, self.view_size)
-        if image is None:  # η 3D σκηνή έκλεισε
-            self.close()
-            return False
-
-        for name, var in self.angle_vars.items():
-            var.set(f"{self.angle_titles[name]}: {round(orientation[name], 1) + 0.0:4.1f}°")
-        self.tk_image = ImageTk.PhotoImage(Image.fromarray(image))
-        self.canvas.itemconfig(self.canvas_image_id, image=self.tk_image)
-        return True
 
 if __name__ == "__main__":
     window = tk.Tk()
-    app = Transparent3DCubeApp(window)
+    app = PiHatGyroApp(window)
     window.mainloop()
