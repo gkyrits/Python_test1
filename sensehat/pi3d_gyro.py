@@ -63,6 +63,11 @@ from pi3d.constants import (GL_FRAMEBUFFER, GL_RENDERBUFFER, GL_COLOR_ATTACHMENT
 # False για να φαίνεται, π.χ. για debug
 HIDE_PI3D_WINDOW = True
 
+# Πάχος γραμμών σε pixels (στα Windows το ANGLE σχεδιάζει πάντα 1 pixel)
+EDGE_LINE_WIDTH = 2   # ακμές του σχήματος
+AXIS_LINE_WIDTH = 2   # άξονες X/Y/Z
+LABEL_LINE_WIDTH = 2  # γράμματα X, Y, Z στις άκρες των αξόνων
+
 
 class ViewFramebuffer:
     # Offscreen framebuffer (RGBA texture + depth renderbuffer) σταθερού μεγέθους.
@@ -160,7 +165,7 @@ class GyroScene:
         ]
 
         for vertices in edges_vertices:
-            edge = pi3d.Lines(vertices=vertices, line_width=3, closed=False)
+            edge = pi3d.Lines(vertices=vertices, line_width=EDGE_LINE_WIDTH, closed=False)
             edge.set_material((1.0, 1.0, 1.0))
             self.frame.add_child(edge)
 
@@ -168,16 +173,16 @@ class GyroScene:
         # Οι άξονες εκτείνονται λίγο πιο έξω από το σώμα του παραλληλεπιπέδου
         Lx, Ly, Lz = xw + 0.4, yh + 0.4, zd + 0.4
 
-        axis_x = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [Lx, 0.0, 0.0]], line_width=4, closed=False)
+        axis_x = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [Lx, 0.0, 0.0]], line_width=AXIS_LINE_WIDTH, closed=False)
         axis_x.set_material((1.0, 0.0, 0.0)) # Κόκκινο
 
         # Ονόματα αξόνων όπως της Sense HAT: X = roll, Y = pitch, Z = yaw.
         # Στο pi3d ο Y είναι ο κάθετος άξονας και ο Z το βάθος, οπότε ο άξονας Y
         # της Sense HAT σχεδιάζεται στο βάθος (pi3d Z) και ο Z κάθετα (pi3d Y)
-        axis_y = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, 0.0, Lz]], line_width=4, closed=False)
+        axis_y = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, 0.0, Lz]], line_width=AXIS_LINE_WIDTH, closed=False)
         axis_y.set_material((0.0, 1.0, 0.0)) # Πράσινο
 
-        axis_z = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, Ly, 0.0]], line_width=4, closed=False)
+        axis_z = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, Ly, 0.0]], line_width=AXIS_LINE_WIDTH, closed=False)
         axis_z.set_material((0.0, 0.0, 1.0)) # Μπλε
 
         self.frame.add_child(axis_x)
@@ -186,17 +191,17 @@ class GyroScene:
 
         # 5. Αυτόματη τοποθέτηση των Γραμμάτων (Labels) στις άκρες των αξόνων
         # Γράμμα X (στο τέλος του άξονα X)
-        lx1 = pi3d.Lines(vertices=[[Lx+0.05, 0.05, 0], [Lx+0.15, -0.05, 0]], line_width=3, closed=False)
-        lx2 = pi3d.Lines(vertices=[[Lx+0.05, -0.05, 0], [Lx+0.15, 0.05, 0]], line_width=3, closed=False)
+        lx1 = pi3d.Lines(vertices=[[Lx+0.05, 0.05, 0], [Lx+0.15, -0.05, 0]], line_width=LABEL_LINE_WIDTH, closed=False)
+        lx2 = pi3d.Lines(vertices=[[Lx+0.05, -0.05, 0], [Lx+0.15, 0.05, 0]], line_width=LABEL_LINE_WIDTH, closed=False)
         lx1.set_material((1.0, 0.2, 0.2))
         lx2.set_material((1.0, 0.2, 0.2))
         self.frame.add_child(lx1)
         self.frame.add_child(lx2)
 
         # Γράμμα Y (στο τέλος του άξονα Y, στο βάθος)
-        ly1 = pi3d.Lines(vertices=[[-0.04, 0.06, Lz+0.05], [0, 0.01, Lz+0.05]], line_width=3, closed=False)
-        ly2 = pi3d.Lines(vertices=[[0.04, 0.06, Lz+0.05], [0, 0.01, Lz+0.05]], line_width=3, closed=False)
-        ly3 = pi3d.Lines(vertices=[[0, 0.01, Lz+0.05], [0, -0.04, Lz+0.05]], line_width=3, closed=False)
+        ly1 = pi3d.Lines(vertices=[[-0.04, 0.06, Lz+0.05], [0, 0.01, Lz+0.05]], line_width=LABEL_LINE_WIDTH, closed=False)
+        ly2 = pi3d.Lines(vertices=[[0.04, 0.06, Lz+0.05], [0, 0.01, Lz+0.05]], line_width=LABEL_LINE_WIDTH, closed=False)
+        ly3 = pi3d.Lines(vertices=[[0, 0.01, Lz+0.05], [0, -0.04, Lz+0.05]], line_width=LABEL_LINE_WIDTH, closed=False)
         ly1.set_material((0.2, 1.0, 0.2))
         ly2.set_material((0.2, 1.0, 0.2))
         ly3.set_material((0.2, 1.0, 0.2))
@@ -205,9 +210,9 @@ class GyroScene:
         self.frame.add_child(ly3)
 
         # Γράμμα Z (στο τέλος του άξονα Z, πάνω)
-        lz1 = pi3d.Lines(vertices=[[-0.04, Ly+0.12, 0], [0.04, Ly+0.12, 0]], line_width=3, closed=False)
-        lz2 = pi3d.Lines(vertices=[[0.04, Ly+0.12, 0], [-0.04, Ly+0.02, 0]], line_width=3, closed=False)
-        lz3 = pi3d.Lines(vertices=[[-0.04, Ly+0.02, 0], [0.04, Ly+0.02, 0]], line_width=3, closed=False)
+        lz1 = pi3d.Lines(vertices=[[-0.04, Ly+0.12, 0], [0.04, Ly+0.12, 0]], line_width=LABEL_LINE_WIDTH, closed=False)
+        lz2 = pi3d.Lines(vertices=[[0.04, Ly+0.12, 0], [-0.04, Ly+0.02, 0]], line_width=LABEL_LINE_WIDTH, closed=False)
+        lz3 = pi3d.Lines(vertices=[[-0.04, Ly+0.02, 0], [0.04, Ly+0.02, 0]], line_width=LABEL_LINE_WIDTH, closed=False)
         lz1.set_material((0.2, 0.2, 1.0))
         lz2.set_material((0.2, 0.2, 1.0))
         lz3.set_material((0.2, 0.2, 1.0))
