@@ -132,9 +132,11 @@ class GyroscopeTab(Tab):
         # shape_frame: αριστερά τα κουμπιά, δεξιά ο canvas
         # (pack στο τέλος, μετά τα πλαίσια του κάτω μέρους, ώστε να παίρνει τον χώρο που μένει)
         shape_frame = tk.Frame(self.frame)
-        # M = επόμενη προβολή του σχήματος, R = reset offsets, C = calibrate (το σχήμα γίνεται 0,0,0)
-        self.buttons = tool_column(shape_frame, {"M": self.next_view, "R": self.reset_offsets,
-                                                 "C": self.calibrate})
+        # M = επόμενη προβολή του σχήματος, V = φόντο 360° on/off, R = reset offsets,
+        # C = calibrate (το σχήμα γίνεται 0,0,0)
+        self.buttons = tool_column(shape_frame, {"M": self.next_view, "V": self.toggle_scene,
+                                                 "R": self.reset_offsets, "C": self.calibrate})
+        self.scene_colors = button_colors(self.buttons["V"])
         self.canvas = tk.Canvas(shape_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT, bg=CANVAS_BG_COLOR,
                                 highlightthickness=0)
 
@@ -173,9 +175,10 @@ class GyroscopeTab(Tab):
         self.view_size = (CANVAS_WIDTH, CANVAS_HEIGHT)
         self.canvas.bind("<Configure>", self._on_canvas_resize)
         self.canvas_image_id = self.canvas.create_image(0, 0, anchor=tk.NW)
-        # Το όνομα της προβολής πάνω αριστερά στον canvas
-        self.view_text_id = self.canvas.create_text(4, 2, anchor=tk.NW, text=self.scene.view.name,
-                                                    fill="gray60", font="TkDefaultFont")
+        # Το όνομα της προβολής πάνω αριστερά στον canvas, με σκιά ώστε να διαβάζεται και πάνω στο φόντο 360°
+        self.view_text_ids = [self.canvas.create_text(4 + d, 2 + d, anchor=tk.NW, text=self.scene.view.name,
+                                                      fill=color, font="TkDefaultFont")
+                              for d, color in ((1, "black"), (0, "gray80"))]
         self.tk_image = None
 
     def imu_config(self):
@@ -183,7 +186,18 @@ class GyroscopeTab(Tab):
 
     def next_view(self):
         # M: η επόμενη προβολή του σχήματος (Axes, Solid, ...)
-        self.canvas.itemconfig(self.view_text_id, text=self.scene.next_view())
+        name = self.scene.next_view()
+        for text_id in self.view_text_ids:
+            self.canvas.itemconfig(text_id, text=name)
+
+    def toggle_scene(self):
+        # V: φόντο με φωτογραφία 360° που γυρίζει με τον προσανατολισμό (πορτοκαλί όσο φαίνεται)
+        visible = not self.scene.scene_visible
+        self.scene.show_scene(visible)
+        if visible:
+            self.buttons["V"].config(relief=tk.SUNKEN, bg="orange", activebackground="orange")
+        else:
+            self.buttons["V"].config(relief=tk.RAISED, **self.scene_colors)
 
     def calibrate(self):
         # Offset = η αντίστροφη περιστροφή της τρέχουσας θέσης του αισθητήρα, ώστε

@@ -11,6 +11,7 @@
   (X = roll, Y = pitch, Z = yaw)
 - render: numpy array (height, width, 3) uint8 RGB, ή None αν η σκηνή έκλεισε
 - next_view(): η επόμενη προβολή του σχήματος (VIEWS: "Axes", "Solid"), επιστρέφει το όνομά της
+- show_scene(visible): φόντο με φωτογραφία 360° που γυρίζει με τον προσανατολισμό (SceneView)
 """
 import ctypes
 import os
@@ -330,6 +331,84 @@ class SolidView:
 VIEWS = (AxesView, SolidView)
 
 
+# Φόντο "Scene" (SceneView, κουμπί V): φωτογραφία 360° (equirectangular, πλάτος = 2 x ύψος)
+# στο εσωτερικό μιας σφαίρας γύρω από την κάμερα, που γυρίζει αντίθετα από την πλακέτα,
+# σαν να κοιτάει η κάμερα από την πλακέτα. Χωρίς το αρχείο φτιάχνεται ένα απλό πανόραμα
+# (scene_360.jpg: "Kiara 1 Dawn" του Greg Zaal, polyhaven.com, CC0, σε 2048x1024)
+SCENE_IMAGE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scene_360.jpg")
+SCENE_TEXTURE_WIDTH = 2048  # πλάτος της υφής σε pixels (ύψος το μισό), όριο για τη GPU του Pi
+SCENE_RADIUS = 50.0         # ακτίνα της σφαίρας (πίσω από το σχήμα, μέσα στο far plane)
+SCENE_YAW_OFFSET = 0.0      # μοίρες: στροφή της φωτογραφίας ώστε το yaw 0 να κοιτάει όπου θέλουμε
+SCENE_DETAIL = (32, 64)     # τμήματα της σφαίρας (κάθετα, οριζόντια)
+
+
+def _generated_scene(width, height):
+    # Πανόραμα χωρίς φωτογραφία: ουρανός, έδαφος, ορίζοντας με N/E/S/W και μοίρες
+    from PIL import Image, ImageDraw, ImageFont
+    image = Image.new("RGB", (width, height))
+    draw = ImageDraw.Draw(image)
+    horizon = height // 2
+    for y in range(height):
+        if y < horizon:  # ουρανός: σκούρο μπλε πάνω, ανοιχτό στον ορίζοντα
+            t = y / horizon
+            color = (int(40 + 150 * t), int(80 + 140 * t), int(160 + 90 * t))
+        else:            # έδαφος: πράσινο-καφέ, πιο σκούρο προς τα κάτω
+            t = (y - horizon) / (height - horizon)
+            color = (int(90 - 50 * t), int(110 - 60 * t), int(60 - 30 * t))
+        draw.line([(0, y), (width, y)], fill=color)
+    try:
+        font = ImageFont.load_default(size=height // 12)
+    except TypeError:  # Pillow < 10.1
+        font = ImageFont.load_default()
+    for degrees in range(0, 360, 15):
+        x = int(degrees / 360 * width)
+        label = {0: "N", 90: "E", 180: "S", 270: "W"}.get(degrees)
+        tick = height // 12 if label else height // 40
+        draw.line([(x, horizon - tick), (x, horizon + tick)], fill="white", width=3 if label else 1)
+        draw.text((x, horizon - tick - 4), label or str(degrees), fill="white",
+                  font=font if label else None, anchor="ms")
+    return image
+
+
+def _scene_image():
+    from PIL import Image
+    width = SCENE_TEXTURE_WIDTH
+    try:
+        image = Image.open(SCENE_IMAGE).convert("RGB").resize((width, width // 2), Image.LANCZOS)
+    except OSError:
+        print("Scene photo not found, using a generated panorama:", SCENE_IMAGE)
+        image = _generated_scene(width, width // 2)
+    # Η ανεστραμμένη σφαίρα του pi3d δείχνει την υφή ανάποδα και σε καθρέφτη
+    return image.transpose(Image.ROTATE_180)
+
+
+class SceneView:
+    # Φόντο: σφαίρα με τη φωτογραφία 360°, με gimbal αντίστροφο από αυτό του σχήματος.
+    # Ρυθμίσεις: SCENE_*
+    def __init__(self):
+        self.shader = pi3d.Shader("uv_flat")
+        texture = pi3d.Texture(_scene_image(), mipmap=False)
+        rings, sides = SCENE_DETAIL
+        sphere = pi3d.Sphere(radius=SCENE_RADIUS, slices=rings, sides=sides, invert=True)
+        sphere.set_draw_details(self.shader, [texture])
+
+        # Αντίστροφη περιστροφή: (yaw · pitch · roll)⁻¹ = roll⁻¹ · pitch⁻¹ · yaw⁻¹, δηλαδή
+        # πρώτα yaw⁻¹ (παιδί), μετά pitch⁻¹, τελευταίο roll⁻¹ (γονέας)
+        self.roll_node = _empty_node()
+        self.pitch_node = _empty_node()
+        self.yaw_node = _empty_node()
+        self.roll_node.add_child(self.pitch_node)
+        self.pitch_node.add_child(self.yaw_node)
+        self.yaw_node.add_child(sphere)
+
+    def draw(self, orientation, camera):
+        # Πρόσημα αντίθετα από αυτά του σχήματος στο GyroScene.render
+        self.roll_node.rotateToX(orientation['roll'])
+        self.pitch_node.rotateToZ(-orientation['pitch'])
+        self.yaw_node.rotateToY(-orientation['yaw'] + SCENE_YAW_OFFSET)
+        self.roll_node.draw(self.shader, camera=camera)
+
+
 class GyroScene:
     def __init__(self, width, height, shape_size=(1.6, 0.2, 1.0), title=""):
         # 1. Αρχικοποίηση pi3D Display
@@ -355,6 +434,10 @@ class GyroScene:
         self.view_names = [view.name for view in self.views]
         self.set_view(0)
 
+        # Το φόντο 360° (κουμπί V): φτιάχνεται την πρώτη φορά που ζητηθεί
+        self.scene = None
+        self.scene_visible = False
+
         # Η σκηνή σχεδιάζεται σε offscreen framebuffer με το μέγεθος που ζητάει το render,
         # ανεξάρτητα από το (κρυφό/ελαχιστοποιημένο) παράθυρο του pi3d
         self.offscreen = None
@@ -369,6 +452,12 @@ class GyroScene:
     def next_view(self):
         # Η επόμενη προβολή (κουμπί M), επιστρέφει το όνομά της
         return self.set_view(self.view_index + 1)
+
+    def show_scene(self, visible):
+        # Φόντο 360° πίσω από το σχήμα (κουμπί V)
+        if visible and self.scene is None:
+            self.scene = SceneView()
+        self.scene_visible = visible
 
     def _hide_pi3d_window(self):
         # Κρύβει το παράθυρο του pi3d: η εικόνα επιστρέφεται από το render
@@ -415,6 +504,8 @@ class GyroScene:
 
         pi3d.opengles.glClearColor(*(GLclampf(c) for c in self.view.background))
         self.offscreen.begin()
+        if self.scene_visible:
+            self.scene.draw(orientation, self.camera)
         self.yaw_node.draw(self.view.shader, camera=self.camera)
         image = self.offscreen.read_pixels()
         self.offscreen.end()
