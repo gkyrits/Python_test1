@@ -53,6 +53,7 @@ STILL_GYRO_STD = 0.03    # rad/s
 STILL_ACCEL = 0.03       # g, μετά την αφαίρεση του υπολοίπου
 STILL_GYRO = 0.1         # rad/s (~6°/s), μετά την αφαίρεση του υπολοίπου
 LONG_STILL = 1.0         # s
+GRAVITY_TOLERANCE = 0.1  # g, η βαρύτητα στις στάσεις πρέπει να είναι 1 g ± αυτό (αλλιώς λάθος βαθμονόμηση)
 BIAS_TAU = 0.5      # s, σταθερά χρόνου για τη μέτρηση (μέσος όρος) όσο είναι ακίνητη
 START_STILL = 1.0   # s μετά το Start/Reset που η πλακέτα θεωρείται ακίνητη (μέτρηση κλίσης,
                     # βαρύτητας και υπολοίπου του gyroscope)
@@ -149,7 +150,7 @@ class Tracker:
             self.corrections = 0         # πόσες κινήσεις διορθώθηκαν (drift) στις στάσεις
             self._window = deque()       # (χρόνος, μπροστά, αριστερά, πάνω, gx, gy, gz) για STILL_TIME
             self._steady_since = None
-            self.diagnostics = {"accel_std": 0.0, "gyro_std": 0.0, "accel": 0.0, "gyro": 0.0}
+            self.diagnostics = {"accel_std": 0.0, "gyro_std": 0.0, "accel": 0.0, "gyro": 0.0, "gravity": None}
             self._start_time = None
             self._last_time = None
             self._last_accel = None
@@ -211,7 +212,8 @@ class Tracker:
             gyro_std = max(_std([w[i] for w in self._window]) for i in (4, 5, 6))
             accel_g = math.sqrt(forward ** 2 + right ** 2 + up ** 2) / G
             gyro_abs = math.sqrt(sum(g * g for g in gyro_c))
-            self.diagnostics = {"accel_std": accel_std, "gyro_std": gyro_std, "accel": accel_g, "gyro": gyro_abs}
+            self.diagnostics = {"accel_std": accel_std, "gyro_std": gyro_std, "accel": accel_g, "gyro": gyro_abs,
+                                "gravity": g_ref}
             steady = full and accel_std < STILL_ACCEL_STD and gyro_std < STILL_GYRO_STD
             if steady:
                 if self._steady_since is None:
@@ -423,7 +425,14 @@ class TrackView:
             for row, (name, value, limit, unit, digits) in enumerate(items):
                 c.create_text(6, 6 + row * 12, text=f"{name} {value:.{digits}f}/{limit:g}{unit}", anchor="nw",
                               fill="#d07000" if value >= limit else "gray60", font="TkDefaultFont 8")
-            c.create_text(6, 6 + 4 * 12, text=f"{snap.get('rate', 0):.0f} Hz", anchor="nw", fill="gray60",
+            # Βαρύτητα που μετρήθηκε στις στάσεις: πρέπει να είναι ≈ 1 g. Αλλιώς η βαθμονόμηση του
+            # επιταχυνσιόμετρου (RTIMULib.ini) είναι λάθος και οι αποστάσεις βγαίνουν λάθος.
+            gravity = diag.get("gravity")
+            if gravity is not None:
+                bad = abs(gravity - 1.0) > GRAVITY_TOLERANCE
+                c.create_text(6, 6 + 4 * 12, text=f"g {gravity:.3f}/1±{GRAVITY_TOLERANCE:g}" + ("  calibration?" if bad else ""),
+                              anchor="nw", fill="#d07000" if bad else "gray60", font="TkDefaultFont 8")
+            c.create_text(6, 6 + 5 * 12, text=f"{snap.get('rate', 0):.0f} Hz", anchor="nw", fill="gray60",
                           font="TkDefaultFont 8")
 
         # Αρχή, διαδρομή, τρέχουσα θέση
