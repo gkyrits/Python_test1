@@ -68,6 +68,18 @@ EDGE_LINE_WIDTH = 2   # ακμές του σχήματος
 AXIS_LINE_WIDTH = 2   # άξονες X/Y/Z
 LABEL_LINE_WIDTH = 2  # γράμματα X, Y, Z στις άκρες των αξόνων
 
+# Χρώματα (R, G, B) με τιμές 0.0 - 1.0
+BACKGROUND_COLOR = (0.1, 0.1, 0.1, 1.0)  # φόντο (R, G, B, A)
+SHAPE_COLOR = (0.3, 0.3, 0.3)            # έδρες του σχήματος
+SHAPE_ALPHA = 0.3                        # διαφάνεια εδρών (0 διάφανο - 1 συμπαγές)
+EDGE_COLOR = (1.0, 1.0, 1.0)             # ακμές του σχήματος
+AXIS_X_COLOR = (1.0, 0.0, 0.0)           # άξονας X (κόκκινο)
+AXIS_Y_COLOR = (0.0, 1.0, 0.0)           # άξονας Y (πράσινο)
+AXIS_Z_COLOR = (0.0, 0.0, 1.0)           # άξονας Z (μπλε)
+LABEL_X_COLOR = (1.0, 0.2, 0.2)          # γράμμα X
+LABEL_Y_COLOR = (0.2, 1.0, 0.2)          # γράμμα Y
+LABEL_Z_COLOR = (0.2, 0.2, 1.0)          # γράμμα Z
+
 
 class ViewFramebuffer:
     # Offscreen framebuffer (RGBA texture + depth renderbuffer) σταθερού μεγέθους.
@@ -114,7 +126,7 @@ class ViewFramebuffer:
 
 class GyroScene:
     def __init__(self, width, height, shape_size=(1.6, 0.2, 1.0), title="",
-                 background=(0.1, 0.1, 0.1, 1.0)):
+                 background=BACKGROUND_COLOR):
         # Διαστάσεις: μήκος (pi3d X), ύψος (pi3d Y, κάθετα), βάθος (pi3d Z)
         MY_W, MY_H, MY_D = shape_size
 
@@ -133,8 +145,8 @@ class GyroScene:
 
         # 2. Δημιουργία του Cuboid με τις ανεξάρτητες διαστάσεις
         self.cube = pi3d.Cuboid(w=MY_W, h=MY_H, d=MY_D)
-        self.cube.set_material((0.3, 0.3, 0.3))
-        self.cube.set_alpha(0.3)
+        self.cube.set_material(SHAPE_COLOR)
+        self.cube.set_alpha(SHAPE_ALPHA)
 
         # Αόρατος γονέας για ακμές/άξονες/γράμματα: σχεδιάζεται πριν το διάφανο
         # cuboid ώστε οι γραμμές πίσω/μέσα από τις έδρες να μην κόβονται από το depth buffer
@@ -166,7 +178,7 @@ class GyroScene:
 
         for vertices in edges_vertices:
             edge = pi3d.Lines(vertices=vertices, line_width=EDGE_LINE_WIDTH, closed=False)
-            edge.set_material((1.0, 1.0, 1.0))
+            edge.set_material(EDGE_COLOR)
             self.frame.add_child(edge)
 
         # 4. Σχεδιασμός των Κύριων Αξόνων
@@ -174,16 +186,16 @@ class GyroScene:
         Lx, Ly, Lz = xw + 0.4, yh + 0.4, zd + 0.4
 
         axis_x = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [Lx, 0.0, 0.0]], line_width=AXIS_LINE_WIDTH, closed=False)
-        axis_x.set_material((1.0, 0.0, 0.0)) # Κόκκινο
+        axis_x.set_material(AXIS_X_COLOR)
 
         # Ονόματα αξόνων όπως της Sense HAT: X = roll, Y = pitch, Z = yaw.
         # Στο pi3d ο Y είναι ο κάθετος άξονας και ο Z το βάθος, οπότε ο άξονας Y
         # της Sense HAT σχεδιάζεται στο βάθος (pi3d Z) και ο Z κάθετα (pi3d Y)
         axis_y = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, 0.0, Lz]], line_width=AXIS_LINE_WIDTH, closed=False)
-        axis_y.set_material((0.0, 1.0, 0.0)) # Πράσινο
+        axis_y.set_material(AXIS_Y_COLOR)
 
         axis_z = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, Ly, 0.0]], line_width=AXIS_LINE_WIDTH, closed=False)
-        axis_z.set_material((0.0, 0.0, 1.0)) # Μπλε
+        axis_z.set_material(AXIS_Z_COLOR)
 
         self.frame.add_child(axis_x)
         self.frame.add_child(axis_y)
@@ -193,8 +205,8 @@ class GyroScene:
         # Γράμμα X (στο τέλος του άξονα X)
         lx1 = pi3d.Lines(vertices=[[Lx+0.05, 0.05, 0], [Lx+0.15, -0.05, 0]], line_width=LABEL_LINE_WIDTH, closed=False)
         lx2 = pi3d.Lines(vertices=[[Lx+0.05, -0.05, 0], [Lx+0.15, 0.05, 0]], line_width=LABEL_LINE_WIDTH, closed=False)
-        lx1.set_material((1.0, 0.2, 0.2))
-        lx2.set_material((1.0, 0.2, 0.2))
+        lx1.set_material(LABEL_X_COLOR)
+        lx2.set_material(LABEL_X_COLOR)
         self.frame.add_child(lx1)
         self.frame.add_child(lx2)
 
@@ -202,9 +214,9 @@ class GyroScene:
         ly1 = pi3d.Lines(vertices=[[-0.04, 0.06, Lz+0.05], [0, 0.01, Lz+0.05]], line_width=LABEL_LINE_WIDTH, closed=False)
         ly2 = pi3d.Lines(vertices=[[0.04, 0.06, Lz+0.05], [0, 0.01, Lz+0.05]], line_width=LABEL_LINE_WIDTH, closed=False)
         ly3 = pi3d.Lines(vertices=[[0, 0.01, Lz+0.05], [0, -0.04, Lz+0.05]], line_width=LABEL_LINE_WIDTH, closed=False)
-        ly1.set_material((0.2, 1.0, 0.2))
-        ly2.set_material((0.2, 1.0, 0.2))
-        ly3.set_material((0.2, 1.0, 0.2))
+        ly1.set_material(LABEL_Y_COLOR)
+        ly2.set_material(LABEL_Y_COLOR)
+        ly3.set_material(LABEL_Y_COLOR)
         self.frame.add_child(ly1)
         self.frame.add_child(ly2)
         self.frame.add_child(ly3)
@@ -213,9 +225,9 @@ class GyroScene:
         lz1 = pi3d.Lines(vertices=[[-0.04, Ly+0.12, 0], [0.04, Ly+0.12, 0]], line_width=LABEL_LINE_WIDTH, closed=False)
         lz2 = pi3d.Lines(vertices=[[0.04, Ly+0.12, 0], [-0.04, Ly+0.02, 0]], line_width=LABEL_LINE_WIDTH, closed=False)
         lz3 = pi3d.Lines(vertices=[[-0.04, Ly+0.02, 0], [0.04, Ly+0.02, 0]], line_width=LABEL_LINE_WIDTH, closed=False)
-        lz1.set_material((0.2, 0.2, 1.0))
-        lz2.set_material((0.2, 0.2, 1.0))
-        lz3.set_material((0.2, 0.2, 1.0))
+        lz1.set_material(LABEL_Z_COLOR)
+        lz2.set_material(LABEL_Z_COLOR)
+        lz3.set_material(LABEL_Z_COLOR)
         self.frame.add_child(lz1)
         self.frame.add_child(lz2)
         self.frame.add_child(lz3)
