@@ -132,8 +132,9 @@ class GyroscopeTab(Tab):
         # shape_frame: αριστερά τα κουμπιά, δεξιά ο canvas
         # (pack στο τέλος, μετά τα πλαίσια του κάτω μέρους, ώστε να παίρνει τον χώρο που μένει)
         shape_frame = tk.Frame(self.frame)
-        # R = reset offsets, C = calibrate (το σχήμα γίνεται 0,0,0)
-        self.buttons = tool_column(shape_frame, {"M": None, "R": self.reset_offsets, "C": self.calibrate})
+        # M = επόμενη προβολή του σχήματος, R = reset offsets, C = calibrate (το σχήμα γίνεται 0,0,0)
+        self.buttons = tool_column(shape_frame, {"M": self.next_view, "R": self.reset_offsets,
+                                                 "C": self.calibrate})
         self.canvas = tk.Canvas(shape_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT, bg=CANVAS_BG_COLOR,
                                 highlightthickness=0)
 
@@ -172,10 +173,17 @@ class GyroscopeTab(Tab):
         self.view_size = (CANVAS_WIDTH, CANVAS_HEIGHT)
         self.canvas.bind("<Configure>", self._on_canvas_resize)
         self.canvas_image_id = self.canvas.create_image(0, 0, anchor=tk.NW)
+        # Το όνομα της προβολής πάνω αριστερά στον canvas
+        self.view_text_id = self.canvas.create_text(4, 2, anchor=tk.NW, text=self.scene.view.name,
+                                                    fill="gray60", font="TkDefaultFont")
         self.tk_image = None
 
     def imu_config(self):
         return True, True, True
+
+    def next_view(self):
+        # M: η επόμενη προβολή του σχήματος (Axes, Solid, ...)
+        self.canvas.itemconfig(self.view_text_id, text=self.scene.next_view())
 
     def calibrate(self):
         # Offset = η αντίστροφη περιστροφή της τρέχουσας θέσης του αισθητήρα, ώστε

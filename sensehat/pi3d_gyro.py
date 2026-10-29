@@ -10,6 +10,7 @@
 - orientation: {"roll", "pitch", "yaw"} σε μοίρες, με τη σύμβαση της Sense HAT
   (X = roll, Y = pitch, Z = yaw)
 - render: numpy array (height, width, 3) uint8 RGB, ή None αν η σκηνή έκλεισε
+- next_view(): η επόμενη προβολή του σχήματος (VIEWS: "Axes", "Solid"), επιστρέφει το όνομά της
 """
 import ctypes
 import os
@@ -57,12 +58,13 @@ from pi3d.constants import (GL_FRAMEBUFFER, GL_RENDERBUFFER, GL_COLOR_ATTACHMENT
                             GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT16, GL_TEXTURE_2D,
                             GL_TEXTURE_MIN_FILTER, GL_TEXTURE_MAG_FILTER, GL_NEAREST,
                             GL_RGBA, GL_UNSIGNED_BYTE, GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT,
-                            GLuint)
+                            GLuint, GLclampf)
 
 # Το παράθυρο του pi3d δεν χρειάζεται (η εικόνα έρχεται από offscreen framebuffer).
 # False για να φαίνεται, π.χ. για debug
 HIDE_PI3D_WINDOW = True
 
+# Προβολή "Axes" (AxesView)
 # Πάχος γραμμών σε pixels (στα Windows το ANGLE σχεδιάζει πάντα 1 pixel)
 EDGE_LINE_WIDTH = 2   # ακμές του σχήματος
 AXIS_LINE_WIDTH = 2   # άξονες X/Y/Z
@@ -124,46 +126,45 @@ class ViewFramebuffer:
         gl.glDeleteTextures(1, ctypes.byref(self.color))
 
 
-class GyroScene:
-    def __init__(self, width, height, shape_size=(1.6, 0.2, 1.0), title="",
-                 background=BACKGROUND_COLOR):
+def _empty_node(z=0.0):
+    # Γραμμή μηδενικού μήκους: δεν φαίνεται, χρησιμεύει μόνο ως γονέας
+    return pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], z=z)
+
+
+def _line(vertices, width, color):
+    line = pi3d.Lines(vertices=vertices, line_width=width, closed=False)
+    line.set_material(color)
+    return line
+
+
+class AxesView:
+    # Προβολή "Axes": διάφανο σχήμα με ακμές, άξονες X/Y/Z και γράμματα
+    # (ρυθμίσεις: *_LINE_WIDTH, *_COLOR, SHAPE_ALPHA)
+    name = "Axes"
+    background = BACKGROUND_COLOR
+
+    def __init__(self, shape_size):
         # Διαστάσεις: μήκος (pi3d X), ύψος (pi3d Y, κάθετα), βάθος (pi3d Z)
         MY_W, MY_H, MY_D = shape_size
 
         # Υπολογισμός των μισών αποστάσεων από το κέντρο (extents)
         xw, yh, zd = MY_W / 2.0, MY_H / 2.0, MY_D / 2.0
 
-        # 1. Αρχικοποίηση pi3D Display
-        self.pi3d_display = pi3d.Display.create(w=width, h=height, background=background,
-                                                window_title=title + " (pi3d)")
-        self.pi3d_display.resize(x=0, y=self.pi3d_display.max_height, w=width, h=height)
-        if HIDE_PI3D_WINDOW:
-            self._hide_pi3d_window()
-
         self.shader = pi3d.Shader("mat_flat")
-        self.camera = pi3d.Camera()
 
-        # 2. Δημιουργία του Cuboid με τις ανεξάρτητες διαστάσεις
-        self.cube = pi3d.Cuboid(w=MY_W, h=MY_H, d=MY_D)
-        self.cube.set_material(SHAPE_COLOR)
-        self.cube.set_alpha(SHAPE_ALPHA)
+        # Cuboid με τις ανεξάρτητες διαστάσεις
+        cube = pi3d.Cuboid(w=MY_W, h=MY_H, d=MY_D)
+        cube.set_material(SHAPE_COLOR)
+        cube.set_alpha(SHAPE_ALPHA)
 
         # Αόρατος γονέας για ακμές/άξονες/γράμματα: σχεδιάζεται πριν το διάφανο
         # cuboid ώστε οι γραμμές πίσω/μέσα από τις έδρες να μην κόβονται από το depth buffer
-        self.frame = self._empty_node()
+        frame = _empty_node()
+        self.node = _empty_node()
+        self.node.add_child(frame)  # πρώτα οι γραμμές,
+        self.node.add_child(cube)   # μετά το διάφανο σώμα
 
-        # Gimbal: το pi3d εφαρμόζει πάντα Y->X->Z σε ένα Shape, ενώ η Sense HAT
-        # θέλει roll->pitch->yaw. Κάθε κόμβος κάνει μία περιστροφή και ο γονέας
-        # εφαρμόζεται μετά το παιδί: roll (pi3d X) -> pitch (pi3d Z) -> yaw (pi3d Y) + μετατόπιση
-        self.yaw_node = self._empty_node(z=3.0)
-        self.pitch_node = self._empty_node()
-        self.roll_node = self._empty_node()
-        self.yaw_node.add_child(self.pitch_node)
-        self.pitch_node.add_child(self.roll_node)
-        self.roll_node.add_child(self.frame)  # πρώτα οι γραμμές,
-        self.roll_node.add_child(self.cube)   # μετά το διάφανο σώμα
-
-        # 3. Αυτόματος υπολογισμός των 12 ακμών με βάση τα xw, yh, zd
+        # Οι 12 ακμές με βάση τα xw, yh, zd
         edges_vertices = [
             # Μπροστινό ορθογώνιο (z = -zd)
             [[-xw, -yh, -zd], [xw, -yh, -zd]], [[xw, -yh, -zd], [xw, yh, -zd]],
@@ -175,67 +176,199 @@ class GyroScene:
             [[-xw, -yh, -zd], [-xw, -yh, zd]], [[xw, -yh, -zd], [xw, -yh, zd]],
             [[xw, yh, -zd], [xw, yh, zd]], [[-xw, yh, -zd], [-xw, yh, zd]]
         ]
-
         for vertices in edges_vertices:
-            edge = pi3d.Lines(vertices=vertices, line_width=EDGE_LINE_WIDTH, closed=False)
-            edge.set_material(EDGE_COLOR)
-            self.frame.add_child(edge)
+            frame.add_child(_line(vertices, EDGE_LINE_WIDTH, EDGE_COLOR))
 
-        # 4. Σχεδιασμός των Κύριων Αξόνων
-        # Οι άξονες εκτείνονται λίγο πιο έξω από το σώμα του παραλληλεπιπέδου
-        Lx, Ly, Lz = xw + 0.4, yh + 0.4, zd + 0.4
-
-        axis_x = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [Lx, 0.0, 0.0]], line_width=AXIS_LINE_WIDTH, closed=False)
-        axis_x.set_material(AXIS_X_COLOR)
-
+        # Οι κύριοι άξονες εκτείνονται λίγο πιο έξω από το σώμα του παραλληλεπιπέδου.
         # Ονόματα αξόνων όπως της Sense HAT: X = roll, Y = pitch, Z = yaw.
         # Στο pi3d ο Y είναι ο κάθετος άξονας και ο Z το βάθος, οπότε ο άξονας Y
         # της Sense HAT σχεδιάζεται στο βάθος (pi3d Z) και ο Z κάθετα (pi3d Y)
-        axis_y = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, 0.0, Lz]], line_width=AXIS_LINE_WIDTH, closed=False)
-        axis_y.set_material(AXIS_Y_COLOR)
+        Lx, Ly, Lz = xw + 0.4, yh + 0.4, zd + 0.4
+        frame.add_child(_line([[0.0, 0.0, 0.0], [Lx, 0.0, 0.0]], AXIS_LINE_WIDTH, AXIS_X_COLOR))
+        frame.add_child(_line([[0.0, 0.0, 0.0], [0.0, 0.0, Lz]], AXIS_LINE_WIDTH, AXIS_Y_COLOR))
+        frame.add_child(_line([[0.0, 0.0, 0.0], [0.0, Ly, 0.0]], AXIS_LINE_WIDTH, AXIS_Z_COLOR))
 
-        axis_z = pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, Ly, 0.0]], line_width=AXIS_LINE_WIDTH, closed=False)
-        axis_z.set_material(AXIS_Z_COLOR)
+        # Τα γράμματα στις άκρες των αξόνων
+        labels = (
+            # X (στο τέλος του άξονα X)
+            (LABEL_X_COLOR, [[[Lx+0.05, 0.05, 0], [Lx+0.15, -0.05, 0]],
+                             [[Lx+0.05, -0.05, 0], [Lx+0.15, 0.05, 0]]]),
+            # Y (στο τέλος του άξονα Y, στο βάθος)
+            (LABEL_Y_COLOR, [[[-0.04, 0.06, Lz+0.05], [0, 0.01, Lz+0.05]],
+                             [[0.04, 0.06, Lz+0.05], [0, 0.01, Lz+0.05]],
+                             [[0, 0.01, Lz+0.05], [0, -0.04, Lz+0.05]]]),
+            # Z (στο τέλος του άξονα Z, πάνω)
+            (LABEL_Z_COLOR, [[[-0.04, Ly+0.12, 0], [0.04, Ly+0.12, 0]],
+                             [[0.04, Ly+0.12, 0], [-0.04, Ly+0.02, 0]],
+                             [[-0.04, Ly+0.02, 0], [0.04, Ly+0.02, 0]]]),
+        )
+        for color, strokes in labels:
+            for vertices in strokes:
+                frame.add_child(_line(vertices, LABEL_LINE_WIDTH, color))
 
-        self.frame.add_child(axis_x)
-        self.frame.add_child(axis_y)
-        self.frame.add_child(axis_z)
 
-        # 5. Αυτόματη τοποθέτηση των Γραμμάτων (Labels) στις άκρες των αξόνων
-        # Γράμμα X (στο τέλος του άξονα X)
-        lx1 = pi3d.Lines(vertices=[[Lx+0.05, 0.05, 0], [Lx+0.15, -0.05, 0]], line_width=LABEL_LINE_WIDTH, closed=False)
-        lx2 = pi3d.Lines(vertices=[[Lx+0.05, -0.05, 0], [Lx+0.15, 0.05, 0]], line_width=LABEL_LINE_WIDTH, closed=False)
-        lx1.set_material(LABEL_X_COLOR)
-        lx2.set_material(LABEL_X_COLOR)
-        self.frame.add_child(lx1)
-        self.frame.add_child(lx2)
+# Προβολή "Solid" (SolidView): συμπαγές σχήμα με φωτισμό, χωρίς άξονες.
+# Χρώματα (R, G, B) 0.0 - 1.0 όπως φαίνονται (sRGB)
+SOLID_BACKGROUND_COLOR = (0.1, 0.1, 0.1, 1.0)  # φόντο (R, G, B, A)
+SOLID_TOP_COLOR = (0.96, 0.93, 0.72)          # πάνω επιφάνεια (λευκό-κίτρινο)
+SOLID_BOTTOM_COLOR = (0.12, 0.5, 0.2)          # κάτω επιφάνεια (πράσινο)
+SOLID_SIDE_COLOR = (0.6, 0.6, 0.6)             # πλαϊνές επιφάνειες (γκρι)
+# Φώτα: (κατεύθυνση προς το φως σε pi3d X, Y πάνω, Z βάθος, ένταση/χρώμα)
+SOLID_KEY_LIGHT = ((-0.5, 1.0, -0.8), (0.8, 0.78, 0.72))   # κύριο φως, πάνω αριστερά μπροστά
+SOLID_FILL_LIGHT = ((0.9, 0.1, -0.3), (0.22, 0.25, 0.32))   # αδύναμο ψυχρό φως από δεξιά
+SOLID_SKY_LIGHT = (0.22, 0.24, 0.28)     # ambient για επιφάνειες που κοιτάνε πάνω
+SOLID_GROUND_LIGHT = (0.05, 0.05, 0.04)  # ambient για επιφάνειες που κοιτάνε κάτω
+SOLID_SPECULAR = 0.35                    # ένταση της γυαλάδας (0 = ματ)
+SOLID_SHININESS = 40.0                   # μέγεθος της γυαλάδας (μεγάλο = μικρή, έντονη)
 
-        # Γράμμα Y (στο τέλος του άξονα Y, στο βάθος)
-        ly1 = pi3d.Lines(vertices=[[-0.04, 0.06, Lz+0.05], [0, 0.01, Lz+0.05]], line_width=LABEL_LINE_WIDTH, closed=False)
-        ly2 = pi3d.Lines(vertices=[[0.04, 0.06, Lz+0.05], [0, 0.01, Lz+0.05]], line_width=LABEL_LINE_WIDTH, closed=False)
-        ly3 = pi3d.Lines(vertices=[[0, 0.01, Lz+0.05], [0, -0.04, Lz+0.05]], line_width=LABEL_LINE_WIDTH, closed=False)
-        ly1.set_material(LABEL_Y_COLOR)
-        ly2.set_material(LABEL_Y_COLOR)
-        ly3.set_material(LABEL_Y_COLOR)
-        self.frame.add_child(ly1)
-        self.frame.add_child(ly2)
-        self.frame.add_child(ly3)
+# Shader με φωτισμό ανά pixel (Blinn-Phong) σε συντεταγμένες κόσμου, με gamma 2.2.
+# Γράφεται σαν τους shaders του pi3d (#version 120, //precision, //fragcolor)
+# και μετατρέπεται για GLES2/GLES3 από το _shader_source
+_SOLID_VS = """#version 120
+//precision highp float;
+attribute vec3 vertex;
+attribute vec3 normal;
+uniform mat4 modelviewmatrix[3];
+varying vec3 normout;
+varying vec3 posout;
 
-        # Γράμμα Z (στο τέλος του άξονα Z, πάνω)
-        lz1 = pi3d.Lines(vertices=[[-0.04, Ly+0.12, 0], [0.04, Ly+0.12, 0]], line_width=LABEL_LINE_WIDTH, closed=False)
-        lz2 = pi3d.Lines(vertices=[[0.04, Ly+0.12, 0], [-0.04, Ly+0.02, 0]], line_width=LABEL_LINE_WIDTH, closed=False)
-        lz3 = pi3d.Lines(vertices=[[-0.04, Ly+0.02, 0], [0.04, Ly+0.02, 0]], line_width=LABEL_LINE_WIDTH, closed=False)
-        lz1.set_material(LABEL_Z_COLOR)
-        lz2.set_material(LABEL_Z_COLOR)
-        lz3.set_material(LABEL_Z_COLOR)
-        self.frame.add_child(lz1)
-        self.frame.add_child(lz2)
-        self.frame.add_child(lz3)
+void main(void) {
+  posout = vec3(modelviewmatrix[0] * vec4(vertex, 1.0));
+  normout = vec3(modelviewmatrix[0] * vec4(normal, 0.0));
+  gl_Position = modelviewmatrix[1] * vec4(vertex, 1.0);
+}
+"""
+
+_SOLID_FS = """#version 120
+//precision highp float;
+uniform vec3 unib[5];
+uniform vec3 unif[20];
+varying vec3 normout;
+varying vec3 posout;
+//fragcolor
+
+vec3 light(vec3 n, vec3 v, vec3 base, vec3 dir, vec3 color) {
+  vec3 l = normalize(dir);
+  float diffuse = max(dot(n, l), 0.0);
+  float specular = 0.0;
+  if (diffuse > 0.0) {
+    specular = pow(max(dot(n, normalize(l + v)), 0.0), SHININESS) * SPECULAR;
+  }
+  return color * (base * diffuse + vec3(specular));
+}
+
+void main(void) {
+  vec3 base = pow(unib[1], vec3(2.2));    // χρώμα του υλικού, σε γραμμικό χώρο
+  vec3 n = normalize(normout);
+  vec3 v = normalize(unif[6] - posout);   // προς την κάμερα (unif[6] = eye)
+  vec3 color = base * mix(GROUND_LIGHT, SKY_LIGHT, 0.5 + 0.5 * n.y);
+  color += light(n, v, base, KEY_DIR, KEY_COLOR);
+  color += light(n, v, base, FILL_DIR, FILL_COLOR);
+  gl_FragColor = vec4(pow(clamp(color, 0.0, 1.0), vec3(1.0 / 2.2)), unif[5][2]);
+}
+"""
+
+
+def _glsl(value):
+    # Αριθμός ή tuple σε σταθερά GLSL (float / vec3)
+    if isinstance(value, (tuple, list)):
+        return "vec3({})".format(", ".join(_glsl(v) for v in value))
+    return "{:.6f}".format(value)
+
+
+def _shader_source(source, vertex):
+    # Οι ίδιες αλλαγές που κάνει το pi3d στους δικούς του shaders, ανάλογα με το context
+    gl_id = pi3d.Display.Display.INSTANCE.opengl.gl_id
+    if gl_id == b"GLES2":
+        source = source.replace("//precision", "precision").replace("version 120", "version 100")
+    elif gl_id == b"GLES3":
+        source = (source.replace("version 120", "version 300 es").replace("//precision", "precision")
+                  .replace("attribute", "in").replace("texture2D", "texture")
+                  .replace("//fragcolor", "out vec4 fragColor;").replace("gl_FragColor", "fragColor")
+                  .replace("varying", "out" if vertex else "in"))
+    return source
+
+
+class SolidView:
+    # Προβολή "Solid": συμπαγές σχήμα, κάθε επιφάνεια με το χρώμα της, με φωτισμό
+    # (κύριο + δευτερεύον φως, ambient ουρανού/εδάφους, γυαλάδα). Ρυθμίσεις: SOLID_*
+    name = "Solid"
+    background = SOLID_BACKGROUND_COLOR
+
+    # Οι 6 επιφάνειες του pi3d.Cuboid με τη σειρά τους: +Z, +X, +Y (πάνω), -Y (κάτω), -X, -Z
+    FACE_COLORS = (SOLID_SIDE_COLOR, SOLID_SIDE_COLOR, SOLID_TOP_COLOR,
+                   SOLID_BOTTOM_COLOR, SOLID_SIDE_COLOR, SOLID_SIDE_COLOR)
+
+    def __init__(self, shape_size):
+        constants = {"SHININESS": SOLID_SHININESS, "SPECULAR": SOLID_SPECULAR,
+                     "GROUND_LIGHT": SOLID_GROUND_LIGHT, "SKY_LIGHT": SOLID_SKY_LIGHT,
+                     "KEY_DIR": SOLID_KEY_LIGHT[0], "KEY_COLOR": SOLID_KEY_LIGHT[1],
+                     "FILL_DIR": SOLID_FILL_LIGHT[0], "FILL_COLOR": SOLID_FILL_LIGHT[1]}
+        fragment = _SOLID_FS
+        for name, value in constants.items():
+            fragment = fragment.replace(name, _glsl(value))
+        self.shader = pi3d.Shader(vshader_source=_shader_source(_SOLID_VS, True),
+                                  fshader_source=_shader_source(fragment, False))
+
+        # Ένα Buffer ανά επιφάνεια ώστε η καθεμιά να έχει το δικό της χρώμα
+        MY_W, MY_H, MY_D = shape_size
+        body = pi3d.Cuboid(w=MY_W, h=MY_H, d=MY_D)
+        body.buf = []
+        for face, color in enumerate(self.FACE_COLORS):
+            first = 4 * face
+            buffer = pi3d.Buffer(body, body.vertices[first:first + 4], body.tex_coords[first:first + 4],
+                                 [[i - first for i in triangle] for triangle in body.indices[2 * face:2 * face + 2]],
+                                 body.normals[first:first + 4])
+            buffer.set_material(color)
+            body.buf.append(buffer)
+
+        self.node = _empty_node()
+        self.node.add_child(body)
+
+
+# Οι προβολές με τη σειρά που τις διαλέγει το κουμπί M
+VIEWS = (AxesView, SolidView)
+
+
+class GyroScene:
+    def __init__(self, width, height, shape_size=(1.6, 0.2, 1.0), title=""):
+        # 1. Αρχικοποίηση pi3D Display
+        self.pi3d_display = pi3d.Display.create(w=width, h=height, background=BACKGROUND_COLOR,
+                                                window_title=title + " (pi3d)")
+        self.pi3d_display.resize(x=0, y=self.pi3d_display.max_height, w=width, h=height)
+        if HIDE_PI3D_WINDOW:
+            self._hide_pi3d_window()
+
+        self.camera = pi3d.Camera()
+
+        # 2. Gimbal: το pi3d εφαρμόζει πάντα Y->X->Z σε ένα Shape, ενώ η Sense HAT
+        # θέλει roll->pitch->yaw. Κάθε κόμβος κάνει μία περιστροφή και ο γονέας
+        # εφαρμόζεται μετά το παιδί: roll (pi3d X) -> pitch (pi3d Z) -> yaw (pi3d Y) + μετατόπιση
+        self.yaw_node = _empty_node(z=3.0)
+        self.pitch_node = _empty_node()
+        self.roll_node = _empty_node()
+        self.yaw_node.add_child(self.pitch_node)
+        self.pitch_node.add_child(self.roll_node)
+
+        # 3. Οι προβολές του σχήματος· η τρέχουσα κρέμεται από τον κόμβο roll
+        self.views = [view(shape_size) for view in VIEWS]
+        self.view_names = [view.name for view in self.views]
+        self.set_view(0)
 
         # Η σκηνή σχεδιάζεται σε offscreen framebuffer με το μέγεθος που ζητάει το render,
         # ανεξάρτητα από το (κρυφό/ελαχιστοποιημένο) παράθυρο του pi3d
         self.offscreen = None
         self.offscreen_size = None
+
+    def set_view(self, index):
+        self.view_index = index % len(self.views)
+        self.view = self.views[self.view_index]
+        self.roll_node.children = [self.view.node]
+        return self.view.name
+
+    def next_view(self):
+        # Η επόμενη προβολή (κουμπί M), επιστρέφει το όνομά της
+        return self.set_view(self.view_index + 1)
 
     def _hide_pi3d_window(self):
         # Κρύβει το παράθυρο του pi3d: η εικόνα επιστρέφεται από το render
@@ -268,11 +401,6 @@ class GyroScene:
         # Νέο aspect ratio στην προβολή ώστε το σχήμα να μην παραμορφώνεται
         self.camera.reset(lens=[d.near, d.far, d.fov, w / float(h)])
 
-    @staticmethod
-    def _empty_node(z=0.0):
-        # Γραμμή μηδενικού μήκους: δεν φαίνεται, χρησιμεύει μόνο ως γονέας
-        return pi3d.Lines(vertices=[[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], z=z)
-
     def render(self, orientation, size):
         # Σχεδιάζει το σχήμα με τον δοσμένο προσανατολισμό και επιστρέφει την εικόνα
         if size != self.offscreen_size:
@@ -285,8 +413,9 @@ class GyroScene:
         self.pitch_node.rotateToZ(orientation['pitch'])
         self.yaw_node.rotateToY(orientation['yaw'])
 
+        pi3d.opengles.glClearColor(*(GLclampf(c) for c in self.view.background))
         self.offscreen.begin()
-        self.yaw_node.draw(self.shader, camera=self.camera)
+        self.yaw_node.draw(self.view.shader, camera=self.camera)
         image = self.offscreen.read_pixels()
         self.offscreen.end()
         return image
