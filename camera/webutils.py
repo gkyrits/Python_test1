@@ -50,11 +50,18 @@ PAGE = """\
 class StreamingOutput(io.BufferedIOBase):
     def __init__(self):
         self.frame = None
+        self.stopped = False
         self.condition = thrd.Condition()
 
     def write(self, buf):
         with self.condition:
             self.frame = buf
+            self.condition.notify_all()
+
+    #wake the waiting stream handlers so they close their clients
+    def end(self):
+        with self.condition:
+            self.stopped = True
             self.condition.notify_all()
 
 
@@ -78,12 +85,16 @@ class StreamingHandler(http.server.BaseHTTPRequestHandler):
             self.send_header('Pragma', 'no-cache')
             self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=FRAME')
             self.end_headers()
+            stream = outStream
             try:
                 while True:
-                    global outStream
-                    with outStream.condition:
-                        outStream.condition.wait()
-                        frame = outStream.frame
+                    with stream.condition:
+                        if not stream.stopped:
+                            stream.condition.wait()
+                        if stream.stopped:
+                            print('Stream stopped for client %s' % (self.client_address,))
+                            break
+                        frame = stream.frame
                     self.wfile.write(b'--FRAME\r\n')
                     self.send_header('Content-Type', 'image/jpeg')
                     self.send_header('Content-Length', len(frame))
@@ -107,6 +118,7 @@ class pageServer:
         global outStream
         self.port=port
         outStream=output
+        self.output=output
         self.server = None
         self.thread=None
 
@@ -121,6 +133,7 @@ class pageServer:
 
     def stop(self):
         if self.server:
+            self.output.end()
             self.server.shutdown()
             self.thread.join()
             #shutdown() only stops serve_forever, the port is freed by server_close()
