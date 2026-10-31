@@ -1,150 +1,162 @@
 # Review: `pihat_gyro.py` and its modules
 
-Reviewed at commit `b3ca1d9` (branch `sense_gyro_test`) on 2026-10-29. This replaces the earlier reviews.
+Reviewed at commit `3e1174f` (branch `sense_gyro_test`) on 2026-10-31, together with the fixes for the first four bugs of that review. This replaces the earlier reviews.
 
 ## Structure
 
 | File | Lines | Contents |
 |---|---|---|
-| `pihat_gyro.py` | 832 | Tk app: `PiHatGyroApp` and one class per tab |
-| `pi3d_gyro.py` | 424 | 3D scene (pi3d): Windows setup, off-screen framebuffer, views `AxesView` / `SolidView`, `GyroScene` (gimbal rotation, `next_view()`) |
+| `pihat_gyro.py` | 867 | Tk app: `PiHatGyroApp` and one class per tab |
+| `pi3d_gyro.py` | 539 | 3D scene (pi3d): Windows setup, off-screen framebuffer, views `AxesView` / `SolidView`, 360° background `SceneView`, `GyroScene` (gimbal rotation, `next_view()`, `show_scene()`) |
 | `compass.py` | 150 | `raw_heading`, `xy_angle`, `CompassOffsets` (offset per source, S), `HardIronCalibration` (H), `CompassView` |
 | `xyz_force.py` | 88 | `XYZForceView` (X/Y cross and Z arrows), `magnitude` |
 | `acceleration.py` | 118 | `gravity_vector`, `remove_gravity`, `GravityCheck` (calibration warning), `ResidualCorrection` (Zero / Auto-zero) |
 | `track.py` | 457 | `Tracker` (own tilt, ZUPT, drift correction), `TrackSampler` (thread), `TrackView` (with diagnostics) |
+| `scene_360.jpg` | 415 KB | 360° photo for V: "Kiara 1 Dawn" by Greg Zaal (polyhaven.com, CC0), 2048×1024 |
 
 **Classes in `pihat_gyro.py`:**
 
 | Class | Role |
 |---|---|
-| `Tab` | base: the tab's frame, `period`, `update()`, `imu_config()`, `hide()`, `close()` |
-| `GyroscopeTab` | 3D shape following the orientation, M (view), R, C, orientation sliders |
+| `Tab` | base: the tab's frame, `period`, `update()`, `imu_config()`, `hide()`, `close()`, last `error` |
+| `GyroscopeTab` | 3D shape following the orientation, M (view), V (360° scene), R, C, orientation sliders |
 | `CompassTab` | compass (Raw XY / sense compass), North slider (offset per source), H, S |
 | `VectorTab` | base: the shared X/Y/Z design (simulation sliders, Axes range, info, canvases) |
 | `MagnetometerTab` | magnetometer with hard-iron correction, \|B\| warning |
 | `AccelerometerTab` | Raw (with "check calibration!") / Linear (with Zero / Auto-zero) |
 | `TrackTab` | Start/Stop/Reset, Board/Gyro/Compass heading, thread |
-| `PiHatGyroApp` | Sense HAT, notebook, shared calibrations (H, compass offsets), `read_magnet()`, `show_field()`, sensors per tab (`apply_imu_config`), one loop per tab (`_run`) |
+| `PiHatGyroApp` | Sense HAT, notebook, shared calibrations (H, compass offsets), `read_magnet()`, `show_field()`, sensors per tab (`apply_imu_config`), one loop per tab (`_run`, which survives errors) |
 
-**3D views in `pi3d_gyro.py`** (M goes to the next one, in the order of `VIEWS`):
+**3D in `pi3d_gyro.py`:**
 
-| View | What it shows | Settings |
+| Part | What it shows | Settings |
 |---|---|---|
-| `AxesView` ("Axes") | transparent shape with edges, X/Y/Z axes and letters | `*_LINE_WIDTH`, `BACKGROUND_COLOR`, `SHAPE_COLOR`, `SHAPE_ALPHA`, `EDGE_COLOR`, `AXIS_*_COLOR`, `LABEL_*_COLOR` |
-| `SolidView` ("Solid") | solid shape, no axes: top white-yellow, bottom green, sides grey, lit per pixel | `SOLID_*`: background, face colours, key and fill lights, sky/ground light, shine |
+| `AxesView` ("Axes", M) | transparent shape with edges, X/Y/Z axes and letters | `*_LINE_WIDTH`, `BACKGROUND_COLOR`, `SHAPE_COLOR`, `SHAPE_ALPHA`, `EDGE_COLOR`, `AXIS_*_COLOR`, `LABEL_*_COLOR` |
+| `SolidView` ("Solid", M) | solid shape, no axes: top white-yellow, bottom green, sides grey, lit per pixel | `SOLID_*`: background, face colours, key and fill lights, sky/ground light, shine |
+| `SceneView` (V) | 360° photo on a sphere around the camera, turning opposite to the board; works with both views | `SCENE_*`: photo, texture size, radius, yaw offset, detail |
 
-Each view has `name`, `background`, `shader` and `node`. `GyroScene` keeps what they share (display, camera, gimbal, framebuffer) and hangs the current view's `node` under the roll node.
+Each view has `name`, `background`, `shader` and `node`. `GyroScene` keeps what they share (display, camera, gimbal, framebuffer), hangs the current view's `node` under the roll node, and draws the scene first when V is on. The scene is built on the first V press. Without `scene_360.jpg`, a panorama marked with N/E/S/W is generated.
 
 **Settings files** (in `sensehat/`, specific to each board):
 - `pihat_gyro_hardiron.json`: the H calibration
 - `pihat_gyro_compass.json`: the S offsets
 
-## Changes since the previous review (`b481e18`)
+## Changes since the previous review (`b3ca1d9`)
 
-- **3D settings at the top of `pi3d_gyro.py`:** line widths (now 2) and all colours, so they can be changed in one place.
-- **M button:** selects the next 3D view. The view's name is shown at the top-left of the canvas.
-- **New Solid view:**
-  - It uses its own shader: per-pixel lighting (Blinn-Phong) with a key light, a weak cool fill light, more light from above than below, a small shine, and gamma 2.2.
-  - The shader is written like pi3d's own and adapted the same way for GLES2 / GLES3 (`_shader_source`).
-  - Each face is a separate buffer, so each can have its own colour.
-- **The `background` parameter of `GyroScene` is gone:** each view has its own background, set with `glClearColor` before each frame.
-- **Tested on Windows:** both views, the M button (Axes → Solid → Axes), and closing. With the depth test alone (no culling) the faces shown are the same, so the Solid view shows the right faces.
-- The "`M` has no command" leftover is resolved.
+- **V button and `SceneView`:** a 360° photo behind the shape that turns with the orientation. Yaw 0 / 90 / 180 shows N / E / S.
+- **Fixed, from the bugs of the review at `3e1174f`:**
+  1. **An error no longer stops a tab** ([pihat_gyro.py:793](pihat_gyro.py:793)). `_run` catches it and keeps the loop going.
+     - The error shows in the window title, e.g. `Sense Gyroscope - Gyroscope error: OSError: …`.
+     - The traceback is printed once, until the error changes.
+     - The title goes back to normal when the tab works again.
+  2. **3D errors are shown.**
+     - The Solid shader is checked after compiling (`_shader_errors`, [pi3d_gyro.py:293](pi3d_gyro.py:293)). On failure the GL log is printed and pi3d's `mat_light` is used, so the shape is still visible (without shine and gamma).
+     - If the scene can't be built on V, a message box shows the error and V stays off ([pihat_gyro.py:196](pihat_gyro.py:196)).
+  3. **Bold titles use `app.bold_font`** (7 places) instead of `"TkDefaultFont 9 bold"`.
+  4. **Gyroscope info labels are `width=17`** ([pihat_gyro.py:172](pihat_gyro.py:172)): `Pitch (Y): -179.9°` fits, and the window stays the same width.
+- **Tested on Windows:**
+  - a tab that fails for 0.8 s then recovers: the loop continued and the title went back to normal
+  - a broken shader: it fell back to `mat_light`
+  - a failing scene: the message box appeared and V stayed off
+  - labels at −123.4 / −179.9 / −150.5
 
-## Issues
+## Bugs
 
-### Medium
+1. **Linear mode leaves some gravity behind** ([pihat_gyro.py:570](pihat_gyro.py:570))
+   `remove_gravity(raw, self.sense.get_orientation())` uses RTIMULib's orientation. It leaves 0.1–0.2 g while RTIMULib is still settling, e.g. after a tab change. The Track's own-tilt method (gravity at stops, gyroscope during movement) would fix it, as a shared class in `acceleration.py`.
 
-1. **If the Solid shader fails to compile, nothing is printed** ([pi3d_gyro.py:310](pi3d_gyro.py:310))
-   pi3d writes shader errors only at DEBUG log level and continues. On the Pi (GLES3, or an older pi3d), a shader error would show just a blank Solid view with no message. Checking `GL_COMPILE_STATUS` / `GL_LINK_STATUS`, printing the log and falling back to pi3d's `mat_light` would make this safe. **Check on the Pi** that the Solid view appears.
+2. **Magnetometer / H**
+   - The |B| warning uses the corrected value; the field the sensor actually sees is the uncorrected one.
+   - Saving H has no error handling ([compass.py:111](compass.py:111)). S already handles it.
 
-2. **Linear mode still uses RTIMULib's orientation** ([pihat_gyro.py:548](pihat_gyro.py:548))
-   `remove_gravity(raw, self.sense.get_orientation())` leaves 0.1–0.2 g of gravity behind while RTIMULib is still settling, e.g. after a tab change. The Track's own-tilt method (gravity at stops, gyroscope during movement) would fix it. It can move into a shared class in `acceleration.py`, and the change stays inside `AccelerometerTab`.
+3. **No check that the off-screen framebuffer is complete** ([pi3d_gyro.py:108](pi3d_gyro.py:108)). If it's incomplete on some GPU, the result is a black image with no message. `glCheckFramebufferStatus` with a printed message would show it.
 
-3. **Track accuracy is limited by the method**
-   With stops between moves it's ~1 cm per move; without stops it drifts within seconds. More accuracy needs an extra sensor without drift: a USB optical mouse or optical flow for a table, wheel encoders for a robot, or camera + ArUco markers.
+## Remaining
 
-4. **The single read uses an internal attribute of sense_hat** ([pihat_gyro.py:661](pihat_gyro.py:661))
-   `self.sense._imu` isn't public API. If a version changes it, the code falls back automatically to three reads, which is slower and not from the same instant.
+4. **The scene isn't tied to real North.**
+   - The scene turns with the displayed yaw, so after C (calibrate) its N is the calibration direction.
+   - The Compass tab's North offset isn't used.
 
-5. **Bold titles still use `"TkDefaultFont 9 bold"`** ([pihat_gyro.py:147](pihat_gyro.py:147), [247](pihat_gyro.py:247), [405](pihat_gyro.py:405), [425](pihat_gyro.py:425), [515](pihat_gyro.py:515), [523](pihat_gyro.py:523), [623](pihat_gyro.py:623))
-   This is read as a font family called "TkDefaultFont", so on the Pi the 7 titles may come out a different size. `app.bold_font` already exists and is used for the warnings.
+   Decide whether it should follow true North (the sensor's yaw plus the compass offset) or the calibrated view.
 
-6. **Gyroscope info labels may be cut off on the Pi** ([pihat_gyro.py:167](pihat_gyro.py:167))
-   `width=12` stays fixed, but `Pitch (Y): -123.4°` is 18 characters.
+5. **The first V press freezes the window briefly** while the photo loads: ~0.2 s on Windows, probably longer on the Pi. Loading at startup, or in the background, would avoid it.
 
-7. **ANGLE licence file is missing** (`sensehat/pi3d/`): the committed DLLs are BSD-licensed, and the repo is public.
+6. **The chosen view and V aren't remembered:** the app always starts in Axes, with no scene.
 
-### Low
+7. **At 0, 0, 0 the board is seen exactly edge-on** ([pi3d_gyro.py:436](pi3d_gyro.py:436)). The camera is level with the shape, so in Solid view it's just a grey strip. Raising the camera a little and pointing it down would show the top.
 
-8. **An error stops that tab's loop for good** ([pihat_gyro.py:771](pihat_gyro.py:771))
-   An I2C error inside a tab's `update()` ends its `after()` chain, and the tab freezes. Since all tabs share `_run`, the fix is in **one place**: a `try/except` that shows the error and schedules the next call. The Track thread already handles errors this way.
+8. **The Solid view relies on pi3d internals:**
+   - the face order of `pi3d.Cuboid` ([pi3d_gyro.py:340](pi3d_gyro.py:340))
+   - `pi3d.Display.Display.INSTANCE` ([pi3d_gyro.py:282](pi3d_gyro.py:282))
 
-9. **Solid view at 0, 0, 0 shows only a grey strip** ([pi3d_gyro.py:333](pi3d_gyro.py:333))
-   The camera is level with the shape, so with the board flat the top is seen exactly edge-on. Raising the camera a little and pointing it down (for both views) would show the top in the rest position.
+   Both are fine in pi3d 2.55; check the version on the Pi.
 
-10. **The Solid view relies on pi3d internals** ([pi3d_gyro.py:281](pi3d_gyro.py:281), [315](pi3d_gyro.py:315))
-    - The face order of `pi3d.Cuboid` (+Z, +X, +Y, −Y, −X, −Z) and its `vertices` / `indices` / `normals` lists.
-    - `pi3d.Display.Display.INSTANCE` for the GL type.
+9. **Not checked on the Pi:**
+   - the Solid shader
+   - the 360° scene
+   - `YAW_SIGN` ([track.py:77](track.py:77)) with a track that turns in Gyro mode
+   - the `MAG_AXES` Z sign ([track.py:75](track.py:75)), which only matters for the compass tilt correction
 
-    Both are the same in pi3d 2.55 on Windows; check the version on the Pi.
+10. **Gyro heading takes its start direction from a single compass reading** ([track.py:200](track.py:200)). An average over the first 1 s would be steadier.
 
-11. **The chosen view isn't remembered:** the app always starts in Axes.
+11. **The Track fallback reads the orientation for nothing** ([pihat_gyro.py:693](pihat_gyro.py:693)). Removing it would raise the rate when there's no `_imu`.
 
-12. **Not checked on the Pi:**
-    - `YAW_SIGN` ([track.py:77](track.py:77)) with a track that turns in Gyro mode.
-    - The `MAG_AXES` Z sign ([track.py:75](track.py:75)): it only affects the compass tilt correction with the board tilted.
+12. **The single read uses an internal attribute of sense_hat** ([pihat_gyro.py:683](pihat_gyro.py:683)). If `self.sense._imu` changes, the code falls back to three slower reads that aren't from the same instant.
 
-13. **Gyro heading takes its start direction from a single compass reading** ([track.py:200](track.py:200))
-    Metal or a magnet nearby at that moment turns the whole track. An average over the first 1 s would be more stable.
+13. **Two threads touching the same data:** H recording and the Track thread both go through `read_magnet()`, and the compass offset changes from Tk while the thread reads it. It works in practice, but a lock in `HardIronCalibration` would be cleaner.
 
-14. **The fallback reads the orientation for nothing** ([pihat_gyro.py:671](pihat_gyro.py:671)): the Track no longer uses it. Removing it would raise the rate when there's no `_imu`.
+14. **The Gyroscope tab needs to settle after other tabs**, since they turn off some sensors.
 
-15. **Two threads touching the same data**
-    - H recording and the Track thread both go through `read_magnet()`.
-    - The compass offset is changed from Tk while the thread reads it.
+15. **A new image every frame** ([pihat_gyro.py:246](pihat_gyro.py:246)).
 
-    Both are simple variables, so in practice there's no problem, but a lock in `HardIronCalibration` would be cleaner.
+16. **Track accuracy is limited by the method:** ~1 cm per move with stops between moves; without stops it drifts within seconds. Better accuracy needs an extra sensor without drift: a mouse sensor / optical flow, wheel encoders, or camera + ArUco markers.
 
-16. **The Gyroscope tab needs to settle after other tabs**, since they turn off some sensors. The Track doesn't have this problem.
+17. **ANGLE licence file is missing** (`sensehat/pi3d/`). The committed DLLs are BSD-licensed and the repo is public.
 
-17. **The |B| warning uses the corrected value** (the field the sensor actually sees is the uncorrected one), and **saving H has no error handling** ([compass.py:109](compass.py:109)). S already handles it.
-
-18. **No check that the framebuffer is complete** ([pi3d_gyro.py:107](pi3d_gyro.py:107)), and **a new image every frame** ([pihat_gyro.py:224](pihat_gyro.py:224)).
-
-19. **Leftovers**
-    - `self.sense.clear()` ([pihat_gyro.py:739](pihat_gyro.py:739)) isn't needed.
+18. **Leftovers**
+    - `self.sense.clear()` ([pihat_gyro.py:761](pihat_gyro.py:761)) isn't needed.
     - The `Raw XY heading` label shows the angle `atan2(Y, X)`, not North.
-    - The off-screen window move ([pi3d_gyro.py:338](pi3d_gyro.py:338)) is no longer needed.
-    - In `AccelerometerTab.__init__`, `self.mode = None` ([pihat_gyro.py:504](pihat_gyro.py:504)) before `super().__init__()` is needed only because `linear()` can be called early. A small tidy-up would be to create the controls before the base builds the panel.
+    - The off-screen window move ([pi3d_gyro.py:441](pi3d_gyro.py:441)) is no longer needed.
+    - `self.mode = None` in `AccelerometerTab.__init__` ([pihat_gyro.py:526](pihat_gyro.py:526)) is only needed because `linear()` can be called early.
     - `.gitignore`: the two settings files and `pi3d_windll-master.zip`.
 
 ## Checked and correct
 
-- **3D views:**
-  - Axes looks the same as before the change into a class.
-  - Solid: top white-yellow, bottom green, sides grey, in every pose tried. The lighting doesn't clip the top to white.
-  - M goes through the views in order and back to the first. The view's name on the canvas follows.
-  - All views are built once at startup; switching only changes the roll node's child.
+- **3D:**
+  - **Axes:** looks the same as before the change into a class.
+  - **Solid:**
+    - top white-yellow, bottom green, sides grey, in every pose tried
+    - the top isn't clipped to white
+  - **Scene:**
+    - the right way round and not mirrored
+    - yaw scrolls it (N → E → S clockwise), pitch tilts the horizon, roll looks up/down
+    - the frame rate is unchanged with it on
+  - **M and V:**
+    - M goes through the views in order
+    - V switches the scene on and off in both views and stays orange while on
+    - the view name has a shadow, so it's readable over the photo
 - **Tab structure:**
-  - Each tab is self-contained: it builds its design, states its sensors (`imu_config`), and runs only while it's showing.
-  - The app holds only what's shared.
+  - Each tab builds its design, states its sensors (`imu_config`), and runs only while it's showing.
   - Leaving a tab calls `hide()`, which stops the Track's thread.
-  - Closing calls `close()` on every tab (the 3D scene, the thread).
+  - Closing calls `close()` on every tab.
+  - An error in one tab no longer stops it.
 - **Track:**
-  - Gravity is removed exactly at stops (own tilt from the measured gravity).
-  - Stop detection doesn't depend on offsets.
-  - The drift correction at stops reduces the error about 20 times.
-  - Board axes: forward = +y reading, right = −x reading, confirmed on the Pi.
-- **Calibration checks:** "check calibration!" (Accelerometer, Raw) and "g … calibration?" (Track) would have caught the bad `RTIMULib.ini` immediately.
+  - gravity removed exactly at stops
+  - stop detection independent of offsets
+  - drift correction ~20× better
+  - board axes confirmed on the Pi
+- **Calibration checks:** "check calibration!" (Accelerometer, Raw) and "g … calibration?" (Track).
 - **Compass:**
-  - The two offsets are kept separately, saved with S, and read back at startup.
-  - H makes |B| steady through a full turn.
-- **Orientation maths and gravity removal:** converting to a rotation and back returns the same angles, with an error below 10⁻¹³°; gravity at rest is exactly 0 at any tilt, given the orientation.
+  - the two offsets are saved with S and read back at startup
+  - H makes |B| steady through a full turn
+- **Orientation maths and gravity removal:**
+  - converting to a rotation and back returns the same angles (error below 10⁻¹³°)
+  - gravity at rest is exactly 0 at any tilt, given the orientation
 - **Interface:**
-  - The same design across all tabs.
-  - The H, Zero and Start buttons stay orange while active, even with the pointer over them.
-  - Warnings in colour and bold.
+  - the same design across all tabs
+  - the H, Zero, Start and V buttons stay orange while active
+  - warnings in colour and bold
+  - all bold titles use the same font
 
 ## Platform notes
 
@@ -152,10 +164,11 @@ Each view has `name`, `background`, `shader` and `node`. `GyroScene` keeps what 
   - The ANGLE DLLs are in `sensehat/pi3d/`.
   - SDL2's message loop is turned off (it was crashing Tk), and the SDL context is GLES2 through ANGLE.
   - Lines are 1 pixel wide, whatever `*_LINE_WIDTH` says.
-  - The Solid shader is tested here (GLES2).
+  - The Solid shader and the scene are tested here (GLES2).
 - **Raspberry Pi (X11):**
   - The pi3d window is minimized, and drawing is done off-screen.
-  - The Solid shader is converted for GLES2 or GLES3, depending on the context. Not yet tested.
+  - The Solid shader is converted for GLES2 or GLES3; if it fails, the error is printed and `mat_light` is used.
+  - The scene texture is 2048×1024.
 - **Sense HAT / RTIMULib:**
   - It reports the direction of gravity: z = +1 g with the board flat.
   - **Accelerometer calibration (`RTIMULibCal`, `a`):** use 6 positions, slowly, holding still in each, **no shaking**. Afterwards `AccelCalMin/Max` should be about ±1.0 on all axes. A wrong calibration scales all readings (seen as 0.42 g on the Pi).

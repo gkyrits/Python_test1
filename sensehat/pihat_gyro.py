@@ -1,4 +1,5 @@
 import math
+import traceback
 import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import messagebox, ttk
@@ -97,6 +98,7 @@ class Tab:
     # - hide(): όταν φεύγει κανείς από το tab, close(): στο κλείσιμο της εφαρμογής
     title = ""
     period = 50  # ms
+    error = None  # το τελευταίο σφάλμα του update() (βλ. PiHatGyroApp._run)
 
     def __init__(self, app):
         self.app = app
@@ -146,7 +148,7 @@ class GyroscopeTab(Tab):
         control_frame = sunken_frame(self.frame)
         control_frame.columnconfigure(1, weight=1)
         title = "Orientation values" if self.sense is None else "Orientation offsets"
-        tk.Label(control_frame, text=title, font="TkDefaultFont 9 bold").grid(
+        tk.Label(control_frame, text=title, font=self.app.bold_font).grid(
             row=0, column=0, columnspan=3, sticky=tk.W, padx=2)
         self.scale_vars = {}
         for row, (name, angle_title) in enumerate(self.angle_titles.items(), start=1):
@@ -166,7 +168,8 @@ class GyroscopeTab(Tab):
         self.angle_vars = {}
         for name, title in self.angle_titles.items():
             var = tk.StringVar(value=f"{title}: ---")
-            tk.Label(info_frame, textvariable=var, width=12, anchor=tk.W,
+            # Πλάτος για το μεγαλύτερο κείμενο ("Pitch (Y): -180.0°"), ώστε να μην κόβεται ούτε να μετακινείται
+            tk.Label(info_frame, textvariable=var, width=17, anchor=tk.W,
                      font="TkDefaultFont").pack(side=tk.LEFT, expand=True, padx=2, pady=1)
             self.angle_vars[name] = var
 
@@ -193,7 +196,12 @@ class GyroscopeTab(Tab):
     def toggle_scene(self):
         # V: φόντο με φωτογραφία 360° που γυρίζει με τον προσανατολισμό (πορτοκαλί όσο φαίνεται)
         visible = not self.scene.scene_visible
-        self.scene.show_scene(visible)
+        try:
+            self.scene.show_scene(visible)
+        except Exception as e:  # π.χ. η φωτογραφία δεν φορτώνεται στη GPU
+            traceback.print_exc()
+            messagebox.showerror("Scene", f"Could not show the 360° scene:\n{type(e).__name__}: {e}")
+            return
         if visible:
             self.buttons["V"].config(relief=tk.SUNKEN, bg="orange", activebackground="orange")
         else:
@@ -258,7 +266,7 @@ class CompassTab(Tab):
         compass_control = sunken_frame(self.frame)
         compass_control.columnconfigure(1, weight=1)
         title = "Compass value" if self.sense is None else "Compass offset"
-        tk.Label(compass_control, text=title, font="TkDefaultFont 9 bold").grid(
+        tk.Label(compass_control, text=title, font=self.app.bold_font).grid(
             row=0, column=0, columnspan=2, sticky=tk.W, padx=2)
         # Πηγή του North: Raw = από τα raw X/Y του μαγνητόμετρου (πλακέτα οριζόντια),
         # sense compass = get_compass() από το fusion του RTIMULib (θέλει calibration με RTIMULibCal)
@@ -416,7 +424,7 @@ class VectorTab(Tab):
         if self.sense is None:
             control = sunken_frame(self.frame)
             control.columnconfigure(1, weight=1)
-            tk.Label(control, text=f"{self.title} values", font="TkDefaultFont 9 bold").grid(
+            tk.Label(control, text=f"{self.title} values", font=self.app.bold_font).grid(
                 row=0, column=0, columnspan=3, sticky=tk.W, padx=2)
             for row, axis in enumerate(("x", "y", "z"), start=1):
                 var = tk.DoubleVar(value=0.0)
@@ -436,7 +444,7 @@ class VectorTab(Tab):
             self.options = sunken_frame(self.frame)
             range_frame = tk.Frame(self.options)
             range_frame.pack(side=tk.BOTTOM, fill=tk.X)
-            tk.Label(range_frame, text="Axes range", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 8))
+            tk.Label(range_frame, text="Axes range", font=self.app.bold_font).pack(side=tk.LEFT, padx=(4, 8))
             for key, text in (("range_xy", "X/Y:"), ("range_z", "Z:")):
                 values, default = self.range_choices[key]
                 tk.Label(range_frame, text=text).pack(side=tk.LEFT, padx=(4, 2))
@@ -526,7 +534,7 @@ class AccelerometerTab(VectorTab):
 
         mode_frame = tk.Frame(self.options)
         mode_frame.pack(side=tk.TOP, fill=tk.X)
-        tk.Label(mode_frame, text="Mode", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 8))
+        tk.Label(mode_frame, text="Mode", font=self.app.bold_font).pack(side=tk.LEFT, padx=(4, 8))
         for text, value in (("Raw", "raw"), ("Linear (gravity removed)", "linear")):
             tk.Radiobutton(mode_frame, text=text, value=value, variable=self.mode, command=self._on_mode,
                            padx=0, pady=0, borderwidth=0, highlightthickness=0,
@@ -534,7 +542,7 @@ class AccelerometerTab(VectorTab):
                            ).pack(side=tk.LEFT, padx=(4, 8), pady=1)
         correction_frame = tk.Frame(self.options)
         correction_frame.pack(side=tk.TOP, fill=tk.X)
-        tk.Label(correction_frame, text="Residual", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 8))
+        tk.Label(correction_frame, text="Residual", font=self.app.bold_font).pack(side=tk.LEFT, padx=(4, 8))
         self.zero_button = tk.Button(correction_frame, text="Zero", padx=6, pady=0, command=self.zero)
         self.zero_button.pack(side=tk.LEFT, padx=(4, 8), pady=1)
         self.zero_colors = button_colors(self.zero_button)
@@ -634,7 +642,7 @@ class TrackTab(Tab):
         # πυξίδα και στροφές από το gyroscope, Compass: Βορράς πάνω (μαγνητόμετρο με διόρθωση κλίσης)
         heading_row = tk.Frame(options)
         heading_row.pack(fill=tk.X)
-        tk.Label(heading_row, text="Heading", font="TkDefaultFont 9 bold").pack(side=tk.LEFT, padx=(4, 4))
+        tk.Label(heading_row, text="Heading", font=self.app.bold_font).pack(side=tk.LEFT, padx=(4, 4))
         self.heading = tk.StringVar(value="board")
         for text, value in (("Board", "board"), ("Gyro", "gyro"), ("Compass", "compass")):
             tk.Radiobutton(heading_row, text=text, value=value, variable=self.heading,
@@ -785,8 +793,21 @@ class PiHatGyroApp:
     def _run(self, tab):
         # Loop του tab: update() κάθε tab.period ms, μόνο όσο το tab φαίνεται
         # (λιγότερη CPU, και κάθε tab διαβάζει μόνο με τους δικούς του αισθητήρες ενεργούς)
-        if self.selected_tab() is tab and tab.update() is False:
-            return  # η εφαρμογή έκλεισε
+        if self.selected_tab() is tab:
+            try:
+                if tab.update() is False:
+                    return  # η εφαρμογή έκλεισε
+                if tab.error is not None:  # δουλεύει ξανά
+                    tab.error = None
+                    self.root.title(WINDOW_TITLE)
+            except Exception as e:
+                # Π.χ. σφάλμα I2C: το loop συνεχίζει. Το σφάλμα φαίνεται στον τίτλο του παραθύρου,
+                # και γράφεται στην κονσόλα μία φορά (μέχρι να αλλάξει ή να ξαναδουλέψει το tab)
+                error = f"{type(e).__name__}: {e}"
+                if error != tab.error:
+                    traceback.print_exc()
+                    tab.error = error
+                    self.root.title(f"{WINDOW_TITLE} - {tab.title} error: {error}")
         self.root.after(tab.period, lambda: self._run(tab))
 
     def selected_tab(self):

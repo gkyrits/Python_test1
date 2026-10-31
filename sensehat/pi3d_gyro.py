@@ -59,7 +59,7 @@ from pi3d.constants import (GL_FRAMEBUFFER, GL_RENDERBUFFER, GL_COLOR_ATTACHMENT
                             GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT16, GL_TEXTURE_2D,
                             GL_TEXTURE_MIN_FILTER, GL_TEXTURE_MAG_FILTER, GL_NEAREST,
                             GL_RGBA, GL_UNSIGNED_BYTE, GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT,
-                            GLuint, GLclampf)
+                            GLuint, GLclampf, GLint, GLsizei, GL_COMPILE_STATUS, GL_LINK_STATUS)
 
 # Το παράθυρο του pi3d δεν χρειάζεται (η εικόνα έρχεται από offscreen framebuffer).
 # False για να φαίνεται, π.χ. για debug
@@ -290,6 +290,25 @@ def _shader_source(source, vertex):
     return source
 
 
+def _shader_errors(shader):
+    # Τα μηνύματα λάθους του compile/link ενός shader (κενή λίστα αν είναι εντάξει).
+    # Το pi3d τα γράφει μόνο στο DEBUG log και συνεχίζει, με αποτέλεσμα κενή εικόνα
+    gl = pi3d.opengles
+    status, length = GLint(), GLsizei()
+    log = ctypes.create_string_buffer(1024)
+    errors = []
+    for part, handle in (("vertex", shader.vshader), ("fragment", shader.fshader)):
+        gl.glGetShaderiv(handle, GL_COMPILE_STATUS, ctypes.byref(status))
+        if not status.value:
+            gl.glGetShaderInfoLog(handle, len(log), ctypes.byref(length), log)
+            errors.append(f"{part}: {log.value.decode(errors='replace').strip()}")
+    gl.glGetProgramiv(shader.program, GL_LINK_STATUS, ctypes.byref(status))
+    if not status.value:
+        gl.glGetProgramInfoLog(shader.program, len(log), ctypes.byref(length), log)
+        errors.append(f"link: {log.value.decode(errors='replace').strip()}")
+    return errors
+
+
 class SolidView:
     # Προβολή "Solid": συμπαγές σχήμα, κάθε επιφάνεια με το χρώμα της, με φωτισμό
     # (κύριο + δευτερεύον φως, ambient ουρανού/εδάφους, γυαλάδα). Ρυθμίσεις: SOLID_*
@@ -310,6 +329,11 @@ class SolidView:
             fragment = fragment.replace(name, _glsl(value))
         self.shader = pi3d.Shader(vshader_source=_shader_source(_SOLID_VS, True),
                                   fshader_source=_shader_source(fragment, False))
+        errors = _shader_errors(self.shader)
+        if errors:
+            # Χωρίς τον δικό μας shader: ο απλός φωτισμός του pi3d (χωρίς γυαλάδα, χωρίς gamma)
+            print("Solid view shader failed, using pi3d mat_light:\n  " + "\n  ".join(errors))
+            self.shader = pi3d.Shader("mat_light")
 
         # Ένα Buffer ανά επιφάνεια ώστε η καθεμιά να έχει το δικό της χρώμα
         MY_W, MY_H, MY_D = shape_size
