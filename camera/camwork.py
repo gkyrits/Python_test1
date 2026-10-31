@@ -146,7 +146,10 @@ class camera_win:
         self.picam.start()
 
 
-    def __close_win(self,e):        
+    def __close_win(self,e):
+        #<Destroy> also fires for every child widget, handle only the window itself
+        if e.widget is not self.win:
+            return
         if self.propInf_win != None:
             self.propInf_win.destroy()
         if self.sensorInf_win != None:
