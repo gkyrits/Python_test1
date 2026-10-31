@@ -66,16 +66,72 @@ FIELD_WARN_COLOR = "#d07000"  # σκούρο πορτοκαλί, ευανάγν�
 # ΟΡΙΣΤΕ ΕΔΩ ΤΙΣ ΑΝΕΞΑΡΤΗΤΕΣ ΔΙΑΣΤΑΣΕΙΣ του σχήματος (μήκος, ύψος, βάθος)
 SHAPE_SIZE = (1.6, 0.2, 1.0)
 GAME_NEXT_LEVEL_DELAY = 2.0  # s μετά την τρύπα πριν από την επόμενη πίστα
+FIELD_TIP = ("Magnetic field strength, with the H calibration.\n"
+             "Earth's field: ~25-65 µT, steady while the board turns.\n"
+             f"Orange above {FIELD_WARN:.0f} µT, red above {FIELD_DANGER:.0f} µT (magnet too close);\n"
+             "then the field the sensor really sees is shown in brackets.")
+ACCEL_TOTAL_TIP = ("Total acceleration |a|.\n"
+                   "Raw: ≈ 1 g at rest in any position (only gravity);\n"
+                   "\"check calibration!\" when not (RTIMULibCal).\n"
+                   "Linear: ≈ 0 g at rest.")
+TOOLTIP_DELAY = 500  # ms που μένει το ποντίκι πάνω σε κουμπί πριν φανεί η βοήθεια
 
 
-def tool_column(parent, commands):
-    # Στήλη με τα μικρά κουμπιά (M/R/C, H/S) αριστερά από τον canvas. Επιστρέφει {κείμενο: κουμπί}.
+class Tooltip:
+    # Balloon help: μικρό κίτρινο παράθυρο με κείμενο, όταν το ποντίκι μένει TOOLTIP_DELAY ms
+    # πάνω σε ένα widget. Κρύβεται όταν το ποντίκι φύγει ή πατηθεί το widget.
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.window = None
+        self.pending = None
+        widget.bind("<Enter>", self._schedule, add="+")
+        widget.bind("<Leave>", self._hide, add="+")
+        widget.bind("<ButtonPress>", self._hide, add="+")
+
+    def _schedule(self, event=None):
+        self._cancel()
+        self.pending = self.widget.after(TOOLTIP_DELAY, self._show)
+
+    def _cancel(self):
+        if self.pending is not None:
+            self.widget.after_cancel(self.pending)
+            self.pending = None
+
+    def _show(self):
+        self.pending = None
+        if self.window is not None or not self.text:
+            return
+        # Δεξιά και λίγο κάτω από τον δείκτη, μέσα στην οθόνη
+        x = self.widget.winfo_pointerx() + 12
+        y = self.widget.winfo_pointery() + 16
+        self.window = window = tk.Toplevel(self.widget)
+        window.wm_overrideredirect(True)
+        tk.Label(window, text=self.text, justify=tk.LEFT, background="#ffffe0", relief=tk.SOLID,
+                 borderwidth=1, padx=4, pady=2, wraplength=360, font="TkDefaultFont").pack()
+        window.update_idletasks()
+        x = min(x, window.winfo_screenwidth() - window.winfo_reqwidth() - 4)
+        y = min(y, window.winfo_screenheight() - window.winfo_reqheight() - 4)
+        window.wm_geometry(f"+{x}+{y}")
+
+    def _hide(self, event=None):
+        self._cancel()
+        if self.window is not None:
+            self.window.destroy()
+            self.window = None
+
+
+def tool_column(parent, commands, tips=None):
+    # Στήλη με τα μικρά κουμπιά (M/R/C, H/S) αριστερά από τον canvas, με balloon help από το tips
+    # ({κείμενο: βοήθεια}). Επιστρέφει {κείμενο: κουμπί}.
     column = tk.Frame(parent)
     column.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 2))
     buttons = {}
     for text, command in commands.items():
         button = tk.Button(column, text=text, width=2, height=2, padx=0, pady=0, command=command)
         button.pack(side=tk.TOP, pady=(10, 0))
+        if tips and text in tips:
+            Tooltip(button, tips[text])
         buttons[text] = button
     return buttons
 
@@ -141,7 +197,11 @@ class GyroscopeTab(Tab):
         # M = επόμενη προβολή του σχήματος, V = φόντο 360° on/off, R = reset offsets,
         # C = calibrate (το σχήμα γίνεται 0,0,0)
         self.buttons = tool_column(shape_frame, {"M": self.next_view, "V": self.toggle_scene,
-                                                 "R": self.reset_offsets, "C": self.calibrate})
+                                                 "R": self.reset_offsets, "C": self.calibrate},
+                                   {"M": "Mode: next 3D view (Axes / Solid)",
+                                    "V": "View: 360° photo background on/off\n(turns with the board, N = North)",
+                                    "R": "Reset: orientation offsets to 0",
+                                    "C": "Calibrate: the current position becomes 0, 0, 0"})
         self.scene_colors = button_colors(self.buttons["V"])
         self.canvas = tk.Canvas(shape_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT, bg=CANVAS_BG_COLOR,
                                 highlightthickness=0)
@@ -283,12 +343,17 @@ class CompassTab(Tab):
         self.source = tk.StringVar(value="raw")
         source_frame = tk.Frame(compass_control)
         source_frame.grid(row=0, column=1, columnspan=2, sticky=tk.E, padx=2)
+        source_tips = {"raw": "North from the raw magnetometer X/Y, with the H calibration.\n"
+                              "Keep the board level.",
+                       "fusion": "North from RTIMULib's get_compass() (sensor fusion).\n"
+                                 "Needs the RTIMULibCal magnetometer calibration."}
         for text, value in (("Raw XY", "raw"), ("sense compass", "fusion")):
-            tk.Radiobutton(source_frame, text=text, value=value, variable=self.source,
-                           command=self._on_source,
-                           padx=0, pady=0, borderwidth=0, highlightthickness=0,
-                           state=tk.DISABLED if self.sense is None else tk.NORMAL
-                           ).pack(side=tk.LEFT, padx=(6, 0))
+            radio = tk.Radiobutton(source_frame, text=text, value=value, variable=self.source,
+                                   command=self._on_source,
+                                   padx=0, pady=0, borderwidth=0, highlightthickness=0,
+                                   state=tk.DISABLED if self.sense is None else tk.NORMAL)
+            radio.pack(side=tk.LEFT, padx=(6, 0))
+            Tooltip(radio, source_tips[value])
         # Με Sense HAT ο slider είναι το offset της επιλεγμένης πηγής, χωρίς Sense HAT η τιμή North
         self.north_var = tk.DoubleVar(value=0.0 if self.sense is None else offsets.values["raw"])
         north_label = tk.Label(compass_control, text="0.0°", width=7, anchor=tk.E)
@@ -316,6 +381,9 @@ class CompassTab(Tab):
                 label.pack(side=tk.LEFT, padx=(4, 6), pady=0)
                 self.vars[name] = var
                 self.label_widgets[name] = label
+        Tooltip(self.label_widgets["field"], FIELD_TIP)
+        Tooltip(self.label_widgets["raw_heading"], "Angle atan2(Y, X) of the raw magnetometer X/Y, not North.\n"
+                                                   "Meaningful only with the board level.")
         self._show_values(None, None)
         self.ticks = 0
 
@@ -324,7 +392,10 @@ class CompassTab(Tab):
         compass_frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
         # H = hard-iron calibration του μαγνητόμετρου (πάτημα: έναρξη, περιστροφή, πάτημα: αποθήκευση)
         # S = αποθήκευση των Compass offsets (Raw XY και sense compass)
-        self.buttons = tool_column(compass_frame, {"H": self.toggle_hard_iron, "S": self.save_offsets})
+        self.buttons = tool_column(compass_frame, {"H": self.toggle_hard_iron, "S": self.save_offsets},
+                                   {"H": "Hard-iron calibration: press, turn the board slowly\n"
+                                         "through a full circle, then press again",
+                                    "S": "Save the compass offset (one for Raw XY,\none for sense compass)"})
         self.hard_iron_colors = button_colors(self.buttons["H"])
         # Χωρίς Sense HAT δεν υπάρχει αισθητήρας για calibration ή offset
         if self.sense is None:
@@ -427,6 +498,7 @@ class VectorTab(Tab):
     resolution = 0.1
     decimals = 1
     range_choices = None
+    total_tip = ""  # βοήθεια για το |B| / |a|
 
     def __init__(self, app):
         super().__init__(app)
@@ -480,6 +552,8 @@ class VectorTab(Tab):
             label.pack(side=tk.LEFT, padx=(4, 6), pady=0)
             self.labels[name] = var
             self.label_widgets[name] = label
+        if self.total_tip:
+            Tooltip(self.label_widgets["total"], self.total_tip)
 
         canvas_frame = tk.Frame(self.frame)
         canvas_frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
@@ -504,6 +578,7 @@ class MagnetometerTab(VectorTab):
     value_range = MAGNET_RANGE
     resolution = 0.1
     decimals = 1
+    total_tip = FIELD_TIP
 
     def __init__(self, app):
         super().__init__(app)
@@ -533,6 +608,7 @@ class AccelerometerTab(VectorTab):
     resolution = 0.01
     decimals = 2
     range_choices = ACCEL_RANGE_CHOICES
+    total_tip = ACCEL_TOTAL_TIP
 
     def __init__(self, app):
         # Raw = μέτρηση όπως είναι (με τη βαρύτητα), Linear = χωρίς βαρύτητα σε X, Y, Z
@@ -551,22 +627,29 @@ class AccelerometerTab(VectorTab):
         mode_frame = tk.Frame(self.options)
         mode_frame.pack(side=tk.TOP, fill=tk.X)
         tk.Label(mode_frame, text="Mode", font=self.app.bold_font).pack(side=tk.LEFT, padx=(4, 8))
+        mode_tips = {"raw": "The accelerometer as measured, gravity included\n(|a| ≈ 1 g at rest)",
+                     "linear": "Gravity removed: tilt measured at stops and followed by\n"
+                               "the gyroscope while moving (|a| ≈ 0 g at rest)"}
         for text, value in (("Raw", "raw"), ("Linear (gravity removed)", "linear")):
-            tk.Radiobutton(mode_frame, text=text, value=value, variable=self.mode, command=self._on_mode,
-                           padx=0, pady=0, borderwidth=0, highlightthickness=0,
-                           state=tk.DISABLED if self.sense is None else tk.NORMAL
-                           ).pack(side=tk.LEFT, padx=(4, 8), pady=1)
+            radio = tk.Radiobutton(mode_frame, text=text, value=value, variable=self.mode, command=self._on_mode,
+                                   padx=0, pady=0, borderwidth=0, highlightthickness=0,
+                                   state=tk.DISABLED if self.sense is None else tk.NORMAL)
+            radio.pack(side=tk.LEFT, padx=(4, 8), pady=1)
+            Tooltip(radio, mode_tips[value])
         correction_frame = tk.Frame(self.options)
         correction_frame.pack(side=tk.TOP, fill=tk.X)
         tk.Label(correction_frame, text="Residual", font=self.app.bold_font).pack(side=tk.LEFT, padx=(4, 8))
         self.zero_button = tk.Button(correction_frame, text="Zero", padx=6, pady=0, command=self.zero)
         self.zero_button.pack(side=tk.LEFT, padx=(4, 8), pady=1)
+        Tooltip(self.zero_button, "Measure what remains at rest for ~1 s and subtract it\n(keep the board still)")
         self.zero_colors = button_colors(self.zero_button)
         self.auto_zero_var = tk.BooleanVar(value=False)
         self.auto_zero_check = tk.Checkbutton(correction_frame, text="Auto-zero", variable=self.auto_zero_var,
                                               command=self._on_auto_zero, padx=0, pady=0,
                                               borderwidth=0, highlightthickness=0)
         self.auto_zero_check.pack(side=tk.LEFT, padx=(4, 8))
+        Tooltip(self.auto_zero_check, "Keep subtracting slowly whatever stays constant\n"
+                                      "(short pushes show, steady accelerations fade away)")
         self._update_correction_controls()
         self.show_values(None)
 
@@ -653,19 +736,27 @@ class TrackTab(Tab):
         self.start_button = tk.Button(buttons_row, text="Start", width=6, padx=2, pady=0,
                                       command=self.toggle, state=state)
         self.start_button.pack(side=tk.LEFT, padx=(4, 4), pady=1)
+        Tooltip(self.start_button, "Start / stop the track\n(keep the board still for 1 s after Start)")
         self.start_colors = button_colors(self.start_button)
-        tk.Button(buttons_row, text="Reset", width=6, padx=2, pady=0, command=self.reset,
-                  state=state).pack(side=tk.LEFT, padx=(0, 8), pady=1)
+        reset_button = tk.Button(buttons_row, text="Reset", width=6, padx=2, pady=0, command=self.reset,
+                                 state=state)
+        reset_button.pack(side=tk.LEFT, padx=(0, 8), pady=1)
+        Tooltip(reset_button, "Clear the track and start again from 0")
         # Board: άξονες της πλακέτας (πάνω = μπροστά, χωρίς στροφές), Gyro: Βορράς πάνω, αρχή από την
         # πυξίδα και στροφές από το gyroscope, Compass: Βορράς πάνω (μαγνητόμετρο με διόρθωση κλίσης)
         heading_row = tk.Frame(options)
         heading_row.pack(fill=tk.X)
         tk.Label(heading_row, text="Heading", font=self.app.bold_font).pack(side=tk.LEFT, padx=(4, 4))
         self.heading = tk.StringVar(value="board")
+        heading_tips = {"board": "Board axes: up = forward. Don't turn the board while moving.",
+                        "gyro": "North up: start direction from the compass,\nthen turns from the gyroscope",
+                        "compass": "North up: direction from the magnetometer\n(tilt-corrected, with the H calibration)"}
         for text, value in (("Board", "board"), ("Gyro", "gyro"), ("Compass", "compass")):
-            tk.Radiobutton(heading_row, text=text, value=value, variable=self.heading,
-                           command=self._on_heading, padx=0, pady=0, borderwidth=0,
-                           highlightthickness=0, state=state).pack(side=tk.LEFT, padx=(4, 4), pady=1)
+            radio = tk.Radiobutton(heading_row, text=text, value=value, variable=self.heading,
+                                   command=self._on_heading, padx=0, pady=0, borderwidth=0,
+                                   highlightthickness=0, state=state)
+            radio.pack(side=tk.LEFT, padx=(4, 4), pady=1)
+            Tooltip(radio, heading_tips[value])
 
         info = sunken_frame(self.frame)
         self.vars = {}
@@ -809,7 +900,11 @@ class GameTab(Tab):
         # R = ξανά η πίστα, C = η τωρινή θέση μετράει ως οριζόντια, L = επόμενη πίστα, J = άλμα
         game_frame = tk.Frame(self.frame)
         self.buttons = tool_column(game_frame, {"R": self.restart, "C": self.calibrate,
-                                                "L": self.next_level, "J": self.jump})
+                                                "L": self.next_level, "J": self.jump},
+                                   {"R": "Restart the level",
+                                    "C": "Calibrate: the way you hold the board now counts as level",
+                                    "L": "Next level",
+                                    "J": "Jump (or lift the board quickly)"})
         self.canvas = tk.Canvas(game_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT, bg=CANVAS_BG_COLOR,
                                 highlightthickness=0)
         game_frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
@@ -975,13 +1070,14 @@ class PiHatGyroApp:
 
     def apply_imu_config(self):
         # Αισθητήρες του IMU για το tab που φαίνεται: set_imu_config(compass, gyroscope, accelerometer).
-        # Τα υπόλοιπα tabs παίρνουν hide() (π.χ. το Track σταματάει το νήμα του).
-        if self.sense is None:
-            return
+        # Τα υπόλοιπα tabs παίρνουν hide() (π.χ. το Track σταματάει το νήμα του, το Game τον χρόνο),
+        # και χωρίς Sense HAT.
         current = self.selected_tab()
         for tab in self.tabs:
             if tab is not current:
                 tab.hide()
+        if self.sense is None:
+            return
         config = current.imu_config() if current is not None else None
         if config is not None:
             self.sense.set_imu_config(*config)

@@ -22,6 +22,10 @@ GAME_SHADOW_ALPHA = 0.35
 GAME_FIT_MARGIN = 1.06      # η απόσταση της κάμερας ώστε να χωράει όλη η πίστα, επί αυτό (περιθώριο)
 GAME_BOARD_TILT = 55.0      # μοίρες: πόσο γέρνει η πίστα προς την κάμερα (90 = κάτοψη)
 GAME_BOARD_LOWER = 0.3      # πόσο χαμηλότερα από το κέντρο της εικόνας
+# Ύψος της τρύπας και της σκιάς πάνω από το δάπεδο: αρκετό για το depth buffer των 16 bit (στην
+# απόσταση της πίστας ξεχωρίζει ~0.005), αλλιώς αναβοσβήνουν με το δάπεδο, και αθέατο ως ύψος
+HOLE_LIFT = 0.02
+SHADOW_LIFT = 0.03
 
 
 def _box(x0, z0, x1, z1, y0, y1, color):
@@ -47,7 +51,7 @@ class GameScene:
 
         hw, hd, t = game_rules.ARENA_WIDTH / 2.0, game_rules.ARENA_DEPTH / 2.0, game_rules.WALL_THICKNESS
         self.board.add_child(_box(-hw - t, -hd - t, hw + t, hd + t, -0.2, 0.0, GAME_FLOOR_COLOR))
-        self.hole = pi3d.Disk(radius=game_rules.HOLE_RADIUS, sides=32, y=0.003)
+        self.hole = pi3d.Disk(radius=game_rules.HOLE_RADIUS, sides=32, y=HOLE_LIFT)
         self.hole.set_material(GAME_HOLE_COLOR)
         self.board.add_child(self.hole)
         self.walls = _empty_node()
@@ -57,7 +61,7 @@ class GameScene:
         self.ball.set_material(GAME_BALL_COLOR)
         self.board.add_child(self.ball)
         # Σκιά κάτω από τη μπάλα (τελευταία, γιατί είναι διάφανη): μικραίνει όσο η μπάλα πηδάει
-        self.shadow = pi3d.Disk(radius=r * 0.9, sides=24, y=0.006)
+        self.shadow = pi3d.Disk(radius=r * 0.9, sides=24, y=SHADOW_LIFT)
         self.shadow.set_material((0.0, 0.0, 0.0))
         self.shadow.set_alpha(GAME_SHADOW_ALPHA)
         self.board.add_child(self.shadow)
@@ -71,7 +75,7 @@ class GameScene:
         h = game_rules.WALL_HEIGHT
         self.walls.children = [_box(x0, y0, x1, y1, 0.0, h, GAME_WALL_COLOR)
                                for x0, y0, x1, y1 in game.border + game.walls]
-        self.hole.position(game.hole[0], 0.003, game.hole[1])
+        self.hole.position(game.hole[0], HOLE_LIFT, game.hole[1])
         self.level = game.level
 
     def _resize_view(self, w, h):
@@ -111,7 +115,7 @@ class GameScene:
         self.ball.position(ball.x, r + ball.h, ball.y)
         falling = game.state in ("falling", "won")
         scale = 0.0 if falling else max(0.3, 1.0 - ball.h / 1.5)
-        self.shadow.position(ball.x, 0.006, ball.y)
+        self.shadow.position(ball.x, SHADOW_LIFT, ball.y)
         self.shadow.scale(scale, 1.0, scale)
 
         pi3d.opengles.glClearColor(*(GLclampf(c) for c in GAME_BACKGROUND_COLOR))
