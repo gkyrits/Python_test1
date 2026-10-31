@@ -11,8 +11,6 @@ import sockutils as scutl
 import genutils as utl
 import camoptions as opt
 
-import camplay_gui as gui
-
 
 global Picamera2, Preview, Transform, Quality
 global H264Encoder, MJPEGEncoder, JpegEncoder, Encoder
@@ -65,8 +63,9 @@ class camera_win:
     INFO_PROP_ID = 0
     INFO_SENSOR_ID = 1
 
-    def __init__(self, idx, cam_model, cam_num, root=False):
+    def __init__(self, idx, cam_model, cam_num, root=False, on_close=None):
         self.idx = idx
+        self.on_close = on_close
         self.cam_num = cam_num
         self.cam_model = cam_model
         self.picam = None
@@ -156,8 +155,8 @@ class camera_win:
             self.picam.stop()
             self.picam = None
         print(f'Close camera {self.cam_num}')
-        if gui.mainWin != None:
-            gui.mainWin.cam_inst[self.idx] = None
+        if self.on_close != None:
+            self.on_close(self.idx)
 
 
     def __info_btn(self):
