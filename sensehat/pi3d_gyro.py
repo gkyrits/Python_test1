@@ -315,6 +315,26 @@ def _shader_errors(shader):
     return errors
 
 
+def lit_shader():
+    # Ο shader με φωτισμό (ρυθμίσεις SOLID_* για φώτα και γυαλάδα), για το SolidView και
+    # το παιχνίδι (pi3d_game). Χρώμα από το set_material κάθε Shape/Buffer.
+    constants = {"SHININESS": SOLID_SHININESS, "SPECULAR": SOLID_SPECULAR,
+                 "GROUND_LIGHT": SOLID_GROUND_LIGHT, "SKY_LIGHT": SOLID_SKY_LIGHT,
+                 "KEY_DIR": SOLID_KEY_LIGHT[0], "KEY_COLOR": SOLID_KEY_LIGHT[1],
+                 "FILL_DIR": SOLID_FILL_LIGHT[0], "FILL_COLOR": SOLID_FILL_LIGHT[1]}
+    fragment = _SOLID_FS
+    for name, value in constants.items():
+        fragment = fragment.replace(name, _glsl(value))
+    shader = pi3d.Shader(vshader_source=_shader_source(_SOLID_VS, True),
+                         fshader_source=_shader_source(fragment, False))
+    errors = _shader_errors(shader)
+    if errors:
+        # Χωρίς τον δικό μας shader: ο απλός φωτισμός του pi3d (χωρίς γυαλάδα, χωρίς gamma)
+        print("Lit shader failed, using pi3d mat_light:\n  " + "\n  ".join(errors))
+        shader = pi3d.Shader("mat_light")
+    return shader
+
+
 class SolidView:
     # Προβολή "Solid": συμπαγές σχήμα, κάθε επιφάνεια με το χρώμα της, με φωτισμό
     # (κύριο + δευτερεύον φως, ambient ουρανού/εδάφους, γυαλάδα). Ρυθμίσεις: SOLID_*
@@ -326,20 +346,7 @@ class SolidView:
                    SOLID_BOTTOM_COLOR, SOLID_SIDE_COLOR, SOLID_SIDE_COLOR)
 
     def __init__(self, shape_size):
-        constants = {"SHININESS": SOLID_SHININESS, "SPECULAR": SOLID_SPECULAR,
-                     "GROUND_LIGHT": SOLID_GROUND_LIGHT, "SKY_LIGHT": SOLID_SKY_LIGHT,
-                     "KEY_DIR": SOLID_KEY_LIGHT[0], "KEY_COLOR": SOLID_KEY_LIGHT[1],
-                     "FILL_DIR": SOLID_FILL_LIGHT[0], "FILL_COLOR": SOLID_FILL_LIGHT[1]}
-        fragment = _SOLID_FS
-        for name, value in constants.items():
-            fragment = fragment.replace(name, _glsl(value))
-        self.shader = pi3d.Shader(vshader_source=_shader_source(_SOLID_VS, True),
-                                  fshader_source=_shader_source(fragment, False))
-        errors = _shader_errors(self.shader)
-        if errors:
-            # Χωρίς τον δικό μας shader: ο απλός φωτισμός του pi3d (χωρίς γυαλάδα, χωρίς gamma)
-            print("Solid view shader failed, using pi3d mat_light:\n  " + "\n  ".join(errors))
-            self.shader = pi3d.Shader("mat_light")
+        self.shader = lit_shader()
 
         # Ένα Buffer ανά επιφάνεια ώστε η καθεμιά να έχει το δικό της χρώμα
         MY_W, MY_H, MY_D = shape_size

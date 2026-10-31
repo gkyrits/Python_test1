@@ -1,4 +1,5 @@
 import math
+import time
 import traceback
 import tkinter as tk
 import tkinter.font as tkfont
@@ -9,12 +10,14 @@ from PIL import Image, ImageTk
 # Module της 3D σκηνής: για άλλη 3D βιβλιοθήκη αλλάζει μόνο αυτό το import
 # (το module πρέπει να δίνει GyroScene με το ίδιο interface, βλ. pi3d_gyro.py)
 import pi3d_gyro as gyro3d
+import pi3d_game as game3d
 
 # Σχεδίαση πυξίδας (Compass) και διανυσμάτων X/Y/Z (Magnetometer, Accelerometer) σε Tk Canvas
 import compass
 import xyz_force
 import acceleration
 import track
+import game
 
 try:
     from sense_hat import SenseHat
@@ -62,6 +65,7 @@ FIELD_WARN_COLOR = "#d07000"  # σκούρο πορτοκαλί, ευανάγν�
 
 # ΟΡΙΣΤΕ ΕΔΩ ΤΙΣ ΑΝΕΞΑΡΤΗΤΕΣ ΔΙΑΣΤΑΣΕΙΣ του σχήματος (μήκος, ύψος, βάθος)
 SHAPE_SIZE = (1.6, 0.2, 1.0)
+GAME_NEXT_LEVEL_DELAY = 2.0  # s μετά την τρύπα πριν από την επόμενη πίστα
 
 
 def tool_column(parent, commands):
@@ -761,6 +765,139 @@ class TrackTab(Tab):
         self.sampler.stop()
 
 
+class GameTab(Tab):
+    # Παιχνίδι λαβύρινθου: γέρνοντας την πλακέτα η μπάλα κυλάει προς την τρύπα, και με ένα
+    # γρήγορο τίναγμα προς τα πάνω πηδάει πάνω από τους τοίχους (module game: φυσική,
+    # pi3d_game: 3D σκηνή). Χωρίς Sense HAT η κλίση έρχεται από sliders και το άλμα από το J.
+    title = "Game"
+    period = 20
+
+    def __init__(self, app):
+        super().__init__(app)
+        self.game = game.Game()
+        self.scene = game3d.GameScene()
+        self.accel = None       # τελευταία μέτρηση (για το C)
+        self.jump_request = False
+        self.won_at = None      # πότε μπήκε η μπάλα στην τρύπα (για την επόμενη πίστα)
+
+        # Από κάτω προς τα πάνω: sliders (χωρίς Sense HAT), info_frame, και το frame με τον canvas
+        self.tilt_vars = {}
+        if self.sense is None:
+            control = sunken_frame(self.frame)
+            control.columnconfigure(1, weight=1)
+            tk.Label(control, text="Tilt", font=self.app.bold_font).grid(row=0, column=0, columnspan=3,
+                                                                         sticky=tk.W, padx=2)
+            for row, (name, title) in enumerate((("right", "Right"), ("forward", "Forward")), start=1):
+                var = tk.DoubleVar(value=0.0)
+                value_label = tk.Label(control, text="0.0°", width=7, anchor=tk.E)
+                tk.Label(control, text=title, anchor=tk.W).grid(row=row, column=0, sticky=tk.W, padx=2)
+                tk.Scale(control, variable=var, from_=-20, to=20, resolution=0.5, orient=tk.HORIZONTAL,
+                         showvalue=False, width=10, sliderlength=15, borderwidth=1
+                         ).grid(row=row, column=1, sticky=tk.EW, padx=2)
+                var.trace_add("write", lambda *_, v=var, lbl=value_label: lbl.config(text=f"{v.get():.1f}°"))
+                value_label.grid(row=row, column=2, padx=2)
+                self.tilt_vars[name] = var
+
+        info = sunken_frame(self.frame)
+        self.info_vars = {}
+        for name in ("level", "time", "best"):
+            var = tk.StringVar()
+            tk.Label(info, textvariable=var, anchor=tk.W, font="TkDefaultFont").pack(
+                side=tk.LEFT, expand=True, padx=2, pady=1)
+            self.info_vars[name] = var
+
+        # R = ξανά η πίστα, C = η τωρινή θέση μετράει ως οριζόντια, L = επόμενη πίστα, J = άλμα
+        game_frame = tk.Frame(self.frame)
+        self.buttons = tool_column(game_frame, {"R": self.restart, "C": self.calibrate,
+                                                "L": self.next_level, "J": self.jump})
+        self.canvas = tk.Canvas(game_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT, bg=CANVAS_BG_COLOR,
+                                highlightthickness=0)
+        game_frame.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.view_size = (CANVAS_WIDTH, CANVAS_HEIGHT)
+        self.canvas.bind("<Configure>", self._on_canvas_resize)
+        self.canvas_image_id = self.canvas.create_image(0, 0, anchor=tk.NW)
+        self.tk_image = None
+        # Μήνυμα στο κέντρο, με σκιά ώστε να διαβάζεται πάνω στην πίστα
+        self.message_ids = [self.canvas.create_text(0, 0, text="", fill=color, font=self.app.bold_font,
+                                                    justify=tk.CENTER)
+                            for color in ("black", "white")]
+
+    def imu_config(self):
+        return False, False, True  # μόνο επιταχυνσιόμετρο
+
+    def hide(self):
+        self.game.pause()  # ο χρόνος δεν μετράει όσο το tab δεν φαίνεται
+
+    def restart(self):
+        self.game.restart()
+        self.won_at = None
+
+    def next_level(self):
+        self.game.next_level()
+        self.won_at = None
+
+    def calibrate(self):
+        # C: η πλακέτα όπως την κρατάει τώρα ο παίκτης μετράει ως οριζόντια
+        if self.sense is None:
+            for var in self.tilt_vars.values():
+                var.set(0.0)
+        elif self.accel is not None:
+            self.game.calibrate(self.accel)
+
+    def jump(self):
+        self.jump_request = True
+
+    def _on_canvas_resize(self, event):
+        self.view_size = (max(event.width, 1), max(event.height, 1))
+        for i, text_id in enumerate(self.message_ids):
+            self.canvas.coords(text_id, event.width / 2 + 1 - i, event.height / 2 + 1 - i)
+
+    def _slider_accel(self):
+        # Η μέτρηση του επιταχυνσιόμετρου που θα έδινε αυτή η κλίση (αντίστροφα από το game)
+        right = math.radians(self.tilt_vars["right"].get())
+        forward = math.radians(self.tilt_vars["forward"].get())
+        accel = {"x": 0.0, "y": 0.0, "z": math.cos(right) * math.cos(forward)}
+        axis, sign = game.RIGHT_TILT
+        accel["xy"[axis]] = sign * math.sin(right)
+        axis, sign = game.FORWARD_TILT
+        accel["xy"[axis]] = sign * math.sin(forward)
+        return accel
+
+    def update(self):
+        now = time.monotonic()
+        self.accel = self.sense.get_accelerometer_raw() if self.sense is not None else self._slider_accel()
+        self.game.update(self.accel, now, jump=self.jump_request)
+        self.jump_request = False
+        state = self.game.state
+        if state == "won":
+            if self.won_at is None:
+                self.won_at = now
+            elif now - self.won_at > GAME_NEXT_LEVEL_DELAY:
+                self.next_level()
+
+        image = self.scene.render(self.game, self.view_size)
+        self.tk_image = ImageTk.PhotoImage(Image.fromarray(image))
+        self.canvas.itemconfig(self.canvas_image_id, image=self.tk_image)
+
+        if state == "ready":
+            message = "Tilt the board to roll the ball into the hole\nJump: lift the board quickly (or J)"
+        elif state == "won":
+            message = f"In the hole!  {self.game.time:.1f} s"
+        else:
+            message = ""
+        for text_id in self.message_ids:
+            self.canvas.itemconfig(text_id, text=message)
+        best = self.game.best.get(self.game.level)
+        self.info_vars["level"].set(f"Level {self.game.level + 1}/{len(game.LEVELS)}")
+        self.info_vars["time"].set(f"Time: {self.game.time:.1f} s")
+        self.info_vars["best"].set("Best: ---" if best is None else f"Best: {best:.1f} s")
+        return True
+
+    def close(self):
+        self.scene.close()
+
+
 class PiHatGyroApp:
     # Το παράθυρο: Sense HAT, notebook με τα tabs, κοινά calibrations (hard-iron, Compass
     # offsets), αισθητήρες του IMU ανά tab και το loop κάθε tab
@@ -795,7 +932,9 @@ class PiHatGyroApp:
         self.magnet_tab = MagnetometerTab(self)
         self.accel_tab = AccelerometerTab(self)
         self.track_tab = TrackTab(self)
-        self.tabs = (self.gyro_tab, self.compass_tab, self.magnet_tab, self.accel_tab, self.track_tab)
+        self.game_tab = GameTab(self)
+        self.tabs = (self.gyro_tab, self.compass_tab, self.magnet_tab, self.accel_tab, self.track_tab,
+                     self.game_tab)
 
         self.notebook.bind("<<NotebookTabChanged>>", lambda event: self._on_tab_changed())
         self.root.protocol("WM_DELETE_WINDOW", self.close)
@@ -883,7 +1022,8 @@ class PiHatGyroApp:
             label.config(fg="black", font="TkDefaultFont")
 
     def close(self):
-        for tab in self.tabs:
+        # Αντίστροφα: το παιχνίδι χρησιμοποιεί το παράθυρο του pi3d του Gyroscope, που κλείνει τελευταίο
+        for tab in reversed(self.tabs):
             tab.close()
         self.root.destroy()
 
