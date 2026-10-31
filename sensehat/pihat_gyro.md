@@ -1,17 +1,18 @@
 # Review: `pihat_gyro.py` and its modules
 
-Reviewed at commit `e57f31a` (branch `sense_gyro_test`) on 2026-10-31, together with the fixes for the five bugs found in it. This replaces the earlier reviews.
+Reviewed at commit `5b23f57` (branch `sense_gyro_test`) on 2026-10-31, together with the fixes for remaining items 6, 7 and 13 of that review. This replaces the earlier reviews.
 
 ## Structure
 
 | File | Lines | Contents |
 |---|---|---|
-| `pihat_gyro.py` | 896 | Tk app: `PiHatGyroApp` and one class per tab |
+| `pihat_gyro.py` | 894 | Tk app: `PiHatGyroApp` and one class per tab |
 | `pi3d_gyro.py` | 551 | 3D scene (pi3d): Windows setup, off-screen framebuffer, views `AxesView` / `SolidView`, 360° background `SceneView`, `GyroScene` (gimbal rotation, `next_view()`, `show_scene()`) |
 | `compass.py` | 155 | `raw_heading`, `xy_angle`, `CompassOffsets` (offset per source, S), `HardIronCalibration` (H, `uncorrected()`), `CompassView` |
 | `xyz_force.py` | 88 | `XYZForceView` (X/Y cross and Z arrows), `magnitude` |
 | `acceleration.py` | 210 | `GravityTracker` (Linear: own tilt), `rotate_into_body`, `gravity_vector`, `remove_gravity`, `GravityCheck` (calibration warning), `ResidualCorrection` (Zero / Auto-zero) |
-| `track.py` | 457 | `Tracker` (own tilt, ZUPT, drift correction), `TrackSampler` (thread), `TrackView` (with diagnostics) |
+| `track.py` | 470 | `Tracker` (own tilt, ZUPT, drift correction, Gyro heading started from a 1 s compass average), `TrackSampler` (thread), `TrackView` (with diagnostics) |
+| `pi3d/` | | ANGLE DLLs for Windows, with `README.md` (origin) and `LICENSE-ANGLE.txt` (BSD) |
 | `scene_360.jpg` | 415 KB | 360° photo for V: "Kiara 1 Dawn" by Greg Zaal (polyhaven.com, CC0), 2048×1024 |
 
 **Classes in `pihat_gyro.py`:**
@@ -41,34 +42,26 @@ Each view has `name`, `background`, `shader` and `node`. `GyroScene` keeps what 
 - `pihat_gyro_hardiron.json`: the H calibration
 - `pihat_gyro_compass.json`: the S offsets
 
-## Changes since the previous review (`70e9432`)
+## Changes since the previous review (`e57f31a`)
 
-- **Fixed at `e57f31a`:**
-  - Linear mode has its own tilt (`acceleration.GravityTracker`): gravity measured at stops, turned by the gyroscope while moving
-  - the |B| warning is judged on the field the sensor actually sees
-  - saving H shows an error message if it fails
-  - the off-screen framebuffer is checked with `glCheckFramebufferStatus`
-- **Fixed now, the five bugs found in `e57f31a`:**
-  1. **The error in the window title is cleared on a tab change** (`_on_tab_changed`, [pihat_gyro.py:827](pihat_gyro.py:827)). Before, it stayed after leaving the failing tab. If the new tab also fails, it shows its own error.
-  2. **The \|B\| warning no longer makes the window wider** ([pihat_gyro.py:878](pihat_gyro.py:878)). The sensor value is shown more briefly, e.g. `|B|: 284.4 µT (406) too close!`, so the window stays 399 px wide.
-  3. **A failed framebuffer resize no longer leads to a crash** ([pi3d_gyro.py:521](pi3d_gyro.py:521)). `offscreen_size` is cleared with `offscreen`, so the next render tries again, even at the old size.
-  4. **Linear starts correctly while the board is moving** ([acceleration.py:123](acceleration.py:123)):
-     - Stillness is judged from 3 samples (`MIN_SAMPLES`), so movement right after a tab change or switching to Linear is seen at once and doesn't go into gravity.
-     - The gyro bias is measured only with a full steady window.
-     - Starting while turning, the error went from 0.26 g to 0.02 g.
-  5. **The scene follows real North** ([pihat_gyro.py:242](pihat_gyro.py:242)):
-     - With a Sense HAT, the 360° background uses the sensor's tilt without the C offsets.
-     - Its yaw is the board's heading plus the Compass tab's "sense compass" offset, as in the Compass tab, so the photo's N is North.
-     - The shape still shows the calibrated orientation.
-     - `GyroScene.render()` takes an optional `scene_orientation`.
-     - Without a Sense HAT, the scene follows the sliders as before.
+- **Fixed at `5b23f57`:**
+  - the window title error is cleared on a tab change
+  - the \|B\| warning text no longer widens the window
+  - a failed framebuffer resize is retried
+  - Linear starts correctly while the board is moving
+  - the 360° scene follows real North (sensor tilt and heading + compass offset)
+- **Fixed now, remaining items 6, 7 and 13 of that review:**
+  - **Gyro heading starts from a compass average** ([track.py:210](track.py:210)):
+    - For the first `START_STILL` (1 s), while the board is still, the start direction is the circular mean of the compass, which is correct around 0°/360° too. After that, or from the first movement, only the gyroscope.
+    - One bad first reading (metal or a magnet nearby) no longer turns the whole track. In a test with a 40° spike on the first two readings, the start was 359.4° instead of 318.3°.
+  - **The Track no longer reads the orientation:**
+    - It's removed from the sample interface: `read_sample()` returns `(accel, gyro, mag, timestamp)`, and `Tracker.update(accel, gyro, mag, now)`.
+    - The fallback without `_imu` makes two or three reads instead of three or four ([pihat_gyro.py:691](pihat_gyro.py:691)).
+  - **ANGLE licence:** `sensehat/pi3d/LICENSE-ANGLE.txt`, taken from the official ANGLE repository, and `sensehat/pi3d/README.md` with where the DLLs come from (pi3d_windll, 64-bit).
 - **Tested on Windows:**
-  - **Title:** a failing Gyroscope tab, then Compass: the title went back to normal.
-  - **Magnetometer:** the window stayed 399 px wide with the warning.
-  - **Framebuffer:** a forced resize failure, then the old size: the image came back.
-  - **Linear started while turning:** 0.02 g error, with no wrong gyro bias.
-  - **Scene after C, with a 12.5° offset:** the shape was 0, 0, 0; the scene was 5, −3, 92.5 (the sensor's tilt, yaw 80 + 12.5).
-  - **Earlier tests:** all still pass (all tabs with and without a Sense HAT, M, V, Linear, \|B\|).
+  - **Gyro heading:** the spike test above, and noise around 0°/360° (359.8°).
+  - **Track fallback without `_imu`:** it ran at 64 samples/s and never read the orientation.
+  - **Earlier tests:** all tabs with and without a Sense HAT, the Track, and Linear still pass.
 
 ## Bugs
 
@@ -95,24 +88,18 @@ None known.
    - `YAW_SIGN` ([track.py:77](track.py:77)) with a track that turns in Gyro mode
    - the `MAG_AXES` Z sign ([track.py:75](track.py:75)), which only matters for the compass tilt correction
 
-6. **Gyro heading takes its start direction from a single compass reading** ([track.py:200](track.py:200)). An average over the first 1 s would be steadier.
+6. **The single read uses an internal attribute of sense_hat** ([pihat_gyro.py:697](pihat_gyro.py:697)). If `self.sense._imu` changes, the code falls back to three slower reads that aren't from the same instant.
 
-7. **The Track fallback reads the orientation for nothing** ([pihat_gyro.py:707](pihat_gyro.py:707)). Removing it would raise the rate when there's no `_imu`.
+7. **Two threads touching the same data:** H recording and the Track thread both go through `read_magnet()`, and the compass offset changes from Tk while the thread reads it. It works in practice, but a lock in `HardIronCalibration` would be cleaner.
 
-8. **The single read uses an internal attribute of sense_hat** ([pihat_gyro.py:697](pihat_gyro.py:697)). If `self.sense._imu` changes, the code falls back to three slower reads that aren't from the same instant.
+8. **The Gyroscope tab needs to settle after other tabs**, since they turn off some sensors.
 
-9. **Two threads touching the same data:** H recording and the Track thread both go through `read_magnet()`, and the compass offset changes from Tk while the thread reads it. It works in practice, but a lock in `HardIronCalibration` would be cleaner.
+9. **A new image every frame** ([pihat_gyro.py:252](pihat_gyro.py:252)).
 
-10. **The Gyroscope tab needs to settle after other tabs**, since they turn off some sensors.
+10. **Track accuracy is limited by the method:** ~1 cm per move with stops between moves; without stops it drifts within seconds. Better accuracy needs an extra sensor without drift: a mouse sensor / optical flow, wheel encoders, or camera + ArUco markers.
 
-11. **A new image every frame** ([pihat_gyro.py:252](pihat_gyro.py:252)).
-
-12. **Track accuracy is limited by the method:** ~1 cm per move with stops between moves; without stops it drifts within seconds. Better accuracy needs an extra sensor without drift: a mouse sensor / optical flow, wheel encoders, or camera + ArUco markers.
-
-13. **ANGLE licence file is missing** (`sensehat/pi3d/`). The committed DLLs are BSD-licensed and the repo is public.
-
-14. **Leftovers**
-    - `self.sense.clear()` ([pihat_gyro.py:775](pihat_gyro.py:775)) isn't needed.
+11. **Leftovers**
+    - `self.sense.clear()` ([pihat_gyro.py:773](pihat_gyro.py:773)) isn't needed.
     - The `Raw XY heading` label shows the angle `atan2(Y, X)`, not North.
     - The off-screen window move ([pi3d_gyro.py:447](pi3d_gyro.py:447)) is no longer needed.
     - `self.mode = None` in `AccelerometerTab.__init__` ([pihat_gyro.py:537](pihat_gyro.py:537)) is only needed because `linear()` can be called early.
@@ -162,7 +149,7 @@ None known.
 ## Platform notes
 
 - **Windows:**
-  - The ANGLE DLLs are in `sensehat/pi3d/`.
+  - The ANGLE DLLs are in `sensehat/pi3d/`, with their licence (`LICENSE-ANGLE.txt`).
   - SDL2's message loop is turned off (it was crashing Tk), and the SDL context is GLES2 through ANGLE.
   - Lines are 1 pixel wide, whatever `*_LINE_WIDTH` says.
   - The Solid shader and the scene are tested here (GLES2).

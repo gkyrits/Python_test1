@@ -689,8 +689,8 @@ class TrackTab(Tab):
         self.tracker.heading_offset = self.app.compass_offsets.values["raw"] if self.sense is not None else 0.0
 
     def _read_sample(self):
-        # Καλείται από το νήμα του Track: (επιτάχυνση g, προσανατολισμός μοίρες, gyroscope rad/s,
-        # μαγνητόμετρο µT με hard-iron διόρθωση ή None, χρόνος s ή None), ή None χωρίς νέο δείγμα.
+        # Καλείται από το νήμα του Track: (επιτάχυνση g, gyroscope rad/s, μαγνητόμετρο µT με
+        # hard-iron διόρθωση ή None, χρόνος s ή None), ή None χωρίς νέο δείγμα.
         # Αν γίνεται, ΜΙΑ ανάγνωση του RTIMULib για όλα (ίδια στιγμή, χρόνος του IMU, πιο
         # γρήγορα), αντί για τρεις ξεχωριστές αναγνώσεις μέσω του sense_hat.
         use_mag = self.tracker.heading_mode in ("gyro", "compass")  # Gyro: αρχική κατεύθυνση από την πυξίδα
@@ -699,16 +699,14 @@ class TrackTab(Tab):
             if not imu.IMURead():
                 return None
             data = imu.getIMUData()
-            roll, pitch, yaw = (math.degrees(v) for v in data["fusionPose"])
             mag = self.app.hard_iron.correct(dict(zip("xyz", data["compass"]))) if use_mag else None
-            return (dict(zip("xyz", data["accel"])), {"roll": roll, "pitch": pitch, "yaw": yaw},
-                    dict(zip("xyz", data["gyro"])), mag, data["timestamp"] / 1e6)
-        # Χωρίς πρόσβαση στο RTIMULib (π.χ. sense_emu): τρεις αναγνώσεις, χρόνος από το νήμα
-        orientation = self.sense.get_orientation()
+            return (dict(zip("xyz", data["accel"])), dict(zip("xyz", data["gyro"])), mag,
+                    data["timestamp"] / 1e6)
+        # Χωρίς πρόσβαση στο RTIMULib (π.χ. sense_emu): δύο ή τρεις αναγνώσεις, χρόνος από το νήμα
         accel = self.sense.get_accelerometer_raw()
         gyro = self.sense.get_gyroscope_raw()
         mag = self.app.read_magnet() if use_mag else None
-        return accel, orientation, gyro, mag, None
+        return accel, gyro, mag, None
 
     def toggle(self):
         # Start / Stop: πορτοκαλί όσο καταγράφει

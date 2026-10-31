@@ -21,10 +21,10 @@
     view = TrackView(canvas)
     view.draw(tracker.snapshot())
 
-read_sample() επιστρέφει (accel σε g, orientation σε μοίρες, gyro σε rad/s, mag σε µT ή None,
-timestamp σε s ή None), όλα με τη σύμβαση της Sense HAT, ή None αν δεν υπάρχει νέο δείγμα.
-Το orientation (του RTIMULib) δεν χρησιμοποιείται από τον Tracker: αργεί να συγκλίνει
-(π.χ. ~13° λάθος στο Start -> 0.23 g βαρύτητα που δεν αφαιρείται).
+read_sample() επιστρέφει (accel σε g, gyro σε rad/s, mag σε µT ή None, timestamp σε s ή None),
+όλα με τη σύμβαση της Sense HAT, ή None αν δεν υπάρχει νέο δείγμα.
+Ο προσανατολισμός του RTIMULib δεν χρειάζεται: ο Tracker έχει δική του κλίση, γιατί του RTIMULib
+αργεί να συγκλίνει (π.χ. ~13° λάθος στο Start -> 0.23 g βαρύτητα που δεν αφαιρείται).
 
 Heading (σύστημα αξόνων του γραφήματος):
 - board:   άξονες της πλακέτας (πάνω = μπροστά). Η πλακέτα δεν πρέπει να στρίβει.
@@ -145,6 +145,8 @@ class Tracker:
             self.gyro_bias = [0.0, 0.0, 0.0]  # υπόλοιπο του gyroscope (rad/s), άξονες της πλακέτας
             self._segment_heading = None     # heading στην αρχή της κίνησης
             self.gyro_heading = None     # μοίρες, για heading_mode "gyro" (αρχή από την πυξίδα)
+            self._gyro_start = None      # πότε ξεκίνησε το gyro_heading
+            self._compass_sum = [0.0, 0.0]  # άθροισμα cos/sin της πυξίδας για τον μέσο όρο της αρχής
             self.heading = None
             self.rate = 0.0              # δείγματα ανά δευτερόλεπτο
             self.corrections = 0         # πόσες κινήσεις διορθώθηκαν (drift) στις στάσεις
@@ -156,7 +158,7 @@ class Tracker:
             self._last_accel = None
             self._segment = None         # κίνηση σε εξέλιξη: χρόνος, δείκτης διαδρομής, απόσταση στην αρχή
 
-    def update(self, accel, orientation, gyro, mag, now):
+    def update(self, accel, gyro, mag, now):
         acc_b = (accel["x"], accel["y"], accel["z"])
         gyro_raw = (gyro["x"], gyro["y"], gyro["z"])
         with self.lock:
@@ -196,9 +198,20 @@ class Tracker:
                 self.heading = compass_heading
             elif self.heading_mode == "gyro":
                 if self.gyro_heading is None:
-                    # Αρχική κατεύθυνση από την πυξίδα (αν υπάρχει), μετά μόνο το gyroscope
                     self.gyro_heading = compass_heading if compass_heading is not None else 0.0
-                self.gyro_heading -= YAW_SIGN * math.degrees(yaw_rate) * dt
+                    self._gyro_start = now
+                    self._compass_sum = [0.0, 0.0]
+                # Αρχική κατεύθυνση: μέσος όρος της πυξίδας (κυκλικός, σωστός και γύρω από 0°/360°)
+                # στο πρώτο START_STILL όσο η πλακέτα είναι ακίνητη, ώστε μια ανάγνωση με μέταλλο
+                # κοντά να μη στρέφει όλη τη διαδρομή. Μετά (ή με την πρώτη κίνηση) μόνο το gyroscope
+                if (compass_heading is not None and self.still
+                        and now - self._gyro_start < START_STILL):
+                    r = math.radians(compass_heading)
+                    self._compass_sum[0] += math.cos(r)
+                    self._compass_sum[1] += math.sin(r)
+                    self.gyro_heading = math.degrees(math.atan2(self._compass_sum[1], self._compass_sum[0]))
+                else:
+                    self.gyro_heading -= YAW_SIGN * math.degrees(yaw_rate) * dt
                 self.heading = self.gyro_heading % 360.0
             else:
                 self.heading = None
@@ -344,9 +357,9 @@ class TrackSampler:
                 if sample is None:
                     time.sleep(self.poll)
                     continue
-                accel, orientation, gyro, mag, timestamp = sample
+                accel, gyro, mag, timestamp = sample
                 now = time.monotonic() if timestamp is None else timestamp
-                self.tracker.update(accel, orientation, gyro, mag, now)
+                self.tracker.update(accel, gyro, mag, now)
             except Exception as e:  # π.χ. σφάλμα I2C: σταματάει και το δείχνει το GUI
                 self.error = e
                 self._running = False
