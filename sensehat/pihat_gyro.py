@@ -389,8 +389,13 @@ class CompassTab(Tab):
             hard_iron.start()
             button.config(relief=tk.SUNKEN, bg="orange", activebackground="orange")
             return
-        updated = hard_iron.stop()
         button.config(relief=tk.RAISED, **self.hard_iron_colors)
+        try:
+            updated = hard_iron.stop()
+        except OSError as e:
+            messagebox.showerror("Hard-iron calibration",
+                                 f"The new offsets are used, but could not be saved:\n{e}")
+            return
         if not updated:
             messagebox.showwarning("Hard-iron calibration",
                                    "Not enough rotation, the previous calibration is kept.\n"
@@ -521,11 +526,12 @@ class AccelerometerTab(VectorTab):
 
     def __init__(self, app):
         # Raw = μέτρηση όπως είναι (με τη βαρύτητα), Linear = χωρίς βαρύτητα σε X, Y, Z
-        # (module acceleration, με την κλίση από gyroscope + accelerometer).
-        # Χωρίς Sense HAT δεν υπάρχει προσανατολισμός για την αφαίρεση, οπότε μόνο Raw.
+        # (acceleration.GravityTracker: βαρύτητα μετρημένη στις στάσεις, gyroscope στην κίνηση).
+        # Χωρίς Sense HAT δεν υπάρχει gyroscope για την αφαίρεση, οπότε μόνο Raw.
         self.mode = None
         super().__init__(app)
         self.mode = tk.StringVar(value="raw")
+        self.gravity_tracker = acceleration.GravityTracker()
         # Διόρθωση υπολοίπου στο Linear: Zero = μέσος όρος ~1 s με την πλακέτα ακίνητη,
         # Auto-zero = αργό φίλτρο που αφαιρεί συνεχώς ό,τι μένει σταθερό
         self.correction = acceleration.ResidualCorrection()
@@ -558,16 +564,17 @@ class AccelerometerTab(VectorTab):
         return self.mode is not None and self.mode.get() == "linear"
 
     def imu_config(self):
-        # Raw: μόνο επιταχυνσιόμετρο. Linear: + gyroscope, για τον προσανατολισμό
+        # Raw: μόνο επιταχυνσιόμετρο. Linear: + gyroscope, για την κλίση στην κίνηση
         return False, self.linear(), True
 
     def update(self):
         # Επιταχυνσιόμετρο σε g (Sense HAT) ή οι sliders, κάθε 50 ms.
-        # Linear: αφαίρεση της βαρύτητας με την κλίση από το get_orientation()
+        # Linear: αφαίρεση της βαρύτητας με δική του κλίση (όχι το get_orientation(), που μετά
+        # από αλλαγή tab χρειάζεται χρόνο να ηρεμήσει και αφήνει 0.1-0.2 g βαρύτητας)
         if self.sense is not None:
             raw = self.sense.get_accelerometer_raw()
             if self.linear():
-                raw = acceleration.remove_gravity(raw, self.sense.get_orientation())
+                raw = self.gravity_tracker.update(raw, self.sense.get_gyroscope_raw())
                 raw = self.correction.apply(raw)
                 if not self.correction.zeroing:
                     self.zero_button.config(**self.zero_colors)
@@ -592,7 +599,8 @@ class AccelerometerTab(VectorTab):
                                            font=self.app.bold_font if warn else "TkDefaultFont")
 
     def _on_mode(self):
-        # Αλλαγή Raw/Linear: νέες ρυθμίσεις IMU, και το υπόλοιπο μετριέται από την αρχή
+        # Αλλαγή Raw/Linear: νέες ρυθμίσεις IMU, και κλίση/υπόλοιπο μετριούνται από την αρχή
+        self.gravity_tracker.reset()
         self.correction.reset()
         self.gravity_check.reset()
         self.zero_button.config(**self.zero_colors)
@@ -840,17 +848,24 @@ class PiHatGyroApp:
         # Ένταση πεδίου |B| με προειδοποίηση όταν ένας μαγνήτης είναι πολύ κοντά:
         # πορτοκαλί πάνω από FIELD_WARN, κόκκινο με "too close!" πάνω από FIELD_DANGER,
         # και στις δύο περιπτώσεις με έντονη γραμματοσειρά
-        # (εκεί κοντινά ατσάλινα μέρη μπορεί να μαγνητιστούν -> νέο hard-iron offset)
+        # (εκεί κοντινά ατσάλινα μέρη μπορεί να μαγνητιστούν -> νέο hard-iron offset).
+        # Το raw είναι διορθωμένο με το hard-iron (το γήινο πεδίο, ~25-65 µT), αλλά η προειδοποίηση
+        # κρίνεται από το πεδίο που βλέπει ο αισθητήρας, χωρίς τη διόρθωση (sensor), που
+        # φαίνεται κι αυτό όταν υπάρχει προειδοποίηση
         field = None if raw is None else xyz_force.magnitude(raw)
+        sensor = field
+        if raw is not None and self.sense is not None:
+            sensor = xyz_force.magnitude(self.hard_iron.uncorrected(raw))
         if field is None:
             var.set(f"{title}: ---")
-        elif field > FIELD_DANGER:
-            var.set(f"{title}: {field:.1f} µT  too close!")
         else:
-            var.set(f"{title}: {field:.1f} µT")
-        if field is not None and field > FIELD_DANGER:
+            text = f"{title}: {field:.1f} µT"
+            if sensor > FIELD_WARN and abs(sensor - field) >= 0.05:
+                text += f" (sensor {sensor:.0f})"
+            var.set(text + ("  too close!" if sensor > FIELD_DANGER else ""))
+        if field is not None and sensor > FIELD_DANGER:
             label.config(fg="red", font=self.bold_font)
-        elif field is not None and field > FIELD_WARN:
+        elif field is not None and sensor > FIELD_WARN:
             label.config(fg=FIELD_WARN_COLOR, font=self.bold_font)
         else:
             label.config(fg="black", font="TkDefaultFont")

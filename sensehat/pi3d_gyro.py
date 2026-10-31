@@ -59,7 +59,8 @@ from pi3d.constants import (GL_FRAMEBUFFER, GL_RENDERBUFFER, GL_COLOR_ATTACHMENT
                             GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT16, GL_TEXTURE_2D,
                             GL_TEXTURE_MIN_FILTER, GL_TEXTURE_MAG_FILTER, GL_NEAREST,
                             GL_RGBA, GL_UNSIGNED_BYTE, GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT,
-                            GLuint, GLclampf, GLint, GLsizei, GL_COMPILE_STATUS, GL_LINK_STATUS)
+                            GLuint, GLclampf, GLint, GLsizei, GL_COMPILE_STATUS, GL_LINK_STATUS,
+                            GL_FRAMEBUFFER_COMPLETE)
 
 # Το παράθυρο του pi3d δεν χρειάζεται (η εικόνα έρχεται από offscreen framebuffer).
 # False για να φαίνεται, π.χ. για debug
@@ -106,7 +107,12 @@ class ViewFramebuffer:
         gl.glBindFramebuffer(GL_FRAMEBUFFER, self.fbo)
         gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.color, 0)
         gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, self.depth)
+        # Αν η GPU δεν δέχεται αυτόν τον συνδυασμό, η εικόνα θα έβγαινε μαύρη χωρίς μήνυμα
+        status = gl.glCheckFramebufferStatus(GL_FRAMEBUFFER)
         gl.glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        if status != GL_FRAMEBUFFER_COMPLETE:
+            self.delete()
+            raise RuntimeError(f"Offscreen framebuffer {w}x{h} is incomplete (status 0x{status:X})")
 
     def begin(self):
         gl = pi3d.opengles
@@ -509,6 +515,7 @@ class GyroScene:
         d = self.pi3d_display
         if self.offscreen is not None:
             self.offscreen.delete()
+            self.offscreen = None  # ώστε να μη σβηστεί ξανά αν το νέο αποτύχει
         self.offscreen = ViewFramebuffer(w, h)
         self.offscreen_size = (w, h)
         # Νέο aspect ratio στην προβολή ώστε το σχήμα να μην παραμορφώνεται

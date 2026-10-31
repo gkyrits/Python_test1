@@ -1,22 +1,31 @@
 """Γραμμική επιτάχυνση: αφαίρεση της βαρύτητας από το επιταχυνσιόμετρο.
 
 Το επιταχυνσιόμετρο μετράει βαρύτητα + πραγματική επιτάχυνση. Μόνο του δεν ξεχωρίζει
-κλίση από επιτάχυνση, γι' αυτό η κλίση (roll, pitch) έρχεται από το sense.get_orientation(),
-που συνδυάζει gyroscope + accelerometer (fusion του RTIMULib).
+κλίση από επιτάχυνση. Δύο τρόποι:
+
+- GravityTracker (Linear στο Accelerometer tab): δική του κλίση, όπως το Track. Στις στάσεις
+  η βαρύτητα είναι ακριβώς η μέτρηση (μέσος όρος), στην κίνηση την ακολουθεί το gyroscope.
+  Δεν περιμένει το fusion του RTIMULib να ηρεμήσει, και η βαθμονόμηση (|g| ≠ 1) δεν πειράζει.
+
+    tracker = GravityTracker()
+    linear = tracker.update(sense.get_accelerometer_raw(), sense.get_gyroscope_raw())
+
+- remove_gravity: με την κλίση (roll, pitch) από το sense.get_orientation() (fusion του
+  RTIMULib). Σφάλμα 1° στον προσανατολισμό αφήνει ~0.017 g βαρύτητας στο αποτέλεσμα.
 
     linear = remove_gravity(sense.get_accelerometer_raw(), sense.get_orientation())
 
 Με την πλακέτα ακίνητη το linear είναι ≈ 0 σε X, Y, Z, σε οποιαδήποτε κλίση.
-Σφάλμα 1° στον προσανατολισμό αφήνει ~0.017 g βαρύτητας στο αποτέλεσμα.
 
 Το υπόλοιπο (offset/κλίμακα του αισθητήρα, καθυστέρηση του fusion) αφαιρείται με το
 ResidualCorrection: Zero (μέσος όρος ~1 s με την πλακέτα ακίνητη) ή Auto-zero (αργό φίλτρο).
 
     correction = ResidualCorrection()
-    linear = correction.apply(remove_gravity(...))
+    linear = correction.apply(tracker.update(...))
 """
 import math
 import time
+from collections import deque
 
 AXES = ("x", "y", "z")
 
@@ -40,6 +49,84 @@ def remove_gravity(accel, orientation):
     # Γραμμική επιτάχυνση (g) = μέτρηση - βαρύτητα, και στους τρεις άξονες
     gravity = gravity_vector(orientation)
     return {axis: accel[axis] - gravity[axis] for axis in AXES}
+
+
+# Ακινησία για το GravityTracker (ίδια λογική με το track.py): σε παράθυρο STILL_TIME η
+# επιτάχυνση και η περιστροφή σχεδόν δεν αλλάζουν, όσο μεγάλο κι αν είναι το offset
+STILL_TIME = 0.3        # s
+STILL_ACCEL_STD = 0.01  # g
+STILL_GYRO_STD = 0.03   # rad/s
+GRAVITY_TAU = 0.3       # s, μέσος όρος της βαρύτητας και του υπολοίπου του gyroscope σε ηρεμία
+MAX_GAP = 0.5           # s, μεγαλύτερο κενό ανάμεσα σε δείγματα = νέα αρχή (π.χ. αλλαγή tab)
+
+
+def _std(values):
+    mean = sum(values) / len(values)
+    return math.sqrt(sum((v - mean) ** 2 for v in values) / len(values))
+
+
+def rotate_into_body(vector, omega, dt):
+    # Ένα σταθερό διάνυσμα (π.χ. η βαρύτητα) στους άξονες της πλακέτας, αφού η πλακέτα
+    # περιστράφηκε με omega (rad/s, άξονες πλακέτας) για dt: περιστροφή κατά -omega·dt (Rodrigues).
+    # Ίδια σύμβαση με το track.rotate_by_gyro, που ελέγχθηκε στο Pi
+    angle = math.sqrt(sum(w * w for w in omega)) * dt
+    if angle < 1e-12:
+        return list(vector)
+    k = [w * dt / angle for w in omega]
+    v = vector
+    cross = (k[1] * v[2] - k[2] * v[1], k[2] * v[0] - k[0] * v[2], k[0] * v[1] - k[1] * v[0])
+    dot = sum(k[i] * v[i] for i in range(3))
+    c, s = math.cos(angle), math.sin(angle)
+    return [v[i] * c - cross[i] * s + k[i] * dot * (1.0 - c) for i in range(3)]
+
+
+class GravityTracker:
+    # Γραμμική επιτάχυνση με δική του κλίση: η βαρύτητα στους άξονες της πλακέτας μετριέται
+    # όσο η πλακέτα είναι ακίνητη (μέσος όρος της μέτρησης) και στην κίνηση γυρίζει με το
+    # gyroscope (χωρίς το υπόλοιπό του, που μετριέται κι αυτό στις στάσεις).
+    # Σταθερή επιτάχυνση χωρίς καμία αλλαγή για πάνω από STILL_TIME μοιάζει με ακινησία
+    # και αφαιρείται σαν βαρύτητα.
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.gravity = None              # g, άξονες της πλακέτας
+        self.gyro_bias = [0.0, 0.0, 0.0]  # rad/s
+        self.still = True
+        self._window = deque()           # (χρόνος, ax, ay, az, gx, gy, gz)
+        self._last_time = None
+
+    def update(self, accel, gyro, now=None):
+        # accel σε g, gyro σε rad/s (sense.get_accelerometer_raw / get_gyroscope_raw)
+        now = time.monotonic() if now is None else now
+        a = [accel[axis] for axis in AXES]
+        w = [gyro[axis] for axis in AXES]
+        dt = None if self._last_time is None else now - self._last_time
+        self._last_time = now
+        if self.gravity is None or dt is None or dt <= 0 or dt > MAX_GAP:
+            # Αρχή (ή μετά από κενό): η πλακέτα θεωρείται ακίνητη μέχρι να γεμίσει το παράθυρο
+            self.gravity = list(a)
+            self._window.clear()
+            dt = 0.0
+
+        self._window.append([now] + a + w)
+        while self._window[0][0] < now - STILL_TIME:
+            self._window.popleft()
+        full = self._window[-1][0] - self._window[0][0] >= STILL_TIME * 0.8
+        steady = (full and max(_std([s[i] for s in self._window]) for i in (1, 2, 3)) < STILL_ACCEL_STD
+                  and max(_std([s[i] for s in self._window]) for i in (4, 5, 6)) < STILL_GYRO_STD)
+        self.still = steady or not full
+
+        if self.still:
+            alpha = 1.0 if dt == 0.0 else dt / (GRAVITY_TAU + dt)
+            for i in range(3):
+                self.gravity[i] += alpha * (a[i] - self.gravity[i])
+                if dt > 0.0:
+                    self.gyro_bias[i] += alpha * (w[i] - self.gyro_bias[i])
+        else:
+            omega = [w[i] - self.gyro_bias[i] for i in range(3)]
+            self.gravity = rotate_into_body(self.gravity, omega, dt)
+        return {axis: a[i] - self.gravity[i] for i, axis in enumerate(AXES)}
 
 
 class GravityCheck:

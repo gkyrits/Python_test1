@@ -82,11 +82,16 @@ class HardIronCalibration:
                 self.record[axis] = (min(low, raw[axis]), max(high, raw[axis]))
         return {axis: raw[axis] - self.offsets[axis] for axis in AXES}
 
+    def uncorrected(self, corrected):
+        # Η αρχική ανάγνωση από μια διορθωμένη: το πεδίο που βλέπει πραγματικά ο αισθητήρας
+        return {axis: corrected[axis] + self.offsets[axis] for axis in AXES}
+
     def start(self):
         self.record = {axis: (math.inf, -math.inf) for axis in AXES}
 
     def stop(self):
-        # Τέλος καταγραφής: επιστρέφει τους άξονες που βαθμονομήθηκαν ([] = καμία αλλαγή)
+        # Τέλος καταγραφής: επιστρέφει τους άξονες που βαθμονομήθηκαν ([] = καμία αλλαγή).
+        # Τα νέα offsets ισχύουν αμέσως· αν η αποθήκευση αποτύχει, πετάει OSError
         record, self.record = self.record, None
         if record is None:
             return []
