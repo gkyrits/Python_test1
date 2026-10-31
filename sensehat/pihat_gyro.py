@@ -232,11 +232,17 @@ class GyroscopeTab(Tab):
         # Χωρίς Sense HAT οι sliders δίνουν τις τιμές, αλλιώς είναι μια περιστροφή
         # offset που εφαρμόζεται πριν από αυτή του αισθητήρα: R = R_offset · R_sensor
         orientation = {name: var.get() for name, var in self.scale_vars.items()}
+        scene_orientation = None
         if self.sense is not None:
             self.sensor = self.sense.get_orientation()
             orientation = matrix_to_euler(euler_to_matrix(orientation) @ euler_to_matrix(self.sensor))
+            # Το φόντο 360° δείχνει τον πραγματικό κόσμο: η κλίση του αισθητήρα χωρίς τα offsets (C),
+            # και yaw = heading της πλακέτας ως προς τον Βορρά (+ το Compass offset του "sense compass",
+            # όπως στο Compass tab), ώστε το N της φωτογραφίας να είναι ο Βορράς
+            scene_orientation = dict(self.sensor)
+            scene_orientation["yaw"] += self.app.compass_offsets.values["fusion"]
 
-        image = self.scene.render(orientation, self.view_size)
+        image = self.scene.render(orientation, self.view_size, scene_orientation)
         if image is None:  # η 3D σκηνή έκλεισε
             self.app.close()
             return False
@@ -793,7 +799,7 @@ class PiHatGyroApp:
         self.track_tab = TrackTab(self)
         self.tabs = (self.gyro_tab, self.compass_tab, self.magnet_tab, self.accel_tab, self.track_tab)
 
-        self.notebook.bind("<<NotebookTabChanged>>", lambda event: self.apply_imu_config())
+        self.notebook.bind("<<NotebookTabChanged>>", lambda event: self._on_tab_changed())
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         for tab in self.tabs:
             self._run(tab)
@@ -817,6 +823,14 @@ class PiHatGyroApp:
                     tab.error = error
                     self.root.title(f"{WINDOW_TITLE} - {tab.title} error: {error}")
         self.root.after(tab.period, lambda: self._run(tab))
+
+    def _on_tab_changed(self):
+        # Το σφάλμα στον τίτλο αφορά το tab που έφυγε (δεν τρέχει πια): καθαρίζει,
+        # και ξαναγράφεται αν το νέο tab έχει κι αυτό σφάλμα
+        for tab in self.tabs:
+            tab.error = None
+        self.root.title(WINDOW_TITLE)
+        self.apply_imu_config()
 
     def selected_tab(self):
         widget = self.notebook.nametowidget(self.notebook.select())
@@ -851,7 +865,7 @@ class PiHatGyroApp:
         # (εκεί κοντινά ατσάλινα μέρη μπορεί να μαγνητιστούν -> νέο hard-iron offset).
         # Το raw είναι διορθωμένο με το hard-iron (το γήινο πεδίο, ~25-65 µT), αλλά η προειδοποίηση
         # κρίνεται από το πεδίο που βλέπει ο αισθητήρας, χωρίς τη διόρθωση (sensor), που
-        # φαίνεται κι αυτό όταν υπάρχει προειδοποίηση
+        # φαίνεται σε παρένθεση όταν υπάρχει προειδοποίηση, π.χ. "|B|: 47.2 µT (159)"
         field = None if raw is None else xyz_force.magnitude(raw)
         sensor = field
         if raw is not None and self.sense is not None:
@@ -861,8 +875,8 @@ class PiHatGyroApp:
         else:
             text = f"{title}: {field:.1f} µT"
             if sensor > FIELD_WARN and abs(sensor - field) >= 0.05:
-                text += f" (sensor {sensor:.0f})"
-            var.set(text + ("  too close!" if sensor > FIELD_DANGER else ""))
+                text += f" ({sensor:.0f})"
+            var.set(text + (" too close!" if sensor > FIELD_DANGER else ""))
         if field is not None and sensor > FIELD_DANGER:
             label.config(fg="red", font=self.bold_font)
         elif field is not None and sensor > FIELD_WARN:

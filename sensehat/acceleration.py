@@ -58,6 +58,7 @@ STILL_ACCEL_STD = 0.01  # g
 STILL_GYRO_STD = 0.03   # rad/s
 GRAVITY_TAU = 0.3       # s, μέσος όρος της βαρύτητας και του υπολοίπου του gyroscope σε ηρεμία
 MAX_GAP = 0.5           # s, μεγαλύτερο κενό ανάμεσα σε δείγματα = νέα αρχή (π.χ. αλλαγή tab)
+MIN_SAMPLES = 3         # δείγματα για να κριθεί η ακινησία (πριν γεμίσει το παράθυρο)
 
 
 def _std(values):
@@ -104,7 +105,7 @@ class GravityTracker:
         dt = None if self._last_time is None else now - self._last_time
         self._last_time = now
         if self.gravity is None or dt is None or dt <= 0 or dt > MAX_GAP:
-            # Αρχή (ή μετά από κενό): η πλακέτα θεωρείται ακίνητη μέχρι να γεμίσει το παράθυρο
+            # Αρχή (ή μετά από κενό): η βαρύτητα από την πρώτη μέτρηση
             self.gravity = list(a)
             self._window.clear()
             dt = 0.0
@@ -112,16 +113,20 @@ class GravityTracker:
         self._window.append([now] + a + w)
         while self._window[0][0] < now - STILL_TIME:
             self._window.popleft()
+        # Ακινησία κρίνεται ήδη από MIN_SAMPLES δείγματα, ώστε κίνηση στην αρχή (μετά από αλλαγή
+        # tab ή Linear) να φαίνεται αμέσως και να μην μπαίνει στη βαρύτητα. Το υπόλοιπο του
+        # gyroscope μετριέται μόνο με γεμάτο παράθυρο (σίγουρη ακινησία)
         full = self._window[-1][0] - self._window[0][0] >= STILL_TIME * 0.8
-        steady = (full and max(_std([s[i] for s in self._window]) for i in (1, 2, 3)) < STILL_ACCEL_STD
+        steady = (len(self._window) >= MIN_SAMPLES
+                  and max(_std([s[i] for s in self._window]) for i in (1, 2, 3)) < STILL_ACCEL_STD
                   and max(_std([s[i] for s in self._window]) for i in (4, 5, 6)) < STILL_GYRO_STD)
-        self.still = steady or not full
+        self.still = steady or len(self._window) < MIN_SAMPLES
 
         if self.still:
             alpha = 1.0 if dt == 0.0 else dt / (GRAVITY_TAU + dt)
             for i in range(3):
                 self.gravity[i] += alpha * (a[i] - self.gravity[i])
-                if dt > 0.0:
+                if steady and full:
                     self.gyro_bias[i] += alpha * (w[i] - self.gyro_bias[i])
         else:
             omega = [w[i] - self.gyro_bias[i] for i in range(3)]

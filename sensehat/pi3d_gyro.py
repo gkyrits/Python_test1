@@ -515,14 +515,19 @@ class GyroScene:
         d = self.pi3d_display
         if self.offscreen is not None:
             self.offscreen.delete()
-            self.offscreen = None  # ώστε να μη σβηστεί ξανά αν το νέο αποτύχει
+            # Ώστε αν το νέο αποτύχει να μη σβηστεί ξανά, και το επόμενο render να ξαναδοκιμάσει
+            # (ακόμα κι αν ζητηθεί πάλι το παλιό μέγεθος)
+            self.offscreen = None
+            self.offscreen_size = None
         self.offscreen = ViewFramebuffer(w, h)
         self.offscreen_size = (w, h)
         # Νέο aspect ratio στην προβολή ώστε το σχήμα να μην παραμορφώνεται
         self.camera.reset(lens=[d.near, d.far, d.fov, w / float(h)])
 
-    def render(self, orientation, size):
-        # Σχεδιάζει το σχήμα με τον δοσμένο προσανατολισμό και επιστρέφει την εικόνα
+    def render(self, orientation, size, scene_orientation=None):
+        # Σχεδιάζει το σχήμα με τον δοσμένο προσανατολισμό και επιστρέφει την εικόνα.
+        # scene_orientation: ο προσανατολισμός για το φόντο 360° αν διαφέρει από του σχήματος
+        # (π.χ. ο πραγματικός, με yaw ως προς τον Βορρά, ενώ το σχήμα δείχνει τον βαθμονομημένο)
         if size != self.offscreen_size:
             self._resize_view(*size)
         if not self.pi3d_display.loop_running():
@@ -536,7 +541,7 @@ class GyroScene:
         pi3d.opengles.glClearColor(*(GLclampf(c) for c in self.view.background))
         self.offscreen.begin()
         if self.scene_visible:
-            self.scene.draw(orientation, self.camera)
+            self.scene.draw(scene_orientation or orientation, self.camera)
         self.yaw_node.draw(self.view.shader, camera=self.camera)
         image = self.offscreen.read_pixels()
         self.offscreen.end()
