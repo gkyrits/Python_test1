@@ -29,9 +29,10 @@ mainWin = None
 class main_win:
     _TEXT_LABEL = "Available Cameras"
     _CAM_INF_PRE = "cam "
-    cam_inst = [None,None,None,None]
+    _MAX_CAMS = 4
 
     def __init__(self,cam_info):
+        self.cam_inst = [None] * self._MAX_CAMS
         self.curr_caminfo = cam_info
         ####
         self.root = tk.Tk()
@@ -45,7 +46,8 @@ class main_win:
         #add cam ListBox ------
         cbx_entries = self.__get_list_items(cam_info,self._CAM_INF_PRE)
         self.cbx = tk2.ComboBox(frm2, label_text='Camera:', labelpos='w', listheight=60, dropdown=1, scrolledlist_items=cbx_entries)
-        self.cbx.selectitem(cbx_entries[0])
+        if cbx_entries:
+            self.cbx.selectitem(cbx_entries[0])
         self.cbx.pack(side=tk.LEFT)
         frm2.pack(side=tk.BOTTOM, anchor=tk.W, pady=5)
         #add test frm ======
@@ -111,15 +113,22 @@ class main_win:
         #update ComboBox
         cbx_entries = self.__get_list_items(cam_info,self._CAM_INF_PRE)
         self.cbx.setlist(cbx_entries)
-        self.cbx.selectitem(cbx_entries[0])
+        if cbx_entries:
+            self.cbx.selectitem(cbx_entries[0])
+        else:
+            self.cbx.component('entryfield').clear()
 
 
 
     def __open_btn(self):
         print('\nopen button:')
-        cbxIdx = self.cbx.component('scrolledlist').curselection()[0]
-        if cbxIdx > len(self.cam_inst) :
-            print('Too many comeras')
+        cbxSel = self.cbx.component('scrolledlist').curselection()
+        if not cbxSel:
+            print('No camera selected')
+            return
+        cbxIdx = cbxSel[0]
+        if cbxIdx >= len(self.cam_inst) :
+            print('Too many cameras')
             return
         print('Select idx:'+str(cbxIdx))
         cam_model =  self.curr_caminfo[cbxIdx]['Model']
@@ -135,7 +144,11 @@ class main_win:
             else:
                 # Window was closed, clean up the reference
                 self.cam_inst[cbxIdx] = None
-        self.cam_inst[cbxIdx] = cam.camera_win(cbxIdx, cam_model, cam_num)
+        self.cam_inst[cbxIdx] = cam.camera_win(cbxIdx, cam_model, cam_num, on_close=self.__cam_closed)
+
+
+    def __cam_closed(self, idx):
+        self.cam_inst[idx] = None
 
 
     def run(self):

@@ -27,7 +27,7 @@ cam_options = {
         "fname_incnum": False
     },
     "stream": {
-        "type": "FFMPEG HSL",
+        "type": "FFMPEG HLS",
         "quality": "medium",
         "size": (640, 480)
     }
@@ -61,7 +61,7 @@ class options_win:
         self.video_fname_incnum = tk.BooleanVar(value=False)
         self.video_audio_sync = tk.DoubleVar(value=2.0)
         #sream variables
-        self.stream_type = tk.StringVar(value="FFMPEG HSL")
+        self.stream_type = tk.StringVar(value="FFMPEG HLS")
         self.stream_quality = tk.StringVar(value="medium")
         self.stream_size = (640,480)
         #load options from file
@@ -248,7 +248,7 @@ class options_win:
     def stream_type_fnc(self,parent):
         frm=tk.Frame(parent, relief=tk.GROOVE,  borderwidth=2)
         tk.Label(frm, text="Stream Type").pack(side=tk.TOP, anchor=tk.W)
-        cbx_entries = ['FFMPEG HSL (web/vlc: http://<PI>:8000/stream.m3u8)', 
+        cbx_entries = ['FFMPEG HLS (web/vlc: http://<PI>:8000/stream.m3u8)', 
                        'FFMPEG DASH (web/vlc: http://<PI>:8000/stream.mpd)',
                        'FFMPEG UDP (vlc: udp://@:8000)',
                        'UDP (vlc: udp://@:8000 or udp/h264://@:8000)',

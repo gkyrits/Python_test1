@@ -5,6 +5,11 @@ import time, io
 
 PORT = 8000
 
+#reuse the port while old connections are still in TIME_WAIT
+class ReuseTCPServer(socketserver.TCPServer):
+    allow_reuse_address = True
+
+
 class simpleServer:
     def __init__(self,port=PORT):
         self.port=port
@@ -13,15 +18,18 @@ class simpleServer:
 
     def start(self):
         handler = http.server.SimpleHTTPRequestHandler
-        self.httpd = socketserver.TCPServer(("", self.port), handler)
+        self.httpd = ReuseTCPServer(("", self.port), handler)
         print(f"Web Server start at port {self.port}")
-        self.thread=thrd.Thread(target=self.httpd.serve_forever)
+        self.thread=thrd.Thread(target=self.httpd.serve_forever, daemon=True)
         self.thread.start()
 
     def stop(self):
         if self.httpd:
             self.httpd.shutdown()
             self.thread.join()
+            #shutdown() only stops serve_forever, the port is freed by server_close()
+            self.httpd.server_close()
+            self.httpd = None
             print("Web Server stop.")
 
 
@@ -42,11 +50,18 @@ PAGE = """\
 class StreamingOutput(io.BufferedIOBase):
     def __init__(self):
         self.frame = None
+        self.stopped = False
         self.condition = thrd.Condition()
 
     def write(self, buf):
         with self.condition:
             self.frame = buf
+            self.condition.notify_all()
+
+    #wake the waiting stream handlers so they close their clients
+    def end(self):
+        with self.condition:
+            self.stopped = True
             self.condition.notify_all()
 
 
@@ -70,12 +85,16 @@ class StreamingHandler(http.server.BaseHTTPRequestHandler):
             self.send_header('Pragma', 'no-cache')
             self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=FRAME')
             self.end_headers()
+            stream = outStream
             try:
                 while True:
-                    global outStream
-                    with outStream.condition:
-                        outStream.condition.wait()
-                        frame = outStream.frame
+                    with stream.condition:
+                        if not stream.stopped:
+                            stream.condition.wait()
+                        if stream.stopped:
+                            print('Stream stopped for client %s' % (self.client_address,))
+                            break
+                        frame = stream.frame
                     self.wfile.write(b'--FRAME\r\n')
                     self.send_header('Content-Type', 'image/jpeg')
                     self.send_header('Content-Length', len(frame))
@@ -99,6 +118,7 @@ class pageServer:
         global outStream
         self.port=port
         outStream=output
+        self.output=output
         self.server = None
         self.thread=None
 
@@ -107,12 +127,16 @@ class pageServer:
         address = ('', self.port)
         self.server = StreamingServer(address, StreamingHandler)
         print(f"Page Server start at port {self.port}")
-        self.thread=thrd.Thread(target=self.server.serve_forever)
+        self.thread=thrd.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
 
 
     def stop(self):
         if self.server:
+            self.output.end()
             self.server.shutdown()
             self.thread.join()
+            #shutdown() only stops serve_forever, the port is freed by server_close()
+            self.server.server_close()
+            self.server = None
             print("Page Server stop.")
