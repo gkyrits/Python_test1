@@ -1,5 +1,11 @@
+
+import os
 import tkinter as tk
-from tkinter import ttk
+from tkinter import Image, ttk
+from tkinter import filedialog
+import PIL.Image as Image
+import PIL.ImageTk as ImageTk
+
 
 class client_win:
     APP_TITLE = "Test Client"
@@ -11,8 +17,13 @@ class client_win:
         self.ipStr = tk.StringVar(value=self.IP)
         self.portStr = tk.StringVar(value=str(self.PORT))         
         self.root.title(self.APP_TITLE)
-        self.root.geometry("350x400+20+50")
+        self.root.geometry("350x500+20+50")
         self.root.configure(bg="#fffecb")
+        #configure notebook tab style - use alt theme which supports background colors better
+        style = ttk.Style()
+        style.theme_use('alt')
+        style.configure("TNotebook.Tab", background="#ebfdff", foreground="black", padding=[5, 2])
+        style.map("TNotebook.Tab", background=[("selected", "#b0f6fc")], foreground=[("selected", "black")])
         #top frame for server IP and port
         topfrm = tk.Frame(self.root, relief=tk.GROOVE, borderwidth=2)
         tk.Label(topfrm, text="Server IP:").pack(side=tk.LEFT, padx=5, pady=5)
@@ -64,9 +75,57 @@ class client_win:
         #add a second sample tab to the notebook
         tab2 = tk.Frame(self.notebook)        
         frm = tk.Frame(tab2, relief=tk.SUNKEN, borderwidth=1)
-        tk.Label(frm, text="Fotos").pack(padx=5, pady=5)
+        self.canvas = tk.Canvas(frm, bg="#c3c3c3")
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+        infoFrm = tk.Frame(frm, relief=tk.SOLID, borderwidth=1)
+        lblFrm = tk.Frame(infoFrm)
+        self.image_label = tk.Label(lblFrm, text="No image")
+        self.image_label.pack(side=tk.LEFT, padx=2)        
+        lblFrm.pack(side=tk.TOP, fill=tk.X)
+        btnFrm = tk.Frame(infoFrm)        
+        tk.Button(btnFrm, text="Load", height=1, width=8, command=self.load_button_click).pack(side=tk.LEFT, padx=(0,5), pady=2)
+        tk.Button(btnFrm, text="Send", height=1, width=8).pack(side=tk.LEFT, padx=(0,5), pady=2)
+        btnFrm.pack(side=tk.TOP, fill=tk.X, padx=2, pady=(0, 2))
+        infoFrm.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=2)
+        ttk.Progressbar(infoFrm, mode='determinate').pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
         frm.pack(fill=tk.BOTH, expand=True)
         return tab2
+
+
+    def load_pil_image(self, image_name):
+        try:
+            img = Image.open(image_name)
+            img = img.resize((self.canvas.winfo_width(), self.canvas.winfo_height()), resample = Image.BILINEAR)
+            return img
+        except Exception as e:
+            print(f"Error loading image: {e}")
+            return None
+
+
+    def get_file_info(self, file_name):
+        filesize = os.path.getsize(file_name)
+        file_info = f"{file_name}   Size:{filesize}"
+        print(f"Selected: {file_name}")     
+        self.image_label.config(text=file_info)
+        
+
+    def load_button_click(self):
+        # Implement the functionality for the Load button here
+        file_path = filedialog.askopenfile( title="Open File",
+                filetypes=[("Images", "*.png *.jpg *.jpeg"), ("All files", "*.*")] )
+        if file_path:
+            global tkimg
+            self.file_name = file_path.name
+            self.get_file_info(self.file_name)
+            self.canvas.delete("all")
+            #self.img = tk.PhotoImage(file=file_path.name)
+            img = self.load_pil_image(self.file_name)
+            if img is None:                
+                self.canvas.create_text(10, 10, anchor=tk.NW, text="No Supported Image File")
+                return
+            tkimg = ImageTk.PhotoImage(img)
+            self.canvas.create_image(0, 0, anchor=tk.NW, image=tkimg)
+
 
     def run(self):
         self.root.mainloop()
