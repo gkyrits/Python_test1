@@ -6,6 +6,7 @@ from tkinter import filedialog
 from tkinter import messagebox
 import PIL.Image as Image
 import PIL.ImageTk as ImageTk
+import socketwork
 
 
 class server_win:
@@ -47,11 +48,13 @@ class server_win:
         midfrm.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=5)
         #botton frame for connect button
         botfrm = tk.Frame(self.root, relief=tk.GROOVE, borderwidth=2)
-        self.connect_btn = tk.Button(botfrm, text="Start", height=1, width=10)
+        self.connect_btn = tk.Button(botfrm, text="Start", command=self.start_stop_server, height=1, width=10)
         self.connect_btn.pack(side=tk.RIGHT, padx=5, pady=5)
         botfrm.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
         #load options from file
         self.load_saved_path()
+        self.sockw = socketwork.ServerSock()
+
 
     def keys_tab(self):
         #add a sample tab to the notebook
@@ -77,6 +80,7 @@ class server_win:
         optKeyFrm.pack(side=tk.BOTTOM, fill=tk.X, pady=2)
         bodyfrm.pack(fill=tk.BOTH, expand=True)
         return tab1
+
 
     def foto_tab(self):
         #add a second sample tab to the notebook
@@ -222,6 +226,16 @@ class server_win:
         self.canvas.create_image(0, 0, anchor=tk.NW, image=tkimg)
 
 
+    def start_stop_server(self):
+        if not self.sockw.started():
+            port = int(self.portStr.get())
+            self.sockw.start(port)
+            self.connect_btn.config(text="Stop")
+        else:
+            self.sockw.stop()
+            self.connect_btn.config(text="Start")
+
+        
     def run(self):
         self.root.mainloop()
 
