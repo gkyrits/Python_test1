@@ -3,6 +3,7 @@ import os
 import tkinter as tk
 from tkinter import Image, ttk
 from tkinter import filedialog
+from tkinter import messagebox
 import PIL.Image as Image
 import PIL.ImageTk as ImageTk
 
@@ -11,8 +12,12 @@ class server_win:
     APP_TITLE = "Test Server"
     PORT = 8000
     IP = '127.0.0.1'
+    OPT_FILE = "server.opt"
 
     def __init__(self):
+        self.path_files = []
+        self.file_idx = 0
+        #initialize Form
         self.root = tk.Tk()        
         self.portStr = tk.StringVar(value=str(self.PORT))
         self.pathStr = tk.StringVar(value="No path")
@@ -45,6 +50,8 @@ class server_win:
         self.connect_btn = tk.Button(botfrm, text="Start", height=1, width=10)
         self.connect_btn.pack(side=tk.RIGHT, padx=5, pady=5)
         botfrm.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
+        #load options from file
+        self.load_saved_path()
 
     def keys_tab(self):
         #add a sample tab to the notebook
@@ -83,8 +90,10 @@ class server_win:
         self.image_label.pack(side=tk.LEFT, padx=2)        
         lblFrm.pack(side=tk.TOP, fill=tk.X)
         btnFrm = tk.Frame(infoFrm)        
-        tk.Button(btnFrm, text="Next", height=1, width=8).pack(side=tk.LEFT, padx=(0,5), pady=2)
-        tk.Button(btnFrm, text="Delete", height=1, width=8).pack(side=tk.LEFT, padx=(0,5), pady=2)
+        tk.Button(btnFrm, text="Next", height=1, width=8, command=self.load_next_image).pack(side=tk.LEFT, padx=(0,5), pady=2)
+        tk.Button(btnFrm, text="Delete", height=1, width=8, command=self.delete_current_image).pack(side=tk.LEFT, padx=(0,5), pady=2)
+        self.files_lbl = tk.Label(btnFrm, text="No file selected")
+        self.files_lbl.pack(side=tk.LEFT, padx=2)
         btnFrm.pack(side=tk.TOP, fill=tk.X, padx=2, pady=(0, 2))
         infoFrm.pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=2)
         pathFrm = tk.Frame(infoFrm)
@@ -112,7 +121,25 @@ class server_win:
         print(f"Selected: {file_name}")     
         self.image_label.config(text=file_info)
 
+
         
+    def delete_current_image(self):
+        if not self.path_files:
+            return
+        #confirm deletion
+        if not messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this image?"):
+            return
+        del self.path_files[self.file_idx]
+        if self.file_idx >= len(self.path_files):
+            self.file_idx = len(self.path_files) - 1
+        if self.path_files:
+            self.load_next_image()
+        else:
+            self.canvas.delete("all")
+            self.files_lbl.config(text="No file selected")
+            self.image_label.config(text="No image")
+
+
     def load_next_image(self):
         # Implement the functionality for the Load button here
         file_path = filedialog.askopenfile( title="Open File",
@@ -131,14 +158,73 @@ class server_win:
             self.canvas.create_image(0, 0, anchor=tk.NW, image=tkimg)
 
 
+    def update_path_info(self):
+        #count the files in path
+        try:
+            path = self.pathStr.get()
+        except Exception as e:
+            print(f"Error accessing path: {e}")
+            return
+        if os.path.isdir(path):
+            self.path_files = os.listdir(path)
+            #image_files = [f for f in files if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+            self.file_idx = 0
+            self.files_lbl.config(text=f"{self.file_idx} of {len(self.path_files)} files")
+        else:
+            self.path_files = []
+            self.file_idx = 0
+            self.files_lbl.config(text=f"{self.file_idx} of {len(self.path_files)} files")
+        
+
     def path_button_click(self):
         file_path = filedialog.askdirectory(title="Select Directory")
         if file_path:
             self.pathStr.set(file_path)
+            self.update_path_info()
+            #save path to file OPT_FILE in application directory
+            try:
+                app_dir = os.path.dirname(os.path.abspath(__file__))
+                opt_file_path = os.path.join(app_dir, self.OPT_FILE)
+                with open(opt_file_path, "w") as f:
+                    f.write(file_path)
+            except Exception as e:
+                print(f"Error saving path to {opt_file_path}: {e}")
+
+
+    def load_saved_path(self):
+        try:
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+            opt_file_path = os.path.join(app_dir, self.OPT_FILE)
+            if os.path.exists(opt_file_path):
+                with open(opt_file_path, "r") as f:
+                    file_path = f.read().strip()
+                    if os.path.isdir(file_path):
+                        self.pathStr.set(file_path)
+                        self.update_path_info()
+        except Exception as e:
+            print(f"Error loading path from {opt_file_path}: {e}")
+
+
+    def load_next_image(self):
+        if not self.path_files:
+            return
+        self.file_idx = (self.file_idx + 1) % len(self.path_files)
+        self.files_lbl.config(text=f"{self.file_idx} of {len(self.path_files)} files")
+        self.file_name = os.path.join(self.pathStr.get(), self.path_files[self.file_idx])
+        self.get_file_info(self.file_name)
+        self.canvas.delete("all")
+        img = self.load_pil_image(self.file_name)
+        if img is None:
+            self.canvas.create_text(10, 10, anchor=tk.NW, text="No Supported Image File")
+            return
+        global tkimg
+        tkimg = ImageTk.PhotoImage(img)
+        self.canvas.create_image(0, 0, anchor=tk.NW, image=tkimg)
 
 
     def run(self):
         self.root.mainloop()
+
 
 #main function
 if __name__ == '__main__':
