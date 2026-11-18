@@ -5,6 +5,7 @@ from tkinter import Image, ttk
 from tkinter import filedialog
 import PIL.Image as Image
 import PIL.ImageTk as ImageTk
+import socketwork
 
 
 class client_win:
@@ -42,31 +43,33 @@ class client_win:
         midfrm.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=5)
         #botton frame for connect button
         botfrm = tk.Frame(self.root, relief=tk.GROOVE, borderwidth=2)
-        self.connect_btn = tk.Button(botfrm, text="Connect", height=1, width=10)
+        self.connect_btn = tk.Button(botfrm, text="Connect", command=self.connect_server_click, height=1, width=10)
         self.connect_btn.pack(side=tk.RIGHT, padx=5, pady=5)
         botfrm.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
+        #create client socket wrapper instance
+        self.sockw = socketwork.ClientSock()
 
     def keys_tab(self):
         #add a sample tab to the notebook
         tab1 = tk.Frame(self.notebook)
         bodyfrm = tk.Frame(tab1)
         arrowKeyFrm = tk.Frame(bodyfrm, relief=tk.SUNKEN, borderwidth=1, bg="#bbefb5")
-        tk.Button(arrowKeyFrm, text="Up").grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-        tk.Button(arrowKeyFrm, text="Left").grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-        tk.Button(arrowKeyFrm, text="Center").grid(row=1, column=1, sticky="nsew", padx=5, pady=5)        
-        tk.Button(arrowKeyFrm, text="Right").grid(row=1, column=2, sticky="nsew", padx=5, pady=5)
-        tk.Button(arrowKeyFrm, text="Down").grid(row=2, column=1, sticky="nsew", padx=5, pady=5)
+        tk.Button(arrowKeyFrm, text="Up", command=lambda: self.key_press_click(socketwork.CMD_KEY_UP)).grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+        tk.Button(arrowKeyFrm, text="Left", command=lambda: self.key_press_click(socketwork.CMD_KEY_LEFT)).grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        tk.Button(arrowKeyFrm, text="Center", command=lambda: self.key_press_click(socketwork.CMD_KEY_ENTER)).grid(row=1, column=1, sticky="nsew", padx=5, pady=5)        
+        tk.Button(arrowKeyFrm, text="Right", command=lambda: self.key_press_click(socketwork.CMD_KEY_RIGHT)).grid(row=1, column=2, sticky="nsew", padx=5, pady=5)
+        tk.Button(arrowKeyFrm, text="Down", command=lambda: self.key_press_click(socketwork.CMD_KEY_DOWN)).grid(row=2, column=1, sticky="nsew", padx=5, pady=5)
         for i in range(3):
             arrowKeyFrm.grid_rowconfigure(i, weight=1)
         for i in range(3):
             arrowKeyFrm.grid_columnconfigure(i, weight=1)
         arrowKeyFrm.pack(side=tk.TOP, expand=True, fill=tk.BOTH)
         optKeyFrm = tk.Frame(bodyfrm, relief=tk.SUNKEN, borderwidth=1, bg="#bbefb5")
-        tk.Button(optKeyFrm, text="Key 1").pack(side=tk.LEFT, expand=True, padx=2, pady=4)
-        tk.Button(optKeyFrm, text="Key 2").pack(side=tk.LEFT, expand=True, padx=2, pady=4)
-        tk.Button(optKeyFrm, text="Key 3").pack(side=tk.LEFT, expand=True, padx=2, pady=4)
-        tk.Button(optKeyFrm, text="Key 4").pack(side=tk.LEFT, expand=True, padx=2, pady=4)
-        tk.Button(optKeyFrm, text="Key 5").pack(side=tk.LEFT, expand=True, padx=2, pady=4)
+        tk.Button(optKeyFrm, text="Key 1", command=lambda: self.key_press_click(socketwork.CMD_KEY_1)).pack(side=tk.LEFT, expand=True, padx=2, pady=4)
+        tk.Button(optKeyFrm, text="Key 2", command=lambda: self.key_press_click(socketwork.CMD_KEY_2)).pack(side=tk.LEFT, expand=True, padx=2, pady=4)
+        tk.Button(optKeyFrm, text="Key 3", command=lambda: self.key_press_click(socketwork.CMD_KEY_3)).pack(side=tk.LEFT, expand=True, padx=2, pady=4)
+        tk.Button(optKeyFrm, text="Key 4", command=lambda: self.key_press_click(socketwork.CMD_KEY_4)).pack(side=tk.LEFT, expand=True, padx=2, pady=4)
+        tk.Button(optKeyFrm, text="Key 5", command=lambda: self.key_press_click(socketwork.CMD_KEY_5)).pack(side=tk.LEFT, expand=True, padx=2, pady=4)
         optKeyFrm.pack(side=tk.BOTTOM, fill=tk.X, pady=2)
         bodyfrm.pack(fill=tk.BOTH, expand=True)
         return tab1
@@ -125,6 +128,24 @@ class client_win:
                 return
             tkimg = ImageTk.PhotoImage(img)
             self.canvas.create_image(0, 0, anchor=tk.NW, image=tkimg)
+
+
+    def connect_server_click(self):
+        if not self.sockw.started():
+            host = self.ipStr.get()
+            port = int(self.portStr.get())
+            if self.sockw.connect(host, port):
+                self.connect_btn.config(text="Disconnect")
+        else:
+            self.sockw.close()
+            self.connect_btn.config(text="Connect")
+
+
+    def key_press_click(self, key_code):
+        if self.sockw.started():
+            if not self.sockw.send(bytes([key_code])):
+                print("Failed to send key press")
+                self.connect_btn.config(text="Connect")
 
 
     def run(self):

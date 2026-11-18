@@ -1,6 +1,20 @@
 import socket
 import threading as thrd
 
+
+CMD_KEY_UP   = 0x01
+CMD_KEY_DOWN = 0x02
+CMD_KEY_LEFT = 0x03
+CMD_KEY_RIGHT = 0x04
+CMD_KEY_ENTER = 0x05
+CMD_KEY_1   = 0x06
+CMD_KEY_2   = 0x07
+CMD_KEY_3   = 0x08
+CMD_KEY_4   = 0x09
+CMD_KEY_5   = 0x0A
+
+
+
 #----------------------------------------------------
 # Server socket wrapper class
 #----------------------------------------------------
@@ -90,6 +104,10 @@ class ClientSock:
         except Exception as e:
             print(f"Error connecting to {host}:{port}: {e}")
             self.sock = None
+            return False
+        self.recv_thrd = thrd.Thread(target=self._receive_worker, daemon=True)
+        self.recv_thrd.start()
+        return True
 
 
     def send(self, data):
@@ -98,11 +116,31 @@ class ClientSock:
                 self.sock.sendall(data)
             except Exception as e:
                 print(f"Error sending data: {e}")
+                return False
         else:
             print("Socket is not connected")
+            return False
+        return True
 
 
     def close(self):
         if self.sock:
             self.sock.close()
             self.sock = None
+            self.recv_thrd.join()
+
+    def started(self):
+        return self.sock is not None
+
+    def _receive_worker(self):
+        while self.sock:
+            try:
+                data = self.sock.recv(1024)
+                if not data:
+                    break
+                print(f"Received {len(data)} bytes: {data}")
+            except Exception as e:
+                print(f"Error receiving data: {e}")
+                break
+        print("Closing client socket")
+        self.close()
