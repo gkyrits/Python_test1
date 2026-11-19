@@ -120,6 +120,7 @@ class Gui:
         self.frcst_tmout=None
         self.smlimg = [None,None,None,None,None,None,None,None]
         self.frcst_loading=False
+        self.pnlBtnId = None
         self.gui_queue = queue.Queue()
         self.root.protocol("WM_DELETE_WINDOW", self.btn_exit)
         self.init_clock_window()
@@ -133,10 +134,19 @@ class Gui:
      def buttonPanel_enter(self,e):
         print('Enter event!')
         self.pnlButton.configure(width=20)
+        if self.pnlBtnId is not None:
+            self.root.after_cancel(self.pnlBtnId)
+            self.pnlBtnId = None
+
+     def buttonPanel_hide(self):
+        print('Hide panel!')
+        self.pnlButton.configure(width=4)
+        self.pnlBtnId = None
 
      def buttonPanel_leave(self,e):
         print('Leave event!')
-        self.pnlButton.configure(width=4)
+        self.pnlBtnId = self.root.after(1000,self.buttonPanel_hide)
+        #self.pnlButton.configure(width=4)
 
      def clockPanel_dblClick(self,e):
         #print('Clock click! :%s' % e.widget)
@@ -786,8 +796,10 @@ class Gui:
         self.keys_panel(self.pnlButton)
         self.pnlButton.pack(side=tk.LEFT, fill=tk.Y)
         self.pnlButton.pack_propagate(False) #enable Frame width=20
-        self.pnlButton.bind('<Enter>',self.buttonPanel_enter)
-        self.pnlButton.bind('<Leave>',self.buttonPanel_leave)
+        #self.pnlButton.bind('<Enter>',self.buttonPanel_enter)
+        bind_tree(self.pnlButton,'<Enter>',self.buttonPanel_enter)
+        #self.pnlButton.bind('<Leave>',self.buttonPanel_leave)
+        bind_tree(self.pnlButton,'<Leave>',self.buttonPanel_leave)
         self.buttonPanel_leave(None)
 
         #----------------
