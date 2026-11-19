@@ -14,6 +14,7 @@ class server_win:
     PORT = 8000
     IP = '127.0.0.1'
     OPT_FILE = "server.opt"
+    KEY_TIME = 300
 
     def __init__(self):
         self.path_files = []
@@ -54,6 +55,7 @@ class server_win:
         #load options from file
         self.load_saved_path()
         self.sockw = socketwork.ServerSock()
+        self.sockw.on_key_received = self.key_received
 
 
     def keys_tab(self):
@@ -61,22 +63,32 @@ class server_win:
         tab1 = tk.Frame(self.notebook)
         bodyfrm = tk.Frame(tab1)
         arrowKeyFrm = tk.Frame(bodyfrm, relief=tk.SUNKEN, borderwidth=1, bg="#bbefb5")
-        tk.Label(arrowKeyFrm, text="Up", relief=tk.SOLID, borderwidth=1).grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-        tk.Label(arrowKeyFrm, text="Left", relief=tk.SOLID, borderwidth=1).grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
-        tk.Label(arrowKeyFrm, text="Center", relief=tk.SOLID, borderwidth=1).grid(row=1, column=1, sticky="nsew", padx=5, pady=5)        
-        tk.Label(arrowKeyFrm, text="Right", relief=tk.SOLID, borderwidth=1).grid(row=1, column=2, sticky="nsew", padx=5, pady=5)
-        tk.Label(arrowKeyFrm, text="Down", relief=tk.SOLID, borderwidth=1).grid(row=2, column=1, sticky="nsew", padx=5, pady=5)
+        self.up_key = tk.Label(arrowKeyFrm, text="Up", relief=tk.SOLID, borderwidth=1)
+        self.up_key.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+        self.left_key = tk.Label(arrowKeyFrm, text="Left", relief=tk.SOLID, borderwidth=1)
+        self.left_key.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        self.center_key = tk.Label(arrowKeyFrm, text="Center", relief=tk.SOLID, borderwidth=1)
+        self.center_key.grid(row=1, column=1, sticky="nsew", padx=5, pady=5)        
+        self.right_key = tk.Label(arrowKeyFrm, text="Right", relief=tk.SOLID, borderwidth=1)
+        self.right_key.grid(row=1, column=2, sticky="nsew", padx=5, pady=5)
+        self.down_key = tk.Label(arrowKeyFrm, text="Down", relief=tk.SOLID, borderwidth=1)
+        self.down_key.grid(row=2, column=1, sticky="nsew", padx=5, pady=5)
         for i in range(3):
             arrowKeyFrm.grid_rowconfigure(i, weight=1)
         for i in range(3):
             arrowKeyFrm.grid_columnconfigure(i, weight=1)
         arrowKeyFrm.pack(side=tk.TOP, expand=True, fill=tk.BOTH)
         optKeyFrm = tk.Frame(bodyfrm, relief=tk.SUNKEN, borderwidth=1, bg="#bbefb5")
-        tk.Label(optKeyFrm, text="Key 1", relief=tk.SOLID, borderwidth=1).pack(side=tk.LEFT, expand=True, padx=2, pady=4)
-        tk.Label(optKeyFrm, text="Key 2", relief=tk.SOLID, borderwidth=1).pack(side=tk.LEFT, expand=True, padx=2, pady=4)
-        tk.Label(optKeyFrm, text="Key 3", relief=tk.SOLID, borderwidth=1).pack(side=tk.LEFT, expand=True, padx=2, pady=4)
-        tk.Label(optKeyFrm, text="Key 4", relief=tk.SOLID, borderwidth=1).pack(side=tk.LEFT, expand=True, padx=2, pady=4)
-        tk.Label(optKeyFrm, text="Key 5", relief=tk.SOLID, borderwidth=1).pack(side=tk.LEFT, expand=True, padx=2, pady=4)
+        self.optkey1 = tk.Label(optKeyFrm, text="Key 1", relief=tk.SOLID, borderwidth=1)
+        self.optkey1.pack(side=tk.LEFT, expand=True, padx=2, pady=4)
+        self.optkey2 = tk.Label(optKeyFrm, text="Key 2", relief=tk.SOLID, borderwidth=1)
+        self.optkey2.pack(side=tk.LEFT, expand=True, padx=2, pady=4)
+        self.optkey3 = tk.Label(optKeyFrm, text="Key 3", relief=tk.SOLID, borderwidth=1)
+        self.optkey3.pack(side=tk.LEFT, expand=True, padx=2, pady=4)
+        self.optkey4 = tk.Label(optKeyFrm, text="Key 4", relief=tk.SOLID, borderwidth=1)
+        self.optkey4.pack(side=tk.LEFT, expand=True, padx=2, pady=4)
+        self.optkey5 = tk.Label(optKeyFrm, text="Key 5", relief=tk.SOLID, borderwidth=1)
+        self.optkey5.pack(side=tk.LEFT, expand=True, padx=2, pady=4)
         optKeyFrm.pack(side=tk.BOTTOM, fill=tk.X, pady=2)
         bodyfrm.pack(fill=tk.BOTH, expand=True)
         return tab1
@@ -107,6 +119,40 @@ class server_win:
         pathFrm.pack(side=tk.TOP, fill=tk.X, padx=2, pady=(0, 2))
         frm.pack(fill=tk.BOTH, expand=True)
         return tab2
+
+
+    def key_received(self, key_code):
+        print(f"Key received: {key_code}")
+        if key_code == socketwork.CMD_KEY_UP:
+            self.up_key.config(bg="red")
+            self.root.after(self.KEY_TIME, lambda: self.up_key.config(bg="SystemButtonFace"))
+        elif key_code == socketwork.CMD_KEY_DOWN:
+            self.down_key.config(bg="red")
+            self.root.after(self.KEY_TIME, lambda: self.down_key.config(bg="SystemButtonFace"))
+        elif key_code == socketwork.CMD_KEY_LEFT:
+            self.left_key.config(bg="red")
+            self.root.after(self.KEY_TIME, lambda: self.left_key.config(bg="SystemButtonFace"))
+        elif key_code == socketwork.CMD_KEY_RIGHT:
+            self.right_key.config(bg="red")
+            self.root.after(self.KEY_TIME, lambda: self.right_key.config(bg="SystemButtonFace"))
+        elif key_code == socketwork.CMD_KEY_ENTER:
+            self.center_key.config(bg="red")
+            self.root.after(self.KEY_TIME, lambda: self.center_key.config(bg="SystemButtonFace"))   
+        elif key_code == socketwork.CMD_KEY_1:
+            self.optkey1.config(bg="red")
+            self.root.after(self.KEY_TIME, lambda: self.optkey1.config(bg="SystemButtonFace"))
+        elif key_code == socketwork.CMD_KEY_2:
+            self.optkey2.config(bg="red")
+            self.root.after(self.KEY_TIME, lambda: self.optkey2.config(bg="SystemButtonFace"))
+        elif key_code == socketwork.CMD_KEY_3:
+            self.optkey3.config(bg="red")
+            self.root.after(self.KEY_TIME, lambda: self.optkey3.config(bg="SystemButtonFace"))
+        elif key_code == socketwork.CMD_KEY_4:
+            self.optkey4.config(bg="red")
+            self.root.after(self.KEY_TIME, lambda: self.optkey4.config(bg="SystemButtonFace"))
+        elif key_code == socketwork.CMD_KEY_5:
+            self.optkey5.config(bg="red")
+            self.root.after(self.KEY_TIME, lambda: self.optkey5.config(bg="SystemButtonFace")) 
 
 
     def load_pil_image(self, image_name):

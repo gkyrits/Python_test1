@@ -27,6 +27,8 @@ class ServerSock:
         self.port = None
         self.accept_thrd = None
         self.stop_req = False
+        #callback functions ...
+        self.on_key_received = None        
 
 
     def start(self,port=8000):
@@ -37,7 +39,8 @@ class ServerSock:
         self.sock.listen(1)
         print(f"Server started and listening on port {self.port}")
         self.accept_thrd = thrd.Thread(target=self._accept_thread, daemon=True)
-        self.accept_thrd.start()
+        self.accept_thrd.start()        
+
 
     def stop(self):
         self.stop_req = True
@@ -66,9 +69,11 @@ class ServerSock:
                 print(f"Error accepting connection: {e}")
 
 
-    def _decode_data(self, data):
-        #print data[0] to hex        
+    def _decode_data(self, data):             
         print(f"receive {len(data)}bytes, data[0]={hex(data[0])}")
+        key_code = data[0]
+        if key_code <= CMD_KEY_5 and self.on_key_received:
+            self.on_key_received(key_code)
 
 
     def _client_worker(self, client_sock):
