@@ -125,34 +125,34 @@ class server_win:
         print(f"Key received: {key_code}")
         if key_code == socketwork.CMD_KEY_UP:
             self.up_key.config(bg="red")
-            self.root.after(self.KEY_TIME, lambda: self.up_key.config(bg="SystemButtonFace"))
+            self.root.after(self.KEY_TIME, lambda: self.up_key.config(bg="gray90"))
         elif key_code == socketwork.CMD_KEY_DOWN:
             self.down_key.config(bg="red")
-            self.root.after(self.KEY_TIME, lambda: self.down_key.config(bg="SystemButtonFace"))
+            self.root.after(self.KEY_TIME, lambda: self.down_key.config(bg="gray90"))
         elif key_code == socketwork.CMD_KEY_LEFT:
             self.left_key.config(bg="red")
-            self.root.after(self.KEY_TIME, lambda: self.left_key.config(bg="SystemButtonFace"))
+            self.root.after(self.KEY_TIME, lambda: self.left_key.config(bg="gray90"))
         elif key_code == socketwork.CMD_KEY_RIGHT:
             self.right_key.config(bg="red")
-            self.root.after(self.KEY_TIME, lambda: self.right_key.config(bg="SystemButtonFace"))
+            self.root.after(self.KEY_TIME, lambda: self.right_key.config(bg="gray90"))
         elif key_code == socketwork.CMD_KEY_ENTER:
             self.center_key.config(bg="red")
-            self.root.after(self.KEY_TIME, lambda: self.center_key.config(bg="SystemButtonFace"))   
+            self.root.after(self.KEY_TIME, lambda: self.center_key.config(bg="gray90"))   
         elif key_code == socketwork.CMD_KEY_1:
             self.optkey1.config(bg="red")
-            self.root.after(self.KEY_TIME, lambda: self.optkey1.config(bg="SystemButtonFace"))
+            self.root.after(self.KEY_TIME, lambda: self.optkey1.config(bg="gray90"))
         elif key_code == socketwork.CMD_KEY_2:
             self.optkey2.config(bg="red")
-            self.root.after(self.KEY_TIME, lambda: self.optkey2.config(bg="SystemButtonFace"))
+            self.root.after(self.KEY_TIME, lambda: self.optkey2.config(bg="gray90"))
         elif key_code == socketwork.CMD_KEY_3:
             self.optkey3.config(bg="red")
-            self.root.after(self.KEY_TIME, lambda: self.optkey3.config(bg="SystemButtonFace"))
+            self.root.after(self.KEY_TIME, lambda: self.optkey3.config(bg="gray90"))
         elif key_code == socketwork.CMD_KEY_4:
             self.optkey4.config(bg="red")
-            self.root.after(self.KEY_TIME, lambda: self.optkey4.config(bg="SystemButtonFace"))
+            self.root.after(self.KEY_TIME, lambda: self.optkey4.config(bg="gray90"))
         elif key_code == socketwork.CMD_KEY_5:
             self.optkey5.config(bg="red")
-            self.root.after(self.KEY_TIME, lambda: self.optkey5.config(bg="SystemButtonFace")) 
+            self.root.after(self.KEY_TIME, lambda: self.optkey5.config(bg="gray90")) 
 
 
     def load_pil_image(self, image_name):
@@ -275,7 +275,11 @@ class server_win:
     def start_stop_server(self):
         if not self.sockw.started():
             port = int(self.portStr.get())
-            self.sockw.start(port)
+            try:
+                self.sockw.start(port)
+            except OSError as e:
+                messagebox.showerror("Server error", str(e))
+                return
             self.connect_btn.config(text="Stop")
         else:
             self.sockw.stop()

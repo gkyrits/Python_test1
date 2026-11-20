@@ -14,7 +14,6 @@ CMD_KEY_4   = 0x09
 CMD_KEY_5   = 0x0A
 
 
-
 #----------------------------------------------------
 # Server socket wrapper class
 #----------------------------------------------------
@@ -28,15 +27,25 @@ class ServerSock:
         self.accept_thrd = None
         self.stop_req = False
         #callback functions ...
-        self.on_key_received = None        
+        self.on_key_received = None
+        self.on_connect = None
+        self.on_disconnect = None
+        self.on_error = None
 
 
     def start(self,port=8000):
         self.port = port
         self.stop_req = False
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.bind(('', self.port))
-        self.sock.listen(1)
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            listener.bind(('', self.port))
+            listener.listen(1)
+            listener.settimeout(0.5)
+        except OSError:
+            listener.close()
+            raise
+        self.sock = listener
         print(f"Server started and listening on port {self.port}")
         self.accept_thrd = thrd.Thread(target=self._accept_thread, daemon=True)
         self.accept_thrd.start()        
@@ -44,29 +53,46 @@ class ServerSock:
 
     def stop(self):
         self.stop_req = True
+        if self.client_sock:
+            try:
+                self.client_sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            self.client_sock.close()
+            self.client_sock = None        
         if self.sock:
             self.sock.close()
-            self.sock = None        
-        if self.client_sock:
-            self.client_sock.close()
-            self.client_sock = None
-        if self.accept_thrd:
-            self.accept_thrd.join()
-            self.accept_thrd = None
+            self.sock = None
+        #if self.accept_thrd:
+        #    self.accept_thrd.join()
+        #    self.accept_thrd = None
 
 
     def started(self):
         return self.sock is not None and not self.stop_req
 
+
     def _accept_thread(self):
+        listener = self.sock
         while not self.stop_req:
             print("Waiting for a connection...")
             try:
-                self.client_sock, self.client_addr = self.sock.accept()
+                self.client_sock, self.client_addr = listener.accept()
                 print(f"Accepted connection from {self.client_addr}")
+                if self.on_connect:
+                    self.on_connect(self.client_addr)
                 self._client_worker(self.client_sock)
+                if self.stop_req:
+                    break                
+            except socket.timeout:
+                continue
             except Exception as e:
+                if self.stop_req:
+                    break
                 print(f"Error accepting connection: {e}")
+                if self.on_error:
+                    self.on_error(e)
+        print("Accept thread exiting")
 
 
     def _decode_data(self, data):             
@@ -81,7 +107,10 @@ class ServerSock:
             try:
                 data = client_sock.recv(1024)
             except Exception as e:
-                print(f"Error receiving data from {self.client_addr}: {e}")
+                if not self.stop_req:
+                    print(f"Error receiving data from {self.client_addr}: {e}")
+                    if self.on_error:
+                        self.on_error(e)
                 break
             if not data:
                 break
@@ -90,6 +119,8 @@ class ServerSock:
         client_sock.close()
         self.client_sock = None
         self.client_addr = None
+        if self.on_disconnect:
+            self.on_disconnect()
 
 
 #----------------------------------------------------
@@ -99,6 +130,9 @@ class ClientSock:
 
     def __init__(self):
         self.sock = None
+        self.recv_thrd = None
+        self.on_disconnect = None
+        self.on_error = None
 
 
     def connect(self, host='127.0.0.1', port=8000):
@@ -109,6 +143,8 @@ class ClientSock:
         except Exception as e:
             print(f"Error connecting to {host}:{port}: {e}")
             self.sock = None
+            if self.on_error:
+                self.on_error(e)            
             return False
         self.recv_thrd = thrd.Thread(target=self._receive_worker, daemon=True)
         self.recv_thrd.start()
@@ -121,6 +157,8 @@ class ClientSock:
                 self.sock.sendall(data)
             except Exception as e:
                 print(f"Error sending data: {e}")
+                if self.on_error:
+                    self.on_error(e)                
                 return False
         else:
             print("Socket is not connected")
@@ -129,13 +167,27 @@ class ClientSock:
 
 
     def close(self):
-        if self.sock:
-            self.sock.close()
+        sock = self.sock
+        recv_thrd = self.recv_thrd
+        was_connected = sock is not None
+        if sock:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            sock.close()
             self.sock = None
-            self.recv_thrd.join()
+        if recv_thrd:
+            if recv_thrd is not thrd.current_thread():
+                recv_thrd.join()
+            self.recv_thrd = None
+        if was_connected and self.on_disconnect:
+            self.on_disconnect()
+
 
     def started(self):
         return self.sock is not None
+
 
     def _receive_worker(self):
         while self.sock:
@@ -146,6 +198,8 @@ class ClientSock:
                 print(f"Received {len(data)} bytes: {data}")
             except Exception as e:
                 print(f"Error receiving data: {e}")
+                if self.on_error:
+                    self.on_error(e)
                 break
         print("Closing client socket")
         self.close()

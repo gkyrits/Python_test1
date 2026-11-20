@@ -3,6 +3,7 @@ import os
 import tkinter as tk
 from tkinter import Image, ttk
 from tkinter import filedialog
+from tkinter import messagebox
 import PIL.Image as Image
 import PIL.ImageTk as ImageTk
 import socketwork
@@ -48,6 +49,8 @@ class client_win:
         botfrm.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
         #create client socket wrapper instance
         self.sockw = socketwork.ClientSock()
+        self.sockw.on_disconnect = self.disconnect_evnt
+        self.sockw.on_error = self.error_evnt
 
     def keys_tab(self):
         #add a sample tab to the notebook
@@ -93,6 +96,16 @@ class client_win:
         ttk.Progressbar(infoFrm, mode='determinate').pack(side=tk.BOTTOM, fill=tk.X, padx=2, pady=(0, 2))
         frm.pack(fill=tk.BOTH, expand=True)
         return tab2
+
+
+    def disconnect_evnt(self):
+        print("Disconnected from server")
+        self.connect_btn.config(text="Connect")
+
+
+    def error_evnt(self, e):
+        #show message box for error
+        messagebox.showerror("Error", str(e))
 
 
     def load_pil_image(self, image_name):
