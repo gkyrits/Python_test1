@@ -55,7 +55,8 @@ class server_win:
         #load options from file
         self.load_saved_path()
         self.sockw = socketwork.ServerSock()
-        self.sockw.on_key_received = self.key_received
+        #socket callback runs on a worker thread - marshal to the Tk main thread
+        self.sockw.on_key_received = lambda key_code: self.root.after(0, self.key_received, key_code)
 
 
     def keys_tab(self):
