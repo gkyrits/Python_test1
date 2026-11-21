@@ -63,9 +63,9 @@ class ServerSock:
         if self.sock:
             self.sock.close()
             self.sock = None
-        #if self.accept_thrd:
-        #    self.accept_thrd.join()
-        #    self.accept_thrd = None
+        if self.accept_thrd:
+            #self.accept_thrd.join()
+            self.accept_thrd = None
 
 
     def started(self):
@@ -131,11 +131,13 @@ class ClientSock:
     def __init__(self):
         self.sock = None
         self.recv_thrd = None
+        self.stop_req = False
         self.on_disconnect = None
         self.on_error = None
 
 
     def connect(self, host='127.0.0.1', port=8000):
+        self.stop_req = False
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             self.sock.connect((host, port))
@@ -167,6 +169,7 @@ class ClientSock:
 
 
     def close(self):
+        self.stop_req = True
         sock = self.sock
         recv_thrd = self.recv_thrd
         was_connected = sock is not None
@@ -178,8 +181,8 @@ class ClientSock:
             sock.close()
             self.sock = None
         if recv_thrd:
-            if recv_thrd is not thrd.current_thread():
-                recv_thrd.join()
+            #if recv_thrd is not thrd.current_thread():
+            #    recv_thrd.join()
             self.recv_thrd = None
         if was_connected and self.on_disconnect:
             self.on_disconnect()
@@ -190,16 +193,17 @@ class ClientSock:
 
 
     def _receive_worker(self):
-        while self.sock:
+        while not self.stop_req:
             try:
                 data = self.sock.recv(1024)
                 if not data:
                     break
                 print(f"Received {len(data)} bytes: {data}")
             except Exception as e:
-                print(f"Error receiving data: {e}")
-                if self.on_error:
-                    self.on_error(e)
+                if not self.stop_req:
+                    print(f"Error receiving data: {e}")
+                    if self.on_error:
+                        self.on_error(e)
                 break
         print("Closing client socket")
         self.close()
