@@ -49,8 +49,9 @@ class client_win:
         botfrm.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
         #create client socket wrapper instance
         self.sockw = socketwork.ClientSock()
-        self.sockw.on_disconnect = self.disconnect_evnt
-        self.sockw.on_error = self.error_evnt
+        #socket callbacks may run on the receive thread - marshal to the Tk main thread
+        self.sockw.on_disconnect = lambda: self.root.after(0, self.disconnect_evnt)
+        self.sockw.on_error = lambda e: self.root.after(0, self.error_evnt, e)
 
     def keys_tab(self):
         #add a sample tab to the notebook

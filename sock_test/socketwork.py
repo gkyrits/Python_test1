@@ -64,7 +64,11 @@ class ServerSock:
             self.sock.close()
             self.sock = None
         if self.accept_thrd:
-            #self.accept_thrd.join()
+            #wait for the accept thread to exit (accept timeout is 0.5s).
+            #timeout avoids a deadlock if the thread is blocked in a Tk call (root.after)
+            #while the GUI thread waits here; skip if stop() is called from that thread
+            if self.accept_thrd is not thrd.current_thread():
+                self.accept_thrd.join(timeout=1.0)
             self.accept_thrd = None
 
 
@@ -181,8 +185,10 @@ class ClientSock:
             sock.close()
             self.sock = None
         if recv_thrd:
-            #if recv_thrd is not thrd.current_thread():
-            #    recv_thrd.join()
+            #wait for the receive thread to exit; skip if called from that thread
+            #timeout avoids a deadlock if the thread is blocked in a Tk call
+            if recv_thrd is not thrd.current_thread():
+                recv_thrd.join(timeout=1.0)
             self.recv_thrd = None
         if was_connected and self.on_disconnect:
             self.on_disconnect()
