@@ -18,7 +18,7 @@ class server_win:
 
     def __init__(self):
         self.path_files = []
-        self.file_idx = 0
+        self.file_idx = -1
         #initialize Form
         self.root = tk.Tk()        
         self.portStr = tk.StringVar(value=str(self.PORT))
@@ -180,12 +180,17 @@ class server_win:
         #confirm deletion
         if not messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this image?"):
             return
+        if self.file_idx < 0:
+            #nothing shown yet
+            return
         del self.path_files[self.file_idx]
         if self.file_idx >= len(self.path_files):
-            self.file_idx = len(self.path_files) - 1
+            self.file_idx = 0
         if self.path_files:
-            self.load_next_image()
+            #the next file has moved into the current slot - show it
+            self.show_image(self.file_idx)
         else:
+            self.file_idx = -1
             self.canvas.delete("all")
             self.files_lbl.config(text="No file selected")
             self.image_label.config(text="No image")
@@ -219,12 +224,11 @@ class server_win:
         if os.path.isdir(path):
             self.path_files = os.listdir(path)
             #image_files = [f for f in files if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-            self.file_idx = 0
-            self.files_lbl.config(text=f"{self.file_idx} of {len(self.path_files)} files")
         else:
             self.path_files = []
-            self.file_idx = 0
-            self.files_lbl.config(text=f"{self.file_idx} of {len(self.path_files)} files")
+        #-1 = no image shown yet
+        self.file_idx = -1
+        self.files_lbl.config(text=f"0 of {len(self.path_files)} files")
         
 
     def path_button_click(self):
@@ -259,8 +263,13 @@ class server_win:
     def load_next_image(self):
         if not self.path_files:
             return
-        self.file_idx = (self.file_idx + 1) % len(self.path_files)
-        self.files_lbl.config(text=f"{self.file_idx} of {len(self.path_files)} files")
+        #file_idx is -1 before the first image is shown, so the first Next shows file 0
+        self.show_image((self.file_idx + 1) % len(self.path_files))
+
+
+    def show_image(self, idx):
+        self.file_idx = idx
+        self.files_lbl.config(text=f"{self.file_idx + 1} of {len(self.path_files)} files")
         self.file_name = os.path.join(self.pathStr.get(), self.path_files[self.file_idx])
         self.get_file_info(self.file_name)
         self.canvas.delete("all")
@@ -275,7 +284,10 @@ class server_win:
 
     def start_stop_server(self):
         if not self.sockw.started():
-            port = int(self.portStr.get())
+            port = socketwork.parse_port(self.portStr.get())
+            if port is None:
+                messagebox.showerror("Server error", "Port must be a number from 1 to 65535")
+                return
             try:
                 self.sockw.start(port)
             except OSError as e:

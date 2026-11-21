@@ -146,8 +146,11 @@ class client_win:
 
     def connect_server_click(self):
         if not self.sockw.started():
-            host = self.ipStr.get()
-            port = int(self.portStr.get())
+            host = self.ipStr.get().strip()
+            port = socketwork.parse_port(self.portStr.get())
+            if port is None:
+                messagebox.showerror("Error", "Port must be a number from 1 to 65535")
+                return
             if self.sockw.connect(host, port):
                 self.connect_btn.config(text="Disconnect")
         else:
@@ -157,9 +160,9 @@ class client_win:
 
     def key_press_click(self, key_code):
         if self.sockw.started():
+            #on failure send() closes the socket and on_disconnect resets the button
             if not self.sockw.send(bytes([key_code])):
                 print("Failed to send key press")
-                self.connect_btn.config(text="Connect")
 
 
     def run(self):

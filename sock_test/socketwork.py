@@ -14,6 +14,15 @@ CMD_KEY_4   = 0x09
 CMD_KEY_5   = 0x0A
 
 
+def parse_port(text):
+    """Return the port as int, or None if text is not a valid TCP port (1-65535)."""
+    try:
+        port = int(text.strip())
+    except (ValueError, AttributeError):
+        return None
+    return port if 1 <= port <= 65535 else None
+
+
 #----------------------------------------------------
 # Server socket wrapper class
 #----------------------------------------------------
@@ -42,7 +51,7 @@ class ServerSock:
             listener.bind(('', self.port))
             listener.listen(1)
             listener.settimeout(0.5)
-        except OSError:
+        except Exception:
             listener.close()
             raise
         self.sock = listener
@@ -53,13 +62,14 @@ class ServerSock:
 
     def stop(self):
         self.stop_req = True
-        if self.client_sock:
+        #take a local copy - the worker thread may set self.client_sock to None at any time
+        client_sock = self.client_sock
+        if client_sock:
             try:
-                self.client_sock.shutdown(socket.SHUT_RDWR)
+                client_sock.shutdown(socket.SHUT_RDWR)
             except OSError:
                 pass
-            self.client_sock.close()
-            self.client_sock = None        
+            client_sock.close()
         if self.sock:
             self.sock.close()
             self.sock = None
@@ -100,10 +110,11 @@ class ServerSock:
 
 
     def _decode_data(self, data):             
-        print(f"receive {len(data)}bytes, data[0]={hex(data[0])}")
-        key_code = data[0]
-        if key_code <= CMD_KEY_5 and self.on_key_received:
-            self.on_key_received(key_code)
+        #TCP is a byte stream - several key codes can arrive in one recv()
+        print(f"receive {len(data)}bytes: {data.hex(' ')}")
+        for key_code in data:
+            if CMD_KEY_UP <= key_code <= CMD_KEY_5 and self.on_key_received:
+                self.on_key_received(key_code)
 
 
     def _client_worker(self, client_sock):
@@ -136,6 +147,7 @@ class ClientSock:
         self.sock = None
         self.recv_thrd = None
         self.stop_req = False
+        self.lock = thrd.Lock()
         self.on_disconnect = None
         self.on_error = None
 
@@ -148,11 +160,12 @@ class ClientSock:
             print(f"Connected to {host}:{port}")
         except Exception as e:
             print(f"Error connecting to {host}:{port}: {e}")
+            self.sock.close()
             self.sock = None
             if self.on_error:
                 self.on_error(e)            
             return False
-        self.recv_thrd = thrd.Thread(target=self._receive_worker, daemon=True)
+        self.recv_thrd = thrd.Thread(target=self._receive_worker, args=(self.sock,), daemon=True)
         self.recv_thrd.start()
         return True
 
@@ -164,7 +177,9 @@ class ClientSock:
             except Exception as e:
                 print(f"Error sending data: {e}")
                 if self.on_error:
-                    self.on_error(e)                
+                    self.on_error(e)
+                #the connection is broken - close it so started() reflects the real state
+                self.close()
                 return False
         else:
             print("Socket is not connected")
@@ -172,10 +187,19 @@ class ClientSock:
         return True
 
 
-    def close(self):
-        self.stop_req = True
-        sock = self.sock
-        recv_thrd = self.recv_thrd
+    def close(self, only_sock=None):
+        #claim the socket atomically (under the lock) before shutdown wakes the receive thread,
+        #so only one caller sees was_connected=True and fires on_disconnect.
+        #only_sock: close only if that is still the current socket (used by the receive
+        #thread so a late exit can't close a newer connection)
+        with self.lock:
+            if only_sock is not None and self.sock is not only_sock:
+                return
+            self.stop_req = True
+            sock = self.sock
+            self.sock = None
+            recv_thrd = self.recv_thrd
+            self.recv_thrd = None
         was_connected = sock is not None
         if sock:
             try:
@@ -183,13 +207,11 @@ class ClientSock:
             except OSError:
                 pass
             sock.close()
-            self.sock = None
         if recv_thrd:
             #wait for the receive thread to exit; skip if called from that thread
             #timeout avoids a deadlock if the thread is blocked in a Tk call
             if recv_thrd is not thrd.current_thread():
                 recv_thrd.join(timeout=1.0)
-            self.recv_thrd = None
         if was_connected and self.on_disconnect:
             self.on_disconnect()
 
@@ -198,18 +220,19 @@ class ClientSock:
         return self.sock is not None
 
 
-    def _receive_worker(self):
-        while not self.stop_req:
+    def _receive_worker(self, sock):
+        #self.sock is not sock -> this connection was closed (and maybe replaced by a new one)
+        while not self.stop_req and self.sock is sock:
             try:
-                data = self.sock.recv(1024)
+                data = sock.recv(1024)
                 if not data:
                     break
                 print(f"Received {len(data)} bytes: {data}")
             except Exception as e:
-                if not self.stop_req:
+                if not self.stop_req and self.sock is sock:
                     print(f"Error receiving data: {e}")
                     if self.on_error:
                         self.on_error(e)
                 break
         print("Closing client socket")
-        self.close()
+        self.close(only_sock=sock)
